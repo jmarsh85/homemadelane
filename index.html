@@ -884,6 +884,166 @@
     .fin-tab-panel { display: none; }
     .fin-tab-panel.active { display: block; animation: fadeIn 0.15s ease; }
 
+    /* ── TRANSACTION TABLE ────────────────────────────────────── */
+    .txn-table-header {
+      display: grid;
+      grid-template-columns: 28px 68px 1fr 68px 78px 36px;
+      gap: 0;
+      background: var(--navy);
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    .txn-th {
+      padding: 9px 8px;
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.7);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      user-select: none;
+    }
+    .txn-th:first-child { padding-left: 10px; cursor: default; }
+    .txn-th:last-child  { cursor: default; }
+    .sort-arrow { opacity: 0.5; font-size: 0.625rem; }
+    .sort-arrow.active { opacity: 1; color: var(--amber); }
+
+    .txn-table-row {
+      display: grid;
+      grid-template-columns: 28px 68px 1fr 68px 78px 36px;
+      gap: 0;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.12s;
+      min-height: 46px;
+    }
+    .txn-table-row:last-child { border-bottom: none; }
+    .txn-table-row:active,
+    .txn-table-row.selected { background: #EEF1F7; }
+    .txn-table-row.selected { background: #E8EDF5; }
+
+    .txn-td {
+      padding: 9px 8px;
+      font-size: 0.8rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .txn-td:first-child { padding-left: 10px; }
+    .txn-td-date  { color: var(--muted); font-size: 0.75rem; }
+    .txn-td-desc  { font-weight: 600; color: var(--text); }
+    .txn-td-cat   { display: none; }  /* shown in detail drawer only */
+    .txn-td-prop  { font-size: 0.75rem; }
+    .txn-td-amt   { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; padding-right: 6px; }
+    .txn-td-amt.income  { color: var(--green); }
+    .txn-td-amt.expense { color: var(--red); }
+    .txn-td-actions { display: flex; gap: 2px; align-items: center; justify-content: center; padding: 0 4px; }
+
+    .txn-row-btn {
+      width: 32px; height: 32px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.875rem;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s;
+    }
+    .txn-row-btn:active { background: var(--border); }
+    .txn-row-btn.edit-row   { color: var(--navy); }
+    .txn-row-btn.delete-row { color: var(--red); }
+
+    /* Month group header in table */
+    .txn-group-header {
+      grid-column: 1 / -1;
+      padding: 6px 10px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Transaction detail drawer */
+    .txn-detail-drawer {
+      grid-column: 1 / -1;
+      background: #EEF1F7;
+      border-bottom: 1px solid var(--border);
+      padding: 12px 14px;
+      display: none;
+    }
+    .txn-detail-drawer.open { display: block; }
+    .txn-detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .txn-detail-cell { font-size: 0.8125rem; }
+    .txn-detail-label { font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 2px; }
+    .txn-detail-val   { font-weight: 600; color: var(--text); }
+
+    /* ── AMENITY CHIPS (multi-select) ─────────────────────────── */
+    .amenity-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 7px 13px;
+      border-radius: 99px;
+      border: 1.5px solid var(--border);
+      background: var(--card);
+      font-family: var(--font-body);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .amenity-chip.selected {
+      background: var(--navy);
+      border-color: var(--navy);
+      color: #fff;
+      font-weight: 600;
+    }
+    .amenity-chip.selected::before { content: '✓ '; font-size: 0.75rem; }
+    .amenity-chip.custom-chip.selected { background: var(--green); border-color: var(--green); }
+    .amenity-chip:active { transform: scale(0.95); }
+
+    /* ── INLINE LIST ITEMS (platforms, amenities) ─────────────── */
+    .inline-list-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .inline-list-remove {
+      background: none;
+      border: none;
+      color: var(--red);
+      cursor: pointer;
+      font-size: 0.875rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .inline-list-remove:active { background: var(--red-light); }
+
     /* ── SCROLLBAR ────────────────────────────────────────────── */
     #content::-webkit-scrollbar { width: 3px; }
     #content::-webkit-scrollbar-track { background: transparent; }
@@ -1311,7 +1471,7 @@
         </div>
       </div>
 
-      <button class="btn btn-primary btn-full" onclick="openModal('modal-add-property')">+ Add Property</button>
+      <button class="btn btn-primary btn-full" onclick="openPropertyForm()">+ Add Property</button>
     </section>
 
     <!-- ── PROPERTY DETAIL ────────────────────────────────────── -->
@@ -1328,7 +1488,7 @@
         <div class="dot-menu-wrap">
           <button class="edit-btn" onclick="toggleDotMenu('prop-menu')">⋯</button>
           <div class="dot-menu-dropdown" id="prop-menu">
-            <button class="dot-menu-item" onclick="closeDotMenu('prop-menu'); openModal('modal-add-property')">✏️ Edit Property</button>
+            <button class="dot-menu-item" onclick="closeDotMenu('prop-menu'); openPropertyForm(currentProperty)">✏️ Edit Property</button>
             <button class="dot-menu-item danger" onclick="closeDotMenu('prop-menu'); confirmDelete('property', 'this property and all its data')">🗑 Delete Property</button>
           </div>
         </div>
@@ -1344,38 +1504,54 @@
 
       <!-- INFO TAB -->
       <div class="prop-tab-panel active" id="ptab-info">
+        <!-- Core property details card -->
         <div class="card" style="padding:0; overflow:hidden; margin-bottom:12px;">
           <div style="padding:14px 16px; border-bottom:1px solid var(--border);">
-            <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:10px;">Property Details</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted);">Property Details</div>
+              <button class="edit-btn" onclick="openPropertyForm(currentProperty)">✏️ Edit</button>
+            </div>
             <div class="info-grid">
               <div class="info-row"><span class="info-label">Bedrooms</span><span class="info-val">3</span></div>
               <div class="info-row"><span class="info-label">Bathrooms</span><span class="info-val">2</span></div>
-              <div class="info-row"><span class="info-label">Furnished</span><span class="info-val">Yes</span></div>
+              <div class="info-row"><span class="info-label">Furnished</span><span class="info-val">Yes — fully</span></div>
               <div class="info-row"><span class="info-label">Pets allowed</span><span class="info-val">Yes</span></div>
               <div class="info-row"><span class="info-label">Pet deposit</span><span class="info-val">$300</span></div>
+              <div class="info-row"><span class="info-label">Security deposit</span><span class="info-val">$500</span></div>
+              <div class="info-row"><span class="info-label">Monthly rate</span><span class="info-val">$950/mo</span></div>
               <div class="info-row"><span class="info-label">Type</span><span class="info-val">Short-term</span></div>
-            </div>
-          </div>
-          <div style="padding:14px 16px; border-bottom:1px solid var(--border);">
-            <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:8px;">Amenities</div>
-            <div style="display:flex; flex-wrap:wrap; gap:6px;">
-              <span class="amenity-tag">WiFi</span>
-              <span class="amenity-tag">Washer/Dryer</span>
-              <span class="amenity-tag">Parking</span>
-              <span class="amenity-tag">AC</span>
-              <span class="amenity-tag">Pool access</span>
-              <span class="amenity-tag">Smart TV</span>
             </div>
           </div>
           <div style="padding:14px 16px;">
             <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:6px;">Listing Platforms</div>
-            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            <div style="display:flex; flex-wrap:wrap; gap:6px;" id="prop-platforms-display">
               <span class="platform-tag">Furnished Finder</span>
               <span class="platform-tag">Direct</span>
             </div>
           </div>
         </div>
-        <button class="btn btn-outline btn-full" onclick="openModal('modal-add-property')">✏️ Edit Property Info</button>
+
+        <!-- Amenities — separate manager -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <p class="section-label" style="margin:0;">Amenities</p>
+          <button class="edit-btn" onclick="openAmenitiesModal()">+ Manage</button>
+        </div>
+        <div class="card" style="padding:14px 16px; margin-bottom:12px;">
+          <div id="prop-amenities-display" style="display:flex; flex-wrap:wrap; gap:6px;">
+            <span class="amenity-tag">WiFi</span>
+            <span class="amenity-tag">Washer/Dryer</span>
+            <span class="amenity-tag">Parking</span>
+            <span class="amenity-tag">AC</span>
+            <span class="amenity-tag">Pool access</span>
+            <span class="amenity-tag">Smart TV</span>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="card card-body" style="margin-bottom:12px;">
+          <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:6px;">Notes</div>
+          <div style="font-size:0.875rem; color:var(--muted); line-height:1.5;">Fully furnished 3/2. Pet-friendly. Available for short-term stays 3–6 months.</div>
+        </div>
       </div>
 
       <!-- TENANTS TAB -->
@@ -2037,96 +2213,75 @@
       <!-- ── TRANSACTIONS TAB ───────────────────────────────── -->
       <div class="fin-tab-panel" id="ftab-transactions">
 
-        <!-- Filters -->
-        <div style="display:flex; gap:8px; margin-bottom:14px; overflow-x:auto; padding-bottom:2px;">
-          <button class="filter-chip active" onclick="setFilter(this,'all')">All</button>
-          <button class="filter-chip" onclick="setFilter(this,'income')">Income</button>
-          <button class="filter-chip" onclick="setFilter(this,'expense')">Expenses</button>
-          <button class="filter-chip" onclick="setFilter(this,'mesa')">Mesa</button>
-          <button class="filter-chip" onclick="setFilter(this,'norfolk')">Norfolk</button>
-          <button class="filter-chip" onclick="setFilter(this,'resale')">Resale</button>
+        <!-- Toolbar: filters + add button -->
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+          <div style="display:flex; gap:6px; overflow-x:auto; flex:1; padding-bottom:2px;">
+            <button class="filter-chip active" onclick="setFilter(this,'all')">All</button>
+            <button class="filter-chip" onclick="setFilter(this,'income')">Income</button>
+            <button class="filter-chip" onclick="setFilter(this,'expense')">Expenses</button>
+            <button class="filter-chip" onclick="setFilter(this,'rental')">Rental</button>
+            <button class="filter-chip" onclick="setFilter(this,'resale')">Resale</button>
+          </div>
+          <button class="btn btn-amber btn-sm" style="flex-shrink:0;" onclick="openTxnForm()">+ Add</button>
         </div>
 
-        <div class="card" style="padding:0; overflow:hidden; margin-bottom:14px;">
-          <!-- April group -->
-          <div style="padding:8px 14px; background:var(--surface); border-bottom:1px solid var(--border);">
-            <span style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted);">April 2026</span>
-            <span style="font-size:0.75rem; color:var(--green); font-weight:600; float:right;">+$998 net</span>
-          </div>
-          <div class="swipe-wrap" id="sw-ft-1">
-            <div class="swipe-content txn-item" onclick="toggleSwipe('sw-ft-1')">
-              <div class="txn-dot txn-dot-green"></div>
-              <div class="txn-info"><div class="txn-desc">Rent received</div><div class="txn-meta">Apr 17 · Mesa, AZ</div></div>
-              <div class="txn-amount income">+$950</div>
-            </div>
-            <div class="swipe-actions">
-              <button class="swipe-btn swipe-btn-edit" onclick="resetSwipe('sw-ft-1'); openModal('modal-rent')"><span class="swipe-icon">✏️</span>Edit</button>
-              <button class="swipe-btn swipe-btn-delete" onclick="resetSwipe('sw-ft-1'); confirmDelete('transaction','Rent · Apr 17')"><span class="swipe-icon">🗑</span>Delete</button>
-            </div>
-          </div>
-          <div class="swipe-wrap" id="sw-ft-2">
-            <div class="swipe-content txn-item" onclick="toggleSwipe('sw-ft-2')">
-              <div class="txn-dot txn-dot-green"></div>
-              <div class="txn-info"><div class="txn-desc">Poshmark — Levi's jacket</div><div class="txn-meta">Apr 12 · Resale</div></div>
-              <div class="txn-amount income">+$34</div>
-            </div>
-            <div class="swipe-actions">
-              <button class="swipe-btn swipe-btn-edit" onclick="resetSwipe('sw-ft-2'); openModal('modal-sale')"><span class="swipe-icon">✏️</span>Edit</button>
-              <button class="swipe-btn swipe-btn-delete" onclick="resetSwipe('sw-ft-2'); confirmDelete('transaction','Poshmark sale · Apr 12')"><span class="swipe-icon">🗑</span>Delete</button>
-            </div>
-          </div>
-          <div class="swipe-wrap" id="sw-ft-3">
-            <div class="swipe-content txn-item" onclick="toggleSwipe('sw-ft-3')">
-              <div class="txn-dot txn-dot-red"></div>
-              <div class="txn-info"><div class="txn-desc">Plumbing repair</div><div class="txn-meta">Apr 14 · Mesa, AZ · Repairs</div></div>
-              <div class="txn-amount expense">-$280</div>
-            </div>
-            <div class="swipe-actions">
-              <button class="swipe-btn swipe-btn-edit" onclick="resetSwipe('sw-ft-3'); openModal('modal-expense')"><span class="swipe-icon">✏️</span>Edit</button>
-              <button class="swipe-btn swipe-btn-delete" onclick="resetSwipe('sw-ft-3'); confirmDelete('transaction','Plumbing repair · Apr 14')"><span class="swipe-icon">🗑</span>Delete</button>
-            </div>
-          </div>
-          <!-- March group -->
-          <div style="padding:8px 14px; background:var(--surface); border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
-            <span style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted);">March 2026</span>
-            <span style="font-size:0.75rem; color:var(--green); font-weight:600; float:right;">+$890 net</span>
-          </div>
-          <div class="swipe-wrap" id="sw-ft-4">
-            <div class="swipe-content txn-item" onclick="toggleSwipe('sw-ft-4')">
-              <div class="txn-dot txn-dot-green"></div>
-              <div class="txn-info"><div class="txn-desc">Rent received</div><div class="txn-meta">Mar 17 · Mesa, AZ</div></div>
-              <div class="txn-amount income">+$950</div>
-            </div>
-            <div class="swipe-actions">
-              <button class="swipe-btn swipe-btn-edit" onclick="resetSwipe('sw-ft-4'); openModal('modal-rent')"><span class="swipe-icon">✏️</span>Edit</button>
-              <button class="swipe-btn swipe-btn-delete" onclick="resetSwipe('sw-ft-4'); confirmDelete('transaction','Rent · Mar 17')"><span class="swipe-icon">🗑</span>Delete</button>
-            </div>
-          </div>
-          <div class="swipe-wrap" id="sw-ft-5">
-            <div class="swipe-content txn-item" onclick="toggleSwipe('sw-ft-5')">
-              <div class="txn-dot txn-dot-green"></div>
-              <div class="txn-info"><div class="txn-desc">FB Marketplace — Vintage lamp</div><div class="txn-meta">Mar 22 · Resale</div></div>
-              <div class="txn-amount income">+$23</div>
-            </div>
-            <div class="swipe-actions">
-              <button class="swipe-btn swipe-btn-edit" onclick="resetSwipe('sw-ft-5'); openModal('modal-sale')"><span class="swipe-icon">✏️</span>Edit</button>
-              <button class="swipe-btn swipe-btn-delete" onclick="resetSwipe('sw-ft-5'); confirmDelete('transaction','FB sale · Mar 22')"><span class="swipe-icon">🗑</span>Delete</button>
-            </div>
-          </div>
-          <div class="swipe-wrap" id="sw-ft-6">
-            <div class="swipe-content txn-item" onclick="toggleSwipe('sw-ft-6')">
-              <div class="txn-dot txn-dot-red"></div>
-              <div class="txn-info"><div class="txn-desc">Cleaning supplies</div><div class="txn-meta">Mar 4 · Mesa, AZ · Supplies</div></div>
-              <div class="txn-amount expense">-$68</div>
-            </div>
-            <div class="swipe-actions">
-              <button class="swipe-btn swipe-btn-edit" onclick="resetSwipe('sw-ft-6'); openModal('modal-expense')"><span class="swipe-icon">✏️</span>Edit</button>
-              <button class="swipe-btn swipe-btn-delete" onclick="resetSwipe('sw-ft-6'); confirmDelete('transaction','Supplies · Mar 4')"><span class="swipe-icon">🗑</span>Delete</button>
-            </div>
+        <!-- Search bar -->
+        <div style="position:relative; margin-bottom:12px;">
+          <input type="text" id="txn-search" placeholder="Search transactions…"
+            oninput="filterTransactions()"
+            style="width:100%; font-family:var(--font-body); font-size:0.875rem; padding:10px 12px 10px 36px; border:1.5px solid var(--border); border-radius:var(--radius-sm); background:var(--card); color:var(--text); outline:none;" />
+          <span style="position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:1rem; pointer-events:none;">🔍</span>
+        </div>
+
+        <!-- Bulk action bar (shown when rows selected) -->
+        <div id="txn-bulk-bar" style="display:none; background:var(--navy); border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:12px; display:none; align-items:center; justify-content:space-between;">
+          <span id="txn-bulk-count" style="color:#fff; font-size:0.875rem; font-weight:600;">0 selected</span>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-sm" style="background:rgba(255,255,255,0.15); color:#fff;" onclick="bulkExportSelected()">⬇ Export</button>
+            <button class="btn btn-sm" style="background:var(--red); color:#fff;" onclick="bulkDeleteSelected()">🗑 Delete</button>
+            <button class="btn btn-sm" style="background:rgba(255,255,255,0.1); color:#fff;" onclick="clearTxnSelection()">✕</button>
           </div>
         </div>
 
-        <button class="btn btn-amber btn-full" onclick="openModal('modal-expense')">+ Add Transaction</button>
+        <!-- Table header -->
+        <div class="txn-table-header">
+          <div class="txn-th txn-th-check">
+            <input type="checkbox" id="txn-select-all" onchange="toggleSelectAll(this)" style="cursor:pointer; width:16px; height:16px;" />
+          </div>
+          <div class="txn-th txn-th-date" onclick="sortTransactions('date')">
+            Date <span class="sort-arrow" id="sort-date">↓</span>
+          </div>
+          <div class="txn-th txn-th-desc" onclick="sortTransactions('description')">
+            Description <span class="sort-arrow" id="sort-description"></span>
+          </div>
+          <div class="txn-th txn-th-prop">Source</div>
+          <div class="txn-th txn-th-amt" onclick="sortTransactions('amount')">
+            Amount <span class="sort-arrow" id="sort-amount"></span>
+          </div>
+          <div class="txn-th txn-th-actions"></div>
+        </div>
+
+        <!-- Table body -->
+        <div id="txn-table-body" class="card" style="padding:0; overflow:hidden; margin-bottom:12px; border-radius:0 0 var(--radius-md) var(--radius-md);">
+          <!-- Rendered by renderTransactionTable() -->
+        </div>
+
+        <!-- Load more / count bar -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span id="txn-count-label" style="font-size:0.75rem; color:var(--muted);">6 transactions</span>
+          <button class="btn btn-ghost btn-sm" id="txn-show-all-btn" onclick="txnShowAll()" style="font-size:0.75rem; color:var(--navy); display:none;">Show all</button>
+        </div>
+        <div id="txn-load-more-wrap" style="display:none; margin-bottom:12px;">
+          <button class="btn btn-outline btn-full btn-sm" id="txn-load-more-btn" onclick="txnLoadMore()">
+            Show more <span id="txn-load-more-hint" style="color:var(--muted);"></span>
+          </button>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-outline btn-full btn-sm" onclick="exportAllCSV()">⬇ Export CSV</button>
+          <button class="btn btn-primary btn-full btn-sm" onclick="switchFinTab('reports')">📊 Reports</button>
+        </div>
+
       </div>
 
       <!-- ── REPORTS TAB ─────────────────────────────────────── -->
@@ -2353,26 +2508,39 @@
       <div class="modal-body">
         <div class="field">
           <label>Property</label>
+          <div style="display:flex; gap:8px;">
+            <select style="flex:1;">
+              <option>Mesa, AZ — 123 Desert Way</option>
+              <option>Norfolk, VA — 456 Harbor Blvd</option>
+              <option value="__new">+ Add new property…</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Tenant / Lease</label>
           <select>
-            <option>Mesa, AZ — 123 Desert Way</option>
-            <option>Norfolk, VA — 456 Harbor Blvd</option>
+            <option>Smith — Active (Apr–Jun 2026)</option>
+            <option value="__new">+ Add new lease…</option>
           </select>
         </div>
         <div class="field-row">
           <div class="field">
             <label>Amount</label>
-            <input type="number" placeholder="$0.00" inputmode="decimal" />
+            <input data-field="amount" type="number" placeholder="$0.00" inputmode="decimal" />
           </div>
           <div class="field">
             <label>Date</label>
-            <input type="date" />
+            <input data-field="date" type="date" />
           </div>
         </div>
         <div class="field">
           <label>Notes (optional)</label>
-          <input type="text" placeholder="e.g. April payment, late fee included" />
+          <input data-field="description" type="text" placeholder="e.g. April payment, late fee included" />
         </div>
-        <button class="btn btn-primary btn-full" onclick="closeModal('modal-rent')">Save Payment</button>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-rent')">Cancel</button>
+          <button class="btn btn-primary" style="flex:2;" onclick="saveTransaction('modal-rent','income')">Save Payment</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2388,55 +2556,42 @@
       <div class="modal-body">
         <div class="field">
           <label>Property</label>
-          <select>
+          <select onchange="if(this.value==='__new'){closeModal('modal-expense');openPropertyForm();}">
             <option>Mesa, AZ — 123 Desert Way</option>
             <option>Norfolk, VA — 456 Harbor Blvd</option>
+            <option value="__new">+ Add new property…</option>
           </select>
         </div>
         <div class="field">
           <label>Category</label>
-          <select>
-            <option>Repairs</option>
-            <option>Supplies</option>
-            <option>Insurance</option>
-            <option>Utilities</option>
-            <option>Management fees</option>
-            <option>Cleaning &amp; maintenance</option>
-            <option>Legal &amp; professional fees</option>
-            <option>Advertising</option>
-            <option>Mortgage interest</option>
-            <option>Property taxes</option>
-            <option>Auto &amp; travel</option>
-            <option>Other</option>
+          <select onchange="if(this.value==='__new'){closeModal('modal-expense');openModal('modal-categories');}">
+            <option>Repairs</option><option>Supplies</option><option>Insurance</option>
+            <option>Utilities</option><option>Management fees</option>
+            <option>Cleaning &amp; maintenance</option><option>Legal &amp; professional fees</option>
+            <option>Advertising</option><option>Mortgage interest</option>
+            <option>Property taxes</option><option>Auto &amp; travel</option>
+            <option>Depreciation</option><option>Other</option>
+            <option value="__new">+ Add new category…</option>
           </select>
         </div>
         <div class="field-row">
-          <div class="field">
-            <label>Amount</label>
-            <input type="number" placeholder="$0.00" inputmode="decimal" />
-          </div>
-          <div class="field">
-            <label>Date</label>
-            <input type="date" />
-          </div>
+          <div class="field"><label>Amount</label><input data-field="amount" type="number" placeholder="$0.00" inputmode="decimal" /></div>
+          <div class="field"><label>Date</label><input data-field="date" type="date" /></div>
         </div>
+        <div class="field"><label>Vendor / Payee</label><input data-field="vendor" type="text" placeholder="e.g. Home Depot, Mike's Plumbing" /></div>
+        <div class="field"><label>Description</label><input data-field="description" type="text" placeholder="Brief description" /></div>
         <div class="field">
-          <label>Vendor / Payee</label>
-          <input type="text" placeholder="e.g. Home Depot, Mike's Plumbing" />
-        </div>
-        <div class="field">
-          <label>Description</label>
-          <input type="text" placeholder="Brief description" />
-        </div>
-        <div class="field">
-          <label>Receipt</label>
+          <label>Receipt (optional)</label>
           <div class="receipt-area">
             <div class="receipt-icon">📷</div>
             <div class="receipt-label">Take or Upload Photo</div>
-            <div class="receipt-sub">Optional — tap to attach receipt image</div>
+            <div class="receipt-sub">Tap to attach receipt image</div>
           </div>
         </div>
-        <button class="btn btn-primary btn-full" onclick="closeModal('modal-expense')">Save Expense</button>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-expense')">Cancel</button>
+          <button class="btn btn-primary" style="flex:2;" onclick="saveTransaction('modal-expense','expense')">Save Expense</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2452,33 +2607,28 @@
       <div class="modal-body">
         <div class="field">
           <label>Property</label>
-          <select>
+          <select onchange="if(this.value==='__new'){closeModal('modal-document');openPropertyForm();}">
             <option>Mesa, AZ — 123 Desert Way</option>
             <option>Norfolk, VA — 456 Harbor Blvd</option>
+            <option value="__new">+ Add new property…</option>
           </select>
         </div>
         <div class="field">
           <label>Document Type</label>
           <select>
-            <option>Lease Agreement</option>
-            <option>Lease Extension Addendum</option>
-            <option>Pet Addendum</option>
-            <option>Move-in Checklist</option>
-            <option>Move-out Checklist</option>
-            <option>Inspection Report</option>
-            <option>Notice</option>
-            <option>Other</option>
+            <option>Lease Agreement</option><option>Lease Extension Addendum</option>
+            <option>Pet Addendum</option><option>Move-in Checklist</option>
+            <option>Move-out Checklist</option><option>Inspection Report</option>
+            <option>Notice</option><option>Other</option>
           </select>
         </div>
-        <div class="field">
-          <label>Document Name</label>
-          <input type="text" placeholder="e.g. Lease Agreement — Smith 2026" />
-        </div>
+        <div class="field"><label>Document Name</label><input type="text" placeholder="e.g. Lease Agreement — Smith 2026" /></div>
         <div class="field">
           <label>Link to Lease (optional)</label>
           <select>
             <option value="">— None —</option>
             <option>Smith · Jan–Jun 2026 (Active)</option>
+            <option>Smith · Extension #1 Apr–Jun 2026</option>
           </select>
         </div>
         <div class="field">
@@ -2489,11 +2639,11 @@
             <div class="receipt-sub">PDF, JPG, PNG supported</div>
           </div>
         </div>
-        <div class="field">
-          <label>Notes (optional)</label>
-          <textarea placeholder="Any notes about this document"></textarea>
+        <div class="field"><label>Notes (optional)</label><textarea placeholder="Any notes about this document"></textarea></div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-document')">Cancel</button>
+          <button class="btn btn-primary" style="flex:2;" onclick="closeModal('modal-document')">Save Document</button>
         </div>
-        <button class="btn btn-primary btn-full" onclick="closeModal('modal-document')">Save Document</button>
       </div>
     </div>
   </div>
@@ -2507,34 +2657,20 @@
         <button class="modal-close" onclick="closeModal('modal-acquire')">✕</button>
       </div>
       <div class="modal-body">
-        <div class="field">
-          <label>Item Name</label>
-          <input type="text" placeholder="e.g. Vintage lamp, Levi's jacket" />
-        </div>
+        <div class="field"><label>Item Name</label><input data-field="itemName" type="text" placeholder="e.g. Vintage lamp, Levi's jacket" /></div>
         <div class="field">
           <label>Category</label>
-          <select>
-            <option>Clothing</option>
-            <option>Furniture</option>
-            <option>Electronics</option>
-            <option>Collectibles</option>
-            <option>Household</option>
-            <option>Other</option>
+          <select onchange="if(this.value==='__new'){promptNewResaleCategory();}">
+            <option>Clothing</option><option>Furniture</option><option>Electronics</option>
+            <option>Collectibles</option><option>Household</option><option>Books</option>
+            <option>Art & Décor</option><option>Toys & Games</option><option>Other</option>
+            <option value="__new">+ Add new category…</option>
           </select>
         </div>
-        <div class="field">
-          <label>Source / Where Purchased</label>
-          <input type="text" placeholder="e.g. Goodwill, Estate sale, FB Marketplace" />
-        </div>
+        <div class="field"><label>Source / Where Purchased</label><input data-field="source" type="text" placeholder="e.g. Goodwill, Estate sale, FB Marketplace" /></div>
         <div class="field-row">
-          <div class="field">
-            <label>Cost Paid</label>
-            <input type="number" placeholder="$0.00" inputmode="decimal" />
-          </div>
-          <div class="field">
-            <label>Date</label>
-            <input type="date" />
-          </div>
+          <div class="field"><label>Cost Paid</label><input data-field="cost" type="number" placeholder="$0.00" inputmode="decimal" /></div>
+          <div class="field"><label>Date</label><input type="date" /></div>
         </div>
         <div class="field">
           <label>Photo (optional)</label>
@@ -2544,11 +2680,11 @@
             <div class="receipt-sub">Helps when listing later</div>
           </div>
         </div>
-        <div class="field">
-          <label>Notes</label>
-          <input type="text" placeholder="Condition, details, where to list..." />
+        <div class="field"><label>Notes</label><input data-field="notes" type="text" placeholder="Condition, details, where to list..." /></div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-acquire')">Cancel</button>
+          <button class="btn btn-primary" style="flex:2;" onclick="saveItem()">Save Item</button>
         </div>
-        <button class="btn btn-primary btn-full" onclick="closeModal('modal-acquire')">Save Item</button>
       </div>
     </div>
   </div>
@@ -2564,49 +2700,39 @@
       <div class="modal-body">
         <div class="field">
           <label>Item Sold</label>
-          <select>
+          <select onchange="if(this.value==='__new'){closeModal('modal-sale');openModal('modal-acquire');}">
             <option>— Select from inventory —</option>
-            <option>Vintage lamp ($12 cost)</option>
-            <option>Levi's jacket ($8 cost)</option>
+            <option>Vintage denim jacket ($8 cost)</option>
+            <option>Ceramic plant stand ($4 cost)</option>
+            <option>Vintage atlas set ($6 cost)</option>
+            <option value="__new">+ Add new item to inventory…</option>
           </select>
         </div>
         <div class="field">
           <label>Platform</label>
-          <select>
-            <option>Poshmark</option>
-            <option>FB Marketplace</option>
-            <option>eBay</option>
-            <option>Mercari</option>
-            <option>In person</option>
-            <option>Other</option>
+          <select onchange="if(this.value==='__new'){promptNewPlatform();}">
+            <option>Poshmark</option><option>FB Marketplace</option><option>eBay</option>
+            <option>Mercari</option><option>In person</option><option>Other</option>
+            <option value="__new">+ Add new platform…</option>
           </select>
         </div>
         <div class="field-row">
-          <div class="field">
-            <label>Sale Price</label>
-            <input type="number" placeholder="$0.00" inputmode="decimal" />
-          </div>
-          <div class="field">
-            <label>Date Sold</label>
-            <input type="date" />
-          </div>
+          <div class="field"><label>Sale Price</label><input data-field="salePrice" type="number" placeholder="$0.00" inputmode="decimal" /></div>
+          <div class="field"><label>Date Sold</label><input data-field="saleDate" type="date" /></div>
         </div>
         <div class="field-row">
-          <div class="field">
-            <label>Platform Fees</label>
-            <input type="number" placeholder="$0.00" inputmode="decimal" />
-          </div>
-          <div class="field">
-            <label>Shipping Cost</label>
-            <input type="number" placeholder="$0.00" inputmode="decimal" />
-          </div>
+          <div class="field"><label>Platform Fees</label><input type="number" placeholder="$0.00" inputmode="decimal" /></div>
+          <div class="field"><label>Shipping Cost</label><input type="number" placeholder="$0.00" inputmode="decimal" /></div>
         </div>
         <div style="background:var(--surface); border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:16px;">
           <div style="font-size:0.75rem; color:var(--muted); margin-bottom:4px;">Estimated Net Profit</div>
           <div style="font-size:1.25rem; font-weight:700; color:var(--green);">$0.00</div>
           <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">Sale − fees − shipping − cost</div>
         </div>
-        <button class="btn btn-primary btn-full" onclick="closeModal('modal-sale')">Save Sale</button>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-sale')">Cancel</button>
+          <button class="btn btn-primary" style="flex:2;" onclick="saveSale()">Save Sale</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2660,6 +2786,7 @@
           <input type="text" placeholder="Any notes about this extension" />
         </div>
         <button class="btn btn-amber btn-full" onclick="closeModal('modal-extend-lease')">✅ Create Extension #2</button>
+        <button class="btn btn-outline btn-full" style="margin-top:8px;" onclick="closeModal('modal-extend-lease')">Cancel</button>
       </div>
     </div>
   </div>
@@ -2676,10 +2803,7 @@
         <div style="background:var(--red-light); border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:16px; border:1px solid var(--red);">
           <div style="font-size:0.8125rem; font-weight:600; color:var(--red);">⚠️ This will mark the lease as completed and the property as vacant.</div>
         </div>
-        <div class="field">
-          <label>End Date</label>
-          <input type="date" />
-        </div>
+        <div class="field"><label>End Date</label><input type="date" /></div>
         <div class="field">
           <label>End Reason</label>
           <select>
@@ -2690,15 +2814,12 @@
             <option>Other</option>
           </select>
         </div>
-        <div class="field">
-          <label>Security Deposit Returned</label>
-          <input type="number" placeholder="$500" inputmode="decimal" />
+        <div class="field"><label>Security Deposit Returned ($)</label><input type="number" placeholder="500" inputmode="decimal" /></div>
+        <div class="field"><label>Notes</label><textarea placeholder="Move-out condition, deductions, etc."></textarea></div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-end-lease')">Cancel</button>
+          <button class="btn" style="flex:2; background:var(--red); color:#fff;" onclick="closeModal('modal-end-lease')">End Lease</button>
         </div>
-        <div class="field">
-          <label>Notes</label>
-          <textarea placeholder="Move-out condition, deductions, etc."></textarea>
-        </div>
-        <button class="btn btn-full" style="background:var(--red); color:#fff;" onclick="closeModal('modal-end-lease')">End Lease</button>
       </div>
     </div>
   </div>
@@ -2714,44 +2835,53 @@
       <div class="modal-body">
         <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:12px;">Tenant Info</div>
         <div class="field-row">
-          <div class="field"><label>First Name</label><input type="text" placeholder="John" /></div>
-          <div class="field"><label>Last Name</label><input type="text" placeholder="Smith" /></div>
+          <div class="field"><label>First Name</label><input data-field="firstName" type="text" placeholder="John" /></div>
+          <div class="field"><label>Last Name</label><input data-field="lastName" type="text" placeholder="Smith" /></div>
         </div>
-        <div class="field"><label>Email</label><input type="email" placeholder="tenant@email.com" /></div>
-        <div class="field"><label>Phone</label><input type="tel" placeholder="(602) 555-0000" /></div>
-        <div class="field"><label>Emergency Contact</label><input type="text" placeholder="Name · Relationship · Phone" /></div>
+        <div class="field"><label>Email</label><input data-field="email" type="email" placeholder="tenant@email.com" /></div>
+        <div class="field"><label>Phone</label><input data-field="phone" type="tel" placeholder="(602) 555-0000" /></div>
+        <div class="field"><label>Emergency Contact Name</label><input data-field="emergencyName" type="text" placeholder="Full name" /></div>
+        <div class="field-row">
+          <div class="field"><label>Emergency Phone</label><input type="tel" placeholder="(602) 555-0000" /></div>
+          <div class="field"><label>Relationship</label><input data-field="relationship" type="text" placeholder="e.g. Sister" /></div>
+        </div>
         <div class="field">
           <label>Pets</label>
           <select>
             <option>No pets</option>
             <option>1 pet</option>
-            <option>2+ pets</option>
+            <option>2 pets</option>
+            <option>3+ pets</option>
           </select>
         </div>
+        <div class="field"><label>Pet Description</label><input data-field="petDesc" type="text" placeholder="Breed, weight, count (e.g. Lab, 60 lb)" /></div>
+
         <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin:16px 0 12px;">Lease Terms</div>
         <div class="field-row">
           <div class="field"><label>Start Date</label><input type="date" /></div>
           <div class="field"><label>End Date</label><input type="date" /></div>
         </div>
         <div class="field-row">
-          <div class="field"><label>Monthly Rent</label><input type="number" placeholder="$0.00" inputmode="decimal" /></div>
-          <div class="field"><label>Security Deposit</label><input type="number" placeholder="$0.00" inputmode="decimal" /></div>
+          <div class="field"><label>Monthly Rent ($)</label><input data-field="monthlyRent" type="number" placeholder="950" inputmode="decimal" /></div>
+          <div class="field"><label>Security Deposit ($)</label><input type="number" placeholder="500" inputmode="decimal" /></div>
         </div>
+        <div class="field"><label>Pet Deposit ($)</label><input type="number" placeholder="300" inputmode="decimal" /></div>
         <div class="field">
           <label>Source Platform</label>
-          <select>
+          <select onchange="if(this.value==='__new'){promptNewPlatform();}">
             <option>Direct</option>
             <option>Furnished Finder</option>
             <option>Airbnb</option>
             <option>VRBO</option>
             <option>Other</option>
+            <option value="__new">+ Add new platform…</option>
           </select>
         </div>
-        <div class="field">
-          <label>Platform Booking ID (optional)</label>
-          <input type="text" placeholder="Booking reference number" />
+        <div class="field"><label>Platform Booking ID (optional)</label><input data-field="bookingId" type="text" placeholder="Booking reference number" /></div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-add-lease')">Cancel</button>
+          <button class="btn btn-primary" style="flex:2;" onclick="saveLease()">Create Lease</button>
         </div>
-        <button class="btn btn-primary btn-full" onclick="closeModal('modal-add-lease')">Create Lease</button>
       </div>
     </div>
   </div>
@@ -2765,26 +2895,98 @@
         <button class="modal-close" onclick="closeModal('modal-add-property')">✕</button>
       </div>
       <div class="modal-body">
-        <div class="field"><label>Property Nickname</label><input type="text" placeholder="e.g. Mesa AZ, Beach House" /></div>
-        <div class="field"><label>Street Address</label><input type="text" placeholder="123 Main St" /></div>
+        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:12px;">Basic Info</div>
+        <div class="field"><label>Property Nickname</label><input data-field="nickname" type="text" placeholder="e.g. Mesa AZ, Beach House" /></div>
+        <div class="field"><label>Street Address</label><input data-field="address" type="text" placeholder="123 Main St" /></div>
         <div class="field-row">
-          <div class="field"><label>City</label><input type="text" placeholder="City" /></div>
-          <div class="field"><label>State</label><input type="text" placeholder="AZ" maxlength="2" /></div>
+          <div class="field"><label>City</label><input data-field="city" type="text" placeholder="City" /></div>
+          <div class="field"><label>State</label><input data-field="state" type="text" placeholder="AZ" maxlength="2" /></div>
         </div>
-        <div class="field"><label>ZIP Code</label><input type="text" placeholder="85201" inputmode="numeric" /></div>
+        <div class="field"><label>ZIP Code</label><input data-field="zip" type="text" placeholder="85201" inputmode="numeric" /></div>
         <div class="field-row">
-          <div class="field"><label>Bedrooms</label><input type="number" placeholder="3" inputmode="numeric" /></div>
-          <div class="field"><label>Bathrooms</label><input type="number" placeholder="2" inputmode="decimal" /></div>
+          <div class="field"><label>Bedrooms</label><input data-field="bedrooms" type="number" placeholder="3" inputmode="numeric" min="0" /></div>
+          <div class="field"><label>Bathrooms</label><input data-field="bathrooms" type="number" placeholder="2" inputmode="decimal" min="0" step="0.5" /></div>
         </div>
+
+        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin:16px 0 12px;">Rates & Deposits</div>
+        <div class="field-row">
+          <div class="field"><label>Monthly Rate ($)</label><input data-field="monthlyRate" type="number" placeholder="950" inputmode="decimal" /></div>
+          <div class="field"><label>Security Deposit ($)</label><input data-field="securityDeposit" type="number" placeholder="500" inputmode="decimal" /></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Pet Deposit ($)</label><input data-field="petDeposit" type="number" placeholder="300" inputmode="decimal" /></div>
+          <div class="field"><label>Pets Allowed</label>
+            <select data-field="petsAllowed"><option>Yes</option><option>No</option></select>
+          </div>
+        </div>
+
+        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin:16px 0 12px;">Property Type</div>
         <div class="field"><label>Furnished</label>
-          <select><option>Yes — fully furnished</option><option>Yes — partially</option><option>No</option></select>
+          <select data-field="furnished"><option>Yes — fully furnished</option><option>Yes — partially</option><option>No</option></select>
         </div>
-        <div class="field"><label>Pets Allowed</label>
-          <select><option>Yes</option><option>No</option></select>
+        <div class="field"><label>Rental Type</label>
+          <select data-field="rentalType"><option>Short-term (3–6 months)</option><option>Long-term (12+ months)</option><option>Vacation / nightly</option></select>
         </div>
-        <div class="field"><label>Pet Deposit ($)</label><input type="number" placeholder="$0.00" inputmode="decimal" /></div>
-        <div class="field"><label>Description / Notes</label><textarea placeholder="Any notes about this property"></textarea></div>
-        <button class="btn btn-primary btn-full" onclick="closeModal('modal-add-property')">Save Property</button>
+
+        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin:16px 0 12px;">Listing Platforms</div>
+        <div id="prop-platforms-list" style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+          <div class="inline-list-item">
+            <span>Furnished Finder</span>
+            <button class="inline-list-remove" onclick="removePlatform(this)">✕</button>
+          </div>
+          <div class="inline-list-item">
+            <span>Direct</span>
+            <button class="inline-list-remove" onclick="removePlatform(this)">✕</button>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:4px;">
+          <select id="new-platform-select" style="flex:1; font-family:var(--font-body); font-size:0.875rem; padding:10px 12px; border:1.5px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text);">
+            <option value="">— Add platform —</option>
+            <option>Airbnb</option>
+            <option>VRBO</option>
+            <option>Furnished Finder</option>
+            <option>Direct</option>
+            <option>Other</option>
+          </select>
+          <button class="btn btn-amber btn-sm" onclick="addPlatform()">Add</button>
+        </div>
+
+        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin:16px 0 12px;">Notes</div>
+        <div class="field"><textarea data-field="notes" placeholder="Any notes about this property" rows="3"></textarea></div>
+
+        <div style="display:flex; gap:10px; margin-top:4px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-add-property')">Cancel</button>
+          <button class="btn btn-primary" style="flex:2;" onclick="saveProperty()">Save Property</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Amenities Manager Modal -->
+  <div class="modal-overlay" id="modal-amenities" onclick="overlayClose(event,'modal-amenities')">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title">Amenities</div>
+        <button class="modal-close" onclick="closeModal('modal-amenities')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:0.75rem; color:var(--muted); margin-bottom:16px; line-height:1.5;">Tap to select or deselect. Add custom amenities below.</div>
+
+        <div id="amenity-chip-grid" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px;"></div>
+
+        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:8px;">Add Custom</div>
+        <div style="display:flex; gap:8px; margin-bottom:20px;">
+          <input type="text" id="amenity-custom" placeholder="e.g. Hot tub, EV charger…"
+            style="flex:1; font-family:var(--font-body); font-size:0.875rem; padding:10px 12px; border:1.5px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text);"
+            onkeydown="if(event.key==='Enter'){addAmenityCustom();event.preventDefault();}" />
+          <button class="btn btn-amber btn-sm" onclick="addAmenityCustom()">Add</button>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-amenities')">Cancel</button>
+          <button class="btn btn-primary" style="flex:2;" onclick="saveAmenities()">Save Amenities</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2800,22 +3002,20 @@
       <div class="modal-body">
         <div class="field">
           <label>Item</label>
-          <select>
+          <select onchange="if(this.value==='__new'){closeModal('modal-add-listing');openModal('modal-acquire');}">
             <option>— Select from inventory —</option>
             <option>Vintage denim jacket ($8 cost)</option>
             <option>Ceramic plant stand ($4 cost)</option>
             <option>Vintage atlas set ($6 cost)</option>
+            <option value="__new">+ Add new item to inventory…</option>
           </select>
         </div>
         <div class="field">
           <label>Platform</label>
-          <select>
-            <option>Poshmark</option>
-            <option>FB Marketplace</option>
-            <option>eBay</option>
-            <option>Mercari</option>
-            <option>In person</option>
-            <option>Other</option>
+          <select onchange="if(this.value==='__new'){promptNewPlatform();}">
+            <option>Poshmark</option><option>FB Marketplace</option><option>eBay</option>
+            <option>Mercari</option><option>In person</option><option>Other</option>
+            <option value="__new">+ Add new platform…</option>
           </select>
         </div>
         <div class="field-row">
@@ -2827,7 +3027,10 @@
           <label>Status</label>
           <select><option>Active</option><option>Sold</option><option>Expired</option><option>Pulled</option></select>
         </div>
-        <button class="btn btn-primary btn-full" onclick="closeModal('modal-add-listing')">Save Listing</button>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-add-listing')">Cancel</button>
+          <button class="btn btn-primary" style="flex:2;" onclick="closeModal('modal-add-listing')">Save Listing</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2861,6 +3064,7 @@
           </div>
         </div>
         <button class="btn btn-primary btn-full" onclick="closeModal('modal-categories')">Done</button>
+        <button class="btn btn-outline btn-full" style="margin-top:8px;" onclick="closeModal('modal-categories')">Cancel</button>
       </div>
     </div>
   </div>
@@ -3139,13 +3343,13 @@
   /* ── CONFIRM DELETE ─────────────────────────────────────── */
   let pendingDeleteCallback = null;
 
-  function confirmDelete(type, label) {
+  function confirmDelete(type, label, callback) {
     document.getElementById('confirm-type').textContent = type;
     document.getElementById('confirm-msg').textContent =
       `"${label}" will be permanently deleted. This cannot be undone.`;
     document.getElementById('confirm-dialog').classList.add('open');
     document.body.style.overflow = 'hidden';
-    pendingDeleteCallback = () => console.log(`Deleted ${type}: ${label}`);
+    pendingDeleteCallback = callback || (() => console.log(`Deleted ${type}: ${label}`));
   }
 
   function closeConfirm() {
@@ -3227,7 +3431,24 @@
   function openProperty(key) {
     const p = PROPERTIES[key];
     if (!p) return;
-    document.getElementById('detail-prop-name').textContent = p.name;
+    // Set currentProperty from DB if available, else use static demo data
+    currentProperty = activeRecords('properties').find(r => r.id === key) || {
+      id: key, name: p.name, address: p.addr.split(',')[0],
+      city: p.addr.split(',')[1]?.trim().split(' ')[0] || '',
+      state: p.addr.split(',')[1]?.trim().split(' ')[1] || '',
+      zip: p.addr.split(',')[1]?.trim().split(' ')[2] || '',
+      bedrooms: key === 'mesa' ? '3' : '2',
+      bathrooms: key === 'mesa' ? '2' : '1',
+      monthlyRate: key === 'mesa' ? '950' : '',
+      securityDeposit: key === 'mesa' ? '500' : '',
+      petDeposit: key === 'mesa' ? '300' : '',
+      petsAllowed: 'Yes',
+      furnished: 'Yes — fully furnished',
+      rentalType: 'Short-term (3–6 months)',
+      platforms: key === 'mesa' ? ['Furnished Finder','Direct'] : ['Direct'],
+      notes: '',
+    };
+    document.getElementById('detail-prop-name').textContent = currentProperty.name || p.name;
     document.getElementById('detail-prop-addr').textContent = p.addr;
     const badge = document.getElementById('detail-prop-badge');
     if (badge) badge.outerHTML = p.badge;
@@ -3255,7 +3476,242 @@
     if (panel) panel.classList.add('active');
   }
 
-  /* ── FINANCES TABS ──────────────────────────────────────── */
+  /* ════════════════════════════════════════════════════════════
+     TRANSACTION TABLE — render, sort, filter, paginate, select
+  ════════════════════════════════════════════════════════════ */
+
+  const DEMO_TRANSACTIONS = [
+    { id:'t1',  type:'income',  date:'2026-04-17', description:'Rent received',                category:'Rent received',  property:'Mesa, AZ',  amount:950  },
+    { id:'t2',  type:'income',  date:'2026-04-12', description:"Poshmark — Levi's jacket",    category:'Gross receipts', property:'Resale',    amount:34   },
+    { id:'t3',  type:'expense', date:'2026-04-14', description:'Plumbing repair',              category:'Repairs',        property:'Mesa, AZ',  amount:-280 },
+    { id:'t4',  type:'income',  date:'2026-03-17', description:'Rent received',                category:'Rent received',  property:'Mesa, AZ',  amount:950  },
+    { id:'t5',  type:'income',  date:'2026-03-22', description:'FB Marketplace — Vintage lamp',category:'Gross receipts', property:'Resale',    amount:23   },
+    { id:'t6',  type:'expense', date:'2026-03-04', description:'Cleaning supplies',            category:'Supplies',       property:'Mesa, AZ',  amount:-68  },
+    { id:'t7',  type:'income',  date:'2026-02-17', description:'Rent received',                category:'Rent received',  property:'Mesa, AZ',  amount:950  },
+    { id:'t8',  type:'expense', date:'2026-02-09', description:'Property insurance',           category:'Insurance',      property:'Mesa, AZ',  amount:-180 },
+    { id:'t9',  type:'expense', date:'2026-01-22', description:'Advertising — Furnished Finder',category:'Advertising',  property:'Mesa, AZ',  amount:-92  },
+    { id:'t10', type:'income',  date:'2026-01-17', description:'Rent received',                category:'Rent received',  property:'Mesa, AZ',  amount:950  },
+  ];
+
+  const TXN_STATE = {
+    filter:    'all',
+    search:    '',
+    sortField: 'date',
+    sortDir:   'desc',
+    visible:   8,      // how many rows currently shown
+    showAll:   false,  // override: display entire dataset
+    selected:  new Set(),
+    openRow:   null,
+  };
+
+  const TXN_BATCH = 8;   // rows per "load more" tap
+  const TXN_INIT  = 8;   // rows shown on first render
+
+  function getTxnData() {
+    const live = activeRecords('transactions');
+    return live.length ? live : DEMO_TRANSACTIONS;
+  }
+
+  function getFilteredTxns() {
+    let data = getTxnData();
+    const f  = TXN_STATE.filter;
+    const q  = TXN_STATE.search.toLowerCase().trim();
+    if (f === 'income')  data = data.filter(t => t.type === 'income');
+    if (f === 'expense') data = data.filter(t => t.type === 'expense');
+    if (f === 'rental')  data = data.filter(t => t.property && t.property !== 'Resale');
+    if (f === 'resale')  data = data.filter(t => t.property === 'Resale');
+    if (q) data = data.filter(t =>
+      (t.description||'').toLowerCase().includes(q) ||
+      (t.category||'').toLowerCase().includes(q) ||
+      (t.property||'').toLowerCase().includes(q) ||
+      String(Math.abs(t.amount||0)).includes(q)
+    );
+    const sf = TXN_STATE.sortField, sd = TXN_STATE.sortDir === 'asc' ? 1 : -1;
+    return [...data].sort((a,b) => {
+      let av = a[sf]??'', bv = b[sf]??'';
+      if (sf==='amount') { av=Math.abs(a.amount||0); bv=Math.abs(b.amount||0); }
+      if (sf==='date')   { av=new Date(av).getTime(); bv=new Date(bv).getTime(); }
+      return av<bv?-sd:av>bv?sd:0;
+    });
+  }
+
+  function renderTransactionTable() {
+    const body = document.getElementById('txn-table-body');
+    if (!body) return;
+    const all   = getFilteredTxns();
+    const total = all.length;
+
+    // Determine visible slice
+    const visCount = TXN_STATE.showAll ? total : Math.min(TXN_STATE.visible, total);
+    const paged    = all.slice(0, visCount);
+    const hidden   = total - visCount;
+
+    // Group by month
+    const groups = {};
+    paged.forEach(t => { const k=t.date?t.date.slice(0,7):'?'; if(!groups[k])groups[k]=[]; groups[k].push(t); });
+
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const MSHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const fmtDate  = d => { if(!d)return'—'; const[y,m,day]=d.split('-'); return `${MSHORT[+m-1]} ${+day}`; };
+    const fmtMonth = k => { if(k==='?')return'Unknown'; const[y,m]=k.split('-'); return `${MONTHS[+m-1]} ${y}`; };
+    const fmtAmt   = t => { const sign=t.type==='income'?'+':'-'; return `${sign}$${Math.abs(t.amount||0).toLocaleString()}`; };
+    const esc      = s => (s||'').replace(/'/g,"\\'").replace(/</g,'&lt;');
+
+    let html = '';
+    Object.entries(groups).forEach(([month, txns]) => {
+      const net = txns.reduce((s,t)=>s+(t.type==='income'?(t.amount||0):-(Math.abs(t.amount||0))),0);
+      const nc  = net>=0?'var(--green)':'var(--red)';
+      const ns  = `${net>=0?'+':''}$${Math.abs(net).toLocaleString()}`;
+      html += `<div style="display:grid;grid-template-columns:28px 68px 1fr 68px 78px 36px;background:var(--surface);border-bottom:1px solid var(--border);">
+        <div style="grid-column:1/-1;padding:6px 10px;font-size:0.6875rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;">
+          <span>${fmtMonth(month)}</span><span style="color:${nc};font-weight:700;">${ns} net</span>
+        </div></div>`;
+      txns.forEach(t => {
+        const sel  = TXN_STATE.selected.has(t.id);
+        const open = TXN_STATE.openRow === t.id;
+        const ac   = t.type==='income'?'income':'expense';
+        const ps   = (t.property||'—').replace(', AZ','').replace(', VA','');
+        const catShort = (t.category||'').split(' ').slice(0,2).join(' ');
+        html += `
+          <div class="txn-table-row${sel?' selected':''}" id="txn-row-${t.id}">
+            <div class="txn-td" style="display:flex;align-items:center;">
+              <input type="checkbox" ${sel?'checked':''} onchange="toggleTxnSelect('${t.id}',this)" style="cursor:pointer;width:15px;height:15px;" />
+            </div>
+            <div class="txn-td txn-td-date">${fmtDate(t.date)}</div>
+            <div class="txn-td txn-td-desc" style="cursor:pointer;" onclick="toggleTxnDetail('${t.id}')">${esc(t.description)||'—'}</div>
+            <div class="txn-td txn-td-prop">${ps}</div>
+            <div class="txn-td txn-td-amt ${ac}">${fmtAmt(t)}</div>
+            <div class="txn-td txn-td-actions">
+              <button class="txn-row-btn edit-row" onclick="toggleTxnDetail('${t.id}')" title="Options" style="font-size:1.1rem; letter-spacing:-1px;">⋯</button>
+            </div>
+          </div>
+          <div class="txn-detail-drawer${open?' open':''}" id="txn-detail-${t.id}">
+            <div class="txn-detail-grid">
+              <div class="txn-detail-cell"><div class="txn-detail-label">Date</div><div class="txn-detail-val">${t.date||'—'}</div></div>
+              <div class="txn-detail-cell"><div class="txn-detail-label">Type</div><div class="txn-detail-val" style="text-transform:capitalize;">${t.type||'—'}</div></div>
+              <div class="txn-detail-cell"><div class="txn-detail-label">Category</div><div class="txn-detail-val">${t.category||'—'}</div></div>
+              <div class="txn-detail-cell"><div class="txn-detail-label">Source</div><div class="txn-detail-val">${t.property||'—'}</div></div>
+              <div class="txn-detail-cell" style="grid-column:1/-1;"><div class="txn-detail-label">Description</div><div class="txn-detail-val">${esc(t.description)||'—'}</div></div>
+              ${t.vendor?`<div class="txn-detail-cell" style="grid-column:1/-1;"><div class="txn-detail-label">Vendor</div><div class="txn-detail-val">${esc(t.vendor)}</div></div>`:''}
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-outline btn-sm btn-full" onclick="editTxn('${t.id}')">✏️ Edit</button>
+              <button class="btn btn-sm btn-full" style="background:var(--red);color:#fff;" onclick="deleteTxn('${t.id}','${esc(t.description)}')">🗑 Delete</button>
+            </div>
+          </div>`;
+      });
+    });
+
+    if (!html) html = `<div style="padding:32px;text-align:center;color:var(--muted);"><div style="font-size:2rem;margin-bottom:8px;">💳</div><div style="font-weight:600;">No transactions found</div><div style="font-size:0.875rem;margin-top:4px;">Try adjusting your filter or search</div></div>`;
+    body.innerHTML = html;
+
+    // Count label
+    const set = (id,v) => { const e=document.getElementById(id); if(e)e.textContent=v; };
+    set('txn-count-label',
+      TXN_STATE.showAll || hidden === 0
+        ? `${total} transaction${total!==1?'s':''}`
+        : `Showing ${visCount} of ${total} transaction${total!==1?'s':''}`
+    );
+
+    // Load more button
+    const lmWrap = document.getElementById('txn-load-more-wrap');
+    const lmHint = document.getElementById('txn-load-more-hint');
+    const saBtn  = document.getElementById('txn-show-all-btn');
+    if (lmWrap) lmWrap.style.display = (!TXN_STATE.showAll && hidden > 0) ? 'block' : 'none';
+    if (lmHint) lmHint.textContent   = hidden > 0 ? `(${hidden} more)` : '';
+    if (saBtn)  saBtn.style.display  = (!TXN_STATE.showAll && hidden > 0) ? 'inline-flex' : 'none';
+
+    // Select-all checkbox state
+    const allBox = document.getElementById('txn-select-all');
+    if (allBox) {
+      const pageIds = paged.map(t=>t.id);
+      const allSel  = pageIds.length>0 && pageIds.every(id=>TXN_STATE.selected.has(id));
+      allBox.checked = allSel;
+      allBox.indeterminate = !allSel && pageIds.some(id=>TXN_STATE.selected.has(id));
+    }
+    _updateBulkBar();
+  }
+
+  function toggleTxnDetail(id) { TXN_STATE.openRow = TXN_STATE.openRow===id?null:id; renderTransactionTable(); }
+
+  function toggleTxnSelect(id, cb) {
+    if(cb.checked) TXN_STATE.selected.add(id); else TXN_STATE.selected.delete(id);
+    _updateBulkBar();
+    const row=document.getElementById('txn-row-'+id); if(row)row.classList.toggle('selected',cb.checked);
+  }
+
+  function toggleSelectAll(cb) {
+    const all    = getFilteredTxns();
+    const total  = all.length;
+    const vis    = TXN_STATE.showAll ? total : Math.min(TXN_STATE.visible, total);
+    const paged  = all.slice(0, vis);
+    paged.forEach(t => { if(cb.checked) TXN_STATE.selected.add(t.id); else TXN_STATE.selected.delete(t.id); });
+    renderTransactionTable();
+  }
+
+  function clearTxnSelection() { TXN_STATE.selected.clear(); renderTransactionTable(); }
+
+  function _updateBulkBar() {
+    const bar=document.getElementById('txn-bulk-bar'), cnt=document.getElementById('txn-bulk-count'), n=TXN_STATE.selected.size;
+    if(!bar)return;
+    bar.style.display=n>0?'flex':'none';
+    if(cnt)cnt.textContent=`${n} selected`;
+  }
+
+  function sortTransactions(field) {
+    TXN_STATE.sortDir = TXN_STATE.sortField===field?(TXN_STATE.sortDir==='asc'?'desc':'asc'):(field==='date'?'desc':'asc');
+    TXN_STATE.sortField = field;
+    document.querySelectorAll('.sort-arrow').forEach(e=>{e.textContent='';e.classList.remove('active');});
+    const a=document.getElementById('sort-'+field); if(a){a.textContent=TXN_STATE.sortDir==='asc'?'↑':'↓';a.classList.add('active');}
+    TXN_STATE.visible=TXN_INIT; TXN_STATE.showAll=false; renderTransactionTable();
+  }
+
+  function filterTransactions() {
+    TXN_STATE.search=(document.getElementById('txn-search')?.value||'');
+    TXN_STATE.visible=TXN_INIT; TXN_STATE.showAll=false; renderTransactionTable();
+  }
+
+  // Load more / show all
+  function txnLoadMore() {
+    TXN_STATE.visible += TXN_BATCH;
+    renderTransactionTable();
+    // Scroll load-more button into view smoothly
+    setTimeout(() => {
+      const btn = document.getElementById('txn-load-more-wrap');
+      if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+  }
+
+  function txnShowAll() {
+    TXN_STATE.showAll = true;
+    renderTransactionTable();
+  }
+
+  function openTxnForm(record) {
+    const modal=(record?.type==='income')?'modal-rent':'modal-expense';
+    openTransactionForm(modal, record||null);
+  }
+  function editTxn(id) { const r=getTxnData().find(t=>t.id===id); if(r)openTxnForm(r); }
+  function deleteTxn(id, label) {
+    confirmDelete('transaction', label||id, () => {
+      softDelete('transactions', id);
+      TXN_STATE.selected.delete(id);
+      renderTransactionTable(); renderDashboard();
+    });
+  }
+  function bulkDeleteSelected() {
+    const ids=[...TXN_STATE.selected]; if(!ids.length)return;
+    confirmDelete('transactions',`${ids.length} selected transactions`,()=>{
+      ids.forEach(id=>softDelete('transactions',id));
+      TXN_STATE.selected.clear(); renderTransactionTable(); renderDashboard();
+    });
+  }
+  function bulkExportSelected() {
+    const rows=getTxnData().filter(t=>TXN_STATE.selected.has(t.id));
+    downloadCSV(`transactions-${new Date().toISOString().slice(0,10)}.csv`,toCSV(rows,['date','type','category','amount','description','property','vendor']));
+  }
+
+  /* ── FINANCES TABS ──────────────────────────────────────────── */
   function switchFinTab(tab) {
     document.querySelectorAll('#fin-tabs .inner-tab').forEach((btn, i) => {
       btn.classList.toggle('active', ['overview','transactions','reports'][i] === tab);
@@ -3264,13 +3720,19 @@
     const panel = document.getElementById('ftab-' + tab);
     if (panel) panel.classList.add('active');
     document.getElementById('content').scrollTo({ top: 0, behavior: 'instant' });
+    // Render transaction table when tab activates
+    if (tab === 'transactions') setTimeout(renderTransactionTable, 30);
   }
 
   /* ── FILTER CHIPS ───────────────────────────────────────── */
   function setFilter(el, filter) {
-    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('#ftab-transactions .filter-chip').forEach(c => c.classList.remove('active'));
     el.classList.add('active');
-    console.log('Filter:', filter);
+    TXN_STATE.filter  = filter;
+    TXN_STATE.visible = TXN_INIT;
+    TXN_STATE.showAll = false;
+    TXN_STATE.selected.clear();
+    renderTransactionTable();
   }
 
   /* ── CSV EXPORT ─────────────────────────────────────────── */
@@ -3321,7 +3783,190 @@
     downloadCSV(`schedule-c-resale-${year}.csv`, toCSV(sales, headers));
   }
 
-  /* ── APP NAME ────────────────────────────────────────────────── */
+  /* ── AMENITIES MANAGER ──────────────────────────────────────── */
+  /* ── AMENITIES — MULTI-SELECT CHIP SYSTEM ───────────────────── */
+
+  // Master list of preset amenities always shown in the grid
+  const AMENITY_PRESETS = [
+    'WiFi', 'Washer/Dryer', 'Parking', 'AC', 'Heating',
+    'Pool access', 'Hot tub', 'Smart TV', 'Cable/Streaming',
+    'Dishwasher', 'Garage', 'Backyard', 'Pet area',
+    'EV charger', 'Security system', 'Gym access',
+  ];
+
+  function _getSelectedAmenities() {
+    // Read currently selected amenities from currentProperty or localStorage fallback
+    if (currentProperty?.amenities) return currentProperty.amenities;
+    try {
+      const stored = localStorage.getItem('hml_amenities_demo');
+      return stored ? JSON.parse(stored) : ['WiFi', 'Washer/Dryer', 'Parking', 'AC', 'Pool access', 'Smart TV'];
+    } catch { return []; }
+  }
+
+  function openAmenitiesModal() {
+    const selected = _getSelectedAmenities();
+    // Collect all chips to show: presets + any custom ones not in presets
+    const custom = selected.filter(a => !AMENITY_PRESETS.includes(a));
+    const allChips = [...AMENITY_PRESETS, ...custom];
+    renderAmenityChips(allChips, selected);
+    openModal('modal-amenities');
+  }
+
+  function renderAmenityChips(allChips, selected) {
+    const grid = document.getElementById('amenity-chip-grid');
+    if (!grid) return;
+    grid.innerHTML = allChips.map(name => {
+      const isSelected = selected.includes(name);
+      const isCustom   = !AMENITY_PRESETS.includes(name);
+      return `<button
+        class="amenity-chip${isSelected ? ' selected' : ''}${isCustom ? ' custom-chip' : ''}"
+        onclick="toggleAmenityChip(this, '${name.replace(/'/g, "\\'")}')">
+        ${name}${isCustom ? ' <span style="font-size:0.65rem;opacity:0.7;" onclick="event.stopPropagation();removeCustomChip(this,\''+name.replace(/'/g,"\\'")+'\')" title="Remove">✕</span>' : ''}
+      </button>`;
+    }).join('');
+  }
+
+  function toggleAmenityChip(btn, name) {
+    btn.classList.toggle('selected');
+  }
+
+  function removeCustomChip(spanEl, name) {
+    // Remove this custom chip entirely from the grid
+    const chip = spanEl.closest('.amenity-chip');
+    if (chip) chip.remove();
+  }
+
+  function addAmenityCustom() {
+    const inp  = document.getElementById('amenity-custom');
+    const name = (inp?.value || '').trim();
+    if (!name) return;
+    const grid = document.getElementById('amenity-chip-grid');
+    if (!grid) return;
+    // Check for duplicate
+    const existing = [...grid.querySelectorAll('.amenity-chip')]
+      .map(c => c.textContent.replace('✓ ','').replace('✕','').trim().toLowerCase());
+    if (existing.includes(name.toLowerCase())) {
+      inp.value = '';
+      return;
+    }
+    // Add as a new selected custom chip
+    const btn = document.createElement('button');
+    btn.className = 'amenity-chip selected custom-chip';
+    btn.innerHTML = `${name} <span style="font-size:0.65rem;opacity:0.7;" onclick="event.stopPropagation();removeCustomChip(this,'${name.replace(/'/g,"\\'")}');" title="Remove">✕</span>`;
+    btn.onclick = (e) => { if (e.target.tagName !== 'SPAN') btn.classList.toggle('selected'); };
+    grid.appendChild(btn);
+    inp.value = '';
+    inp.focus();
+  }
+
+  function saveAmenities() {
+    const grid = document.getElementById('amenity-chip-grid');
+    if (!grid) { closeModal('modal-amenities'); return; }
+
+    // Collect only selected chips
+    const selected = [...grid.querySelectorAll('.amenity-chip.selected')]
+      .map(c => c.childNodes[0].textContent.replace('✓ ','').trim())
+      .filter(Boolean);
+
+    // 1. Persist to currentProperty and DB
+    if (currentProperty) {
+      currentProperty.amenities = selected;
+      upsert('properties', currentProperty);
+    } else {
+      localStorage.setItem('hml_amenities_demo', JSON.stringify(selected));
+    }
+
+    // 2. Update the info tab display immediately
+    const display = document.getElementById('prop-amenities-display');
+    if (display) {
+      display.innerHTML = selected.length
+        ? selected.map(n => `<span class="amenity-tag">${n}</span>`).join('')
+        : '<span style="color:var(--muted);font-size:0.875rem;">No amenities selected</span>';
+    }
+
+    closeModal('modal-amenities');
+  }
+
+  // Keep these as no-ops so any lingering references don't crash
+  function removeAmenity() {}
+  function addAmenityPreset() {}
+  function addAmenityToList() {}
+
+  /* ── PLATFORM MANAGER ───────────────────────────────────────── */
+  function _readPlatformList() {
+    return [...document.querySelectorAll('#prop-platforms-list .inline-list-item span')]
+      .map(s => s.textContent.trim()).filter(Boolean);
+  }
+
+  function _syncPlatformDisplay(platforms) {
+    const display = document.getElementById('prop-platforms-display');
+    if (!display) return;
+    display.innerHTML = platforms.length
+      ? platforms.map(p => `<span class="platform-tag">${p}</span>`).join('')
+      : '<span style="color:var(--muted);font-size:0.875rem;">No platforms added</span>';
+  }
+
+  function _persistPlatforms(platforms) {
+    if (currentProperty) {
+      currentProperty.platforms = platforms;
+      upsert('properties', currentProperty);
+    }
+    _syncPlatformDisplay(platforms);
+  }
+
+  function addPlatform() {
+    const sel = document.getElementById('new-platform-select');
+    const val = sel?.value;
+    if (!val) return;
+    const list = document.getElementById('prop-platforms-list');
+    if (!list) return;
+    const existing = _readPlatformList().map(p => p.toLowerCase());
+    if (existing.includes(val.toLowerCase())) { sel.value = ''; return; }
+    const div = document.createElement('div');
+    div.className = 'inline-list-item';
+    div.innerHTML = `<span>${val}</span><button class="inline-list-remove" onclick="removePlatform(this)">✕</button>`;
+    list.appendChild(div);
+    sel.value = '';
+    _persistPlatforms(_readPlatformList());
+  }
+
+  function removePlatform(btn) {
+    btn.closest('.inline-list-item').remove();
+    _persistPlatforms(_readPlatformList());
+  }
+
+  /* ── ADD-NEW PROMPT HELPERS ─────────────────────────────────── */
+  function promptNewResaleCategory() {
+    const name = prompt('New resale category name:');
+    if (name && name.trim()) {
+      // Add to all resale category selects
+      document.querySelectorAll('#modal-acquire select').forEach(sel => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = name.trim();
+        // Insert before the __new option
+        const newOpt = [...sel.options].find(o => o.value === '__new');
+        if (newOpt) sel.insertBefore(opt, newOpt);
+        sel.value = name.trim();
+      });
+    }
+  }
+
+  function promptNewPlatform() {
+    const name = prompt('New platform name:');
+    if (name && name.trim()) {
+      document.querySelectorAll('select').forEach(sel => {
+        const hasNew = [...sel.options].some(o => o.value === '__new');
+        if (!hasNew) return;
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = name.trim();
+        const newOpt = [...sel.options].find(o => o.value === '__new');
+        sel.insertBefore(opt, newOpt);
+        sel.value = name.trim();
+      });
+    }
+  }
+
+  
   const DEFAULT_APP_NAME = 'Homemade Lane';
 
   function getAppName() {
@@ -3467,7 +4112,48 @@
     document.getElementById('content').scrollTo({ top: 0, behavior: 'instant' });
   }
 
-  /* ── MODALS ─────────────────────────────────────────────── */
+  /* ════════════════════════════════════════════════════════════
+     FORM STATE SYSTEM
+     Each modal has:
+       - openXxx(record?)  — populates form fields from record or blank
+       - saveXxx()         — reads fields → upsert → render → close
+       - renderXxx()       — updates DOM from DB (or current state obj)
+     This is the single source of truth pattern: DB → form → DB → render
+  ════════════════════════════════════════════════════════════ */
+
+  /* ── CURRENT EDIT STATE ─────────────────────────────────── */
+  // Holds the id being edited so Save knows whether to insert or update
+  // Tracks which property is currently open in the detail view
+  let currentProperty = null;
+
+  const EDIT = {
+    property:    null,
+    lease:       null,
+    transaction: null,
+    item:        null,
+    listing:     null,
+    sale:        null,
+    document:    null,
+  };
+
+  /* ── FIELD HELPERS ──────────────────────────────────────── */
+  // Read a value from a named input/select inside a modal
+  function fGet(modalId, name) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return '';
+    const el = modal.querySelector(`[data-field="${name}"]`);
+    return el ? el.value.trim() : '';
+  }
+
+  // Write a value into a named input/select inside a modal
+  function fSet(modalId, name, value) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    const el = modal.querySelector(`[data-field="${name}"]`);
+    if (el) el.value = value ?? '';
+  }
+
+  /* ── MODALS — low-level open/close ──────────────────────── */
   function openModal(id) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -3488,6 +4174,401 @@
   function overlayClose(e, id) {
     if (e.target === document.getElementById(id)) closeModal(id);
   }
+
+  /* ════════════════════════════════════════════════════════════
+     PROPERTY
+  ════════════════════════════════════════════════════════════ */
+  function openPropertyForm(record) {
+    record = record || null;
+    EDIT.property = record;
+    const m = 'modal-add-property';
+    const r = record || {};
+    document.getElementById('prop-modal-title').textContent = record ? 'Edit Property' : 'Add Property';
+    fSet(m, 'nickname',         r.name || '');
+    fSet(m, 'address',          r.address || '');
+    fSet(m, 'city',             r.city || '');
+    fSet(m, 'state',            r.state || '');
+    fSet(m, 'zip',              r.zip || '');
+    fSet(m, 'bedrooms',         r.bedrooms || '');
+    fSet(m, 'bathrooms',        r.bathrooms || '');
+    fSet(m, 'monthlyRate',      r.monthlyRate || '');
+    fSet(m, 'securityDeposit',  r.securityDeposit || '');
+    fSet(m, 'petDeposit',       r.petDeposit || '');
+    fSet(m, 'petsAllowed',      r.petsAllowed || 'Yes');
+    fSet(m, 'furnished',        r.furnished || 'Yes — fully furnished');
+    fSet(m, 'rentalType',       r.rentalType || 'Short-term (3–6 months)');
+    fSet(m, 'notes',            r.notes || '');
+    // Render platforms list from saved data (not hardcoded defaults)
+    const list = document.getElementById('prop-platforms-list');
+    if (list) {
+      const platforms = r.platforms || ['Furnished Finder', 'Direct'];
+      list.innerHTML = platforms.map(p => `
+        <div class="inline-list-item">
+          <span>${p}</span>
+          <button class="inline-list-remove" onclick="removePlatform(this)">✕</button>
+        </div>`).join('');
+    }
+    openModal(m);
+  }
+
+  /* ── AMENITIES MODAL OPEN ───────────────────────────────────── */
+  function saveProperty() {
+    const m = 'modal-add-property';
+    // Read platform list
+    const platforms = [...document.querySelectorAll('#prop-platforms-list .inline-list-item span')]
+      .map(s => s.textContent);
+    const record = {
+      id:              EDIT.property?.id || genId(),
+      name:            fGet(m, 'nickname'),
+      address:         fGet(m, 'address'),
+      city:            fGet(m, 'city'),
+      state:           fGet(m, 'state'),
+      zip:             fGet(m, 'zip'),
+      bedrooms:        fGet(m, 'bedrooms'),
+      bathrooms:       fGet(m, 'bathrooms'),
+      monthlyRate:     fGet(m, 'monthlyRate'),
+      securityDeposit: fGet(m, 'securityDeposit'),
+      petDeposit:      fGet(m, 'petDeposit'),
+      petsAllowed:     fGet(m, 'petsAllowed'),
+      furnished:       fGet(m, 'furnished'),
+      rentalType:      fGet(m, 'rentalType'),
+      notes:           fGet(m, 'notes'),
+      platforms,
+      // Preserve amenities — they are saved separately via saveAmenities()
+      amenities:       EDIT.property?.amenities || currentProperty?.amenities || [],
+      createdAt:       EDIT.property?.createdAt || now(),
+    };
+    if (!record.name) { alert('Property nickname is required.'); return; }
+    upsert('properties', record);
+    // Update currentProperty so subsequent modal opens are pre-filled correctly
+    currentProperty = record;
+    renderPropertyList();
+    renderPropertyDetail(record);
+    renderDashboard();
+    closeModal(m);
+    EDIT.property = null;
+  }
+
+  function renderPropertyList() {
+    // Re-render the property list cards from DB
+    // (in future: full dynamic render; for now updates key fields on existing cards)
+    const props = activeRecords('properties');
+    props.forEach(p => {
+      const nameEls = document.querySelectorAll('.prop-card-name, #detail-prop-name');
+      // Update detail view if this property is currently open
+      if (PROPERTIES[p.id]) {
+        PROPERTIES[p.id].name = p.name;
+        PROPERTIES[p.id].addr = `${p.address}, ${p.city} ${p.state} ${p.zip}`;
+      }
+    });
+  }
+
+  function renderPropertyDetail(record) {
+    if (!record) return;
+    // Update info tab display fields
+    const setInfo = (label, val) => {
+      document.querySelectorAll('.info-row').forEach(row => {
+        if (row.querySelector('.info-label')?.textContent.toLowerCase().includes(label.toLowerCase())) {
+          const valEl = row.querySelector('.info-val');
+          if (valEl) valEl.textContent = val;
+        }
+      });
+    };
+    setInfo('Bedrooms',         record.bedrooms || '—');
+    setInfo('Bathrooms',        record.bathrooms || '—');
+    setInfo('Furnished',        record.furnished || '—');
+    setInfo('Pets allowed',     record.petsAllowed || '—');
+    setInfo('Pet deposit',      record.petDeposit ? `$${record.petDeposit}` : '—');
+    setInfo('Security deposit', record.securityDeposit ? `$${record.securityDeposit}` : '—');
+    setInfo('Monthly rate',     record.monthlyRate ? `$${record.monthlyRate}/mo` : '—');
+    setInfo('Type',             record.rentalType || '—');
+    // Update platforms display
+    const platDisplay = document.getElementById('prop-platforms-display');
+    if (platDisplay && record.platforms) {
+      platDisplay.innerHTML = record.platforms.length
+        ? record.platforms.map(p => `<span class="platform-tag">${p}</span>`).join('')
+        : '<span style="color:var(--muted);font-size:0.875rem;">No platforms added</span>';
+    }
+    // Update amenities display
+    const amenDisplay = document.getElementById('prop-amenities-display');
+    if (amenDisplay && record.amenities && record.amenities.length) {
+      amenDisplay.innerHTML = record.amenities.map(a =>
+        `<span class="amenity-tag">${a}</span>`).join('');
+    }
+    // Update header
+    const nameEl = document.getElementById('detail-prop-name');
+    const addrEl = document.getElementById('detail-prop-addr');
+    if (nameEl && record.name) nameEl.textContent = record.name;
+    if (addrEl) addrEl.textContent = `${record.address || ''}, ${record.city || ''} ${record.state || ''} ${record.zip || ''}`.trim();
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     TRANSACTION (rent payment + expense unified)
+  ════════════════════════════════════════════════════════════ */
+  function openTransactionForm(modalId, record) {
+    EDIT.transaction = record || null;
+    if (record) {
+      fSet(modalId, 'amount',      record.amount || '');
+      fSet(modalId, 'date',        record.date || new Date().toISOString().split('T')[0]);
+      fSet(modalId, 'description', record.description || '');
+      fSet(modalId, 'vendor',      record.vendor || '');
+      fSet(modalId, 'category',    record.category || '');
+    }
+    openModal(modalId);
+  }
+
+  function saveTransaction(modalId, type) {
+    const record = {
+      id:          EDIT.transaction?.id || genId(),
+      type,
+      property:    fGet(modalId, 'property'),
+      amount:      parseFloat(fGet(modalId, 'amount')) || 0,
+      date:        fGet(modalId, 'date') || new Date().toISOString().split('T')[0],
+      category:    fGet(modalId, 'category') || (type === 'income' ? 'Rent received' : 'Other'),
+      description: fGet(modalId, 'description'),
+      vendor:      fGet(modalId, 'vendor'),
+      taxYear:     new Date(fGet(modalId, 'date') || Date.now()).getFullYear().toString(),
+      createdAt:   EDIT.transaction?.createdAt || now(),
+    };
+    if (!record.amount) { alert('Amount is required.'); return; }
+    upsert('transactions', record);
+    renderTransactionLists();
+    renderDashboard();
+    closeModal(modalId);
+    EDIT.transaction = null;
+  }
+
+  function renderTransactionLists() {
+    // Refresh the recent transactions on dashboard and finances screens
+    // These will be fully dynamic when data is real; for now we signal a refresh
+    renderDashboard();
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     LEASE
+  ════════════════════════════════════════════════════════════ */
+  function openLeaseForm(record) {
+    EDIT.lease = record || null;
+    const m = 'modal-add-lease';
+    const r = record || {};
+    document.querySelector('#modal-add-lease .modal-title').textContent =
+      record ? 'Edit Lease' : 'New Lease';
+    fSet(m, 'firstName',      r.firstName || '');
+    fSet(m, 'lastName',       r.lastName || '');
+    fSet(m, 'email',          r.email || '');
+    fSet(m, 'phone',          r.phone || '');
+    fSet(m, 'emergencyName',  r.emergencyName || '');
+    fSet(m, 'emergencyPhone', r.emergencyPhone || '');
+    fSet(m, 'relationship',   r.relationship || '');
+    fSet(m, 'pets',           r.pets || 'No pets');
+    fSet(m, 'petDesc',        r.petDesc || '');
+    fSet(m, 'startDate',      r.startDate || '');
+    fSet(m, 'endDate',        r.endDate || '');
+    fSet(m, 'monthlyRent',    r.monthlyRent || '');
+    fSet(m, 'securityDeposit',r.securityDeposit || '');
+    fSet(m, 'petDeposit',     r.petDeposit || '');
+    fSet(m, 'platform',       r.platform || 'Direct');
+    fSet(m, 'bookingId',      r.bookingId || '');
+    openModal(m);
+  }
+
+  function saveLease() {
+    const m = 'modal-add-lease';
+    const record = {
+      id:              EDIT.lease?.id || genId(),
+      propertyId:      EDIT.lease?.propertyId || '',
+      firstName:       fGet(m, 'firstName'),
+      lastName:        fGet(m, 'lastName'),
+      email:           fGet(m, 'email'),
+      phone:           fGet(m, 'phone'),
+      emergencyName:   fGet(m, 'emergencyName'),
+      emergencyPhone:  fGet(m, 'emergencyPhone'),
+      relationship:    fGet(m, 'relationship'),
+      pets:            fGet(m, 'pets'),
+      petDesc:         fGet(m, 'petDesc'),
+      startDate:       fGet(m, 'startDate'),
+      endDate:         fGet(m, 'endDate'),
+      monthlyRent:     fGet(m, 'monthlyRent'),
+      securityDeposit: fGet(m, 'securityDeposit'),
+      petDeposit:      fGet(m, 'petDeposit'),
+      platform:        fGet(m, 'platform'),
+      bookingId:       fGet(m, 'bookingId'),
+      status:          EDIT.lease?.status || 'active',
+      createdAt:       EDIT.lease?.createdAt || now(),
+    };
+    if (!record.lastName && !record.firstName) { alert('Tenant name is required.'); return; }
+    upsert('leases', record);
+    renderActiveLease(record);
+    closeModal(m);
+    EDIT.lease = null;
+  }
+
+  function renderActiveLease(record) {
+    if (!record) return;
+    const nameEl = document.querySelector('#ptab-tenants .card .prop-card-name, #ptab-tenants [style*="font-weight:700"]');
+    // Update tenant display name in active lease card
+    const tenantHeader = document.querySelector('#ptab-tenants .card [style*="font-weight:700; font-size:1rem"]');
+    if (tenantHeader) tenantHeader.textContent = `${record.firstName} ${record.lastName}`;
+    // Update contact rows
+    document.querySelectorAll('#ptab-tenants .info-row').forEach(row => {
+      const label = row.querySelector('.info-label')?.textContent || '';
+      const valEl = row.querySelector('.info-val');
+      if (!valEl) return;
+      if (label.includes('Phone'))     valEl.textContent = record.phone || '—';
+      if (label.includes('Email'))     valEl.textContent = record.email || '—';
+      if (label.includes('Pets'))      valEl.textContent = record.petDesc || record.pets || '—';
+      if (label.includes('Emergency')) valEl.textContent = `${record.emergencyName || '—'} · ${record.relationship || ''}`;
+    });
+    // Update lease dates in header
+    const subEl = document.querySelector('#ptab-tenants .card [style*="font-size:0.8125rem; color:var(--muted)"]');
+    if (subEl && record.startDate && record.endDate) {
+      const fmt = d => new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+      subEl.textContent = `${record.isExtension ? 'Extension' : 'Lease'} · ${fmt(record.startDate)} – ${fmt(record.endDate)}`;
+    }
+    // Update terms grid
+    document.querySelectorAll('#ptab-tenants .card [style*="font-weight:700; color:var(--navy)"]').forEach((el, i) => {
+      if (i === 0 && record.monthlyRent)    el.textContent = `$${record.monthlyRent}`;
+      if (i === 1 && record.securityDeposit) el.textContent = `$${record.securityDeposit}`;
+      if (i === 2 && record.petDeposit)     el.textContent = `$${record.petDeposit}`;
+    });
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     RESALE — ITEM
+  ════════════════════════════════════════════════════════════ */
+  function openItemForm(record) {
+    EDIT.item = record || null;
+    const m = 'modal-acquire';
+    const r = record || {};
+    document.querySelector('#modal-acquire .modal-title').textContent =
+      record ? 'Edit Item' : 'Log Purchase';
+    fSet(m, 'itemName',  r.name || '');
+    fSet(m, 'category',  r.category || 'Clothing');
+    fSet(m, 'source',    r.source || '');
+    fSet(m, 'cost',      r.acquisitionCost || '');
+    fSet(m, 'date',      r.acquisitionDate || '');
+    fSet(m, 'notes',     r.notes || '');
+    openModal(m);
+  }
+
+  function saveItem() {
+    const m = 'modal-acquire';
+    const record = {
+      id:              EDIT.item?.id || genId(),
+      name:            fGet(m, 'itemName'),
+      category:        fGet(m, 'category'),
+      source:          fGet(m, 'source'),
+      acquisitionCost: parseFloat(fGet(m, 'cost')) || 0,
+      acquisitionDate: fGet(m, 'date'),
+      notes:           fGet(m, 'notes'),
+      status:          EDIT.item?.status || 'acquired',
+      createdAt:       EDIT.item?.createdAt || now(),
+    };
+    if (!record.name) { alert('Item name is required.'); return; }
+    upsert('items', record);
+    renderInventoryList();
+    closeModal(m);
+    EDIT.item = null;
+  }
+
+  function renderInventoryList() {
+    const items = activeRecords('items');
+    // Update inventory snapshot counts
+    const inStock = items.filter(i => i.status === 'acquired' || i.status === 'in stock').length;
+    const listed  = items.filter(i => i.status === 'listed').length;
+    document.querySelectorAll('.snapshot-cell').forEach(cell => {
+      const label = cell.querySelector('.snapshot-label')?.textContent;
+      const valEl = cell.querySelector('.snapshot-value');
+      if (!valEl) return;
+      if (label === 'In Stock') valEl.textContent = inStock || items.length;
+      if (label === 'Listed')   valEl.textContent = listed;
+    });
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     RESALE — SALE
+  ════════════════════════════════════════════════════════════ */
+  function openSaleForm(record) {
+    EDIT.sale = record || null;
+    const m = 'modal-sale';
+    const r = record || {};
+    fSet(m, 'salePrice',    r.salePrice || '');
+    fSet(m, 'saleDate',     r.saleDate || '');
+    fSet(m, 'platform',     r.platform || 'Poshmark');
+    fSet(m, 'platformFees', r.platformFees || '');
+    fSet(m, 'shipping',     r.shippingCost || '');
+    openModal(m);
+  }
+
+  function saveSale() {
+    const m = 'modal-sale';
+    const price  = parseFloat(fGet(m, 'salePrice'))    || 0;
+    const fees   = parseFloat(fGet(m, 'platformFees')) || 0;
+    const ship   = parseFloat(fGet(m, 'shipping'))     || 0;
+    const itemSel = document.querySelector('#modal-sale [data-field="itemSold"]');
+    const itemId  = itemSel?.value || '';
+    const item    = DB.items.find(i => i.id === itemId);
+    const cost    = item?.acquisitionCost || 0;
+    const net     = price - fees - ship - cost;
+    const record = {
+      id:              EDIT.sale?.id || genId(),
+      itemId,
+      itemName:        item?.name || itemSel?.options[itemSel.selectedIndex]?.text || '',
+      platform:        fGet(m, 'platform'),
+      salePrice:       price,
+      platformFees:    fees,
+      shippingCost:    ship,
+      acquisitionCost: cost,
+      netProceeds:     net,
+      saleDate:        fGet(m, 'saleDate'),
+      taxYear:         new Date(fGet(m, 'saleDate') || Date.now()).getFullYear().toString(),
+      createdAt:       EDIT.sale?.createdAt || now(),
+    };
+    // Update net profit display in modal
+    const profitEl = document.querySelector('#modal-sale [style*="font-size:1.25rem"]');
+    if (profitEl) profitEl.textContent = `$${net.toFixed(2)}`;
+    upsert('sales', record);
+    renderSalesList();
+    closeModal(m);
+    EDIT.sale = null;
+  }
+
+  function renderSalesList() {
+    const sales = activeRecords('sales');
+    const total = sales.reduce((s, r) => s + (r.netProceeds || 0), 0);
+    // Update resale profit snapshot
+    document.querySelectorAll('.snapshot-cell').forEach(cell => {
+      const label = cell.querySelector('.snapshot-label')?.textContent;
+      const valEl = cell.querySelector('.snapshot-value');
+      if (label === 'Sold YTD' && valEl) valEl.textContent = sales.length;
+      if (label === 'Profit'   && valEl) valEl.textContent = `$${total.toFixed(0)}`;
+    });
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     DASHBOARD REFRESH
+  ════════════════════════════════════════════════════════════ */
+  function renderDashboard() {
+    // Recalculate this-month snapshot from DB
+    const thisMonth = new Date().toISOString().slice(0, 7); // "2026-04"
+    const txns = activeRecords('transactions').filter(t =>
+      (t.date || t.createdAt || '').startsWith(thisMonth)
+    );
+    const income   = txns.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
+    const expenses = txns.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
+    const net      = income - expenses;
+    // Update snapshot cells on dashboard
+    document.querySelectorAll('#screen-dashboard .snapshot-cell').forEach(cell => {
+      const label = cell.querySelector('.snapshot-label')?.textContent;
+      const valEl = cell.querySelector('.snapshot-value');
+      if (!valEl) return;
+      if (label === 'Income')   valEl.textContent = `$${income.toFixed(0)}`;
+      if (label === 'Expenses') valEl.textContent = `$${expenses.toFixed(0)}`;
+      if (label === 'Net')      valEl.textContent = `$${net.toFixed(0)}`;
+    });
+  }
+
+  
 
   /* ── SETTINGS ACTIONS ───────────────────────────────────── */
   // Wire up export/import buttons in settings
@@ -3623,17 +4704,7 @@
   /* ── CONFIRM DELETE ──────────────────────────────────────────── */
   let pendingDeleteCallback = null;
 
-  function confirmDelete(type, label) {
-    document.getElementById('confirm-type').textContent = type;
-    document.getElementById('confirm-msg').textContent =
-      `"${label}" will be permanently deleted. This cannot be undone.`;
-    document.getElementById('confirm-dialog').classList.add('open');
-    document.body.style.overflow = 'hidden';
-    pendingDeleteCallback = () => {
-      // In real app: remove from data store, re-render list
-      console.log(`Deleted ${type}: ${label}`);
-    };
-  }
+
 
   function closeConfirm() {
     document.getElementById('confirm-dialog').classList.remove('open');
