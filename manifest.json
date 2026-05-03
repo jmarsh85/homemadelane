@@ -1,10 +1,12 @@
 {
-  "name": "Our Lifestyle App",
-  "short_name": "LifeApp",
-  "start_url": "/",
+  "name": "Homemade Lane",
+  "short_name": "Homemade Lane",
+  "description": "Property & Resale Tracker",
+  "start_url": "/homemadelane/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#1B2B4B",
+  "theme_color": "#1B2B4B",
+  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "icon-192.png",
