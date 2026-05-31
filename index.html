@@ -2027,6 +2027,18 @@
         </div>
       </div>
 
+      <div class="card" style="padding:14px 16px; margin-bottom:12px;">
+        <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:10px;">App Update</div>
+        <div style="font-size:0.8125rem;color:var(--muted);margin-bottom:12px;line-height:1.5;">
+          If the app looks outdated after a GitHub push, tap below to reload from the server and clear cached files.
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline" style="flex:1;font-size:0.8125rem;" onclick="forceAppUpdate()">🔄 Force Update</button>
+          <button class="btn btn-outline" style="flex:1;font-size:0.8125rem;" onclick="showUpdateStatus()">📋 Check Version</button>
+        </div>
+        <div id="update-status-msg" style="display:none;margin-top:10px;font-size:0.75rem;color:var(--muted);line-height:1.5;"></div>
+      </div>
+
       <button class="btn btn-full" style="background:var(--red-light); color:var(--red); font-weight:700; border:1.5px solid var(--red);" onclick="openClearAll()">🗑 Clear All Data</button>
 
     </section>
@@ -4277,6 +4289,52 @@
   }
 
   /* ── STORAGE STATS ───────────────────────────────────────────── */
+  function forceAppUpdate() {
+    // iOS PWA standalone mode caches aggressively — the only reliable escape is
+    // opening the live URL in Safari with a cache-busting query param.
+    const base = window.location.origin + window.location.pathname;
+    const bust  = '?v=' + Date.now();
+    const url   = base + bust;
+
+    // Try location.reload(true) first (forces server fetch in some browsers)
+    try {
+      // Open in Safari (breaks out of PWA shell if running as standalone)
+      if (window.navigator.standalone) {
+        // Running as home screen PWA — open in Safari to force reload
+        window.open(url, '_blank');
+        showToast('Opening in Safari to reload latest version…', 3500);
+      } else {
+        // Running in browser — hard reload with cache bust
+        window.location.href = url;
+      }
+    } catch(e) {
+      window.location.reload(true);
+    }
+  }
+
+  function showUpdateStatus() {
+    const msg = document.getElementById('update-status-msg');
+    if (!msg) return;
+    msg.style.display = 'block';
+
+    const schema     = localStorage.getItem('hml_app_schema') || 'pre-v4';
+    const seeded     = localStorage.getItem('hml_seeded') ? 'Yes' : 'No';
+    const migrated   = localStorage.getItem('hml_seed_migrated_v1') ? 'Yes' : 'No';
+    const standalone = window.navigator.standalone ? 'Yes (PWA)' : 'No (Browser)';
+    const savedAt    = localStorage.getItem('nestAndNest_savedAt') || '—';
+    const propCount  = activeRecords('properties').length;
+    const txnCount   = activeRecords('transactions').length;
+
+    msg.innerHTML = [
+      '<strong>App schema:</strong> v' + schema,
+      '<strong>Standalone PWA:</strong> ' + standalone,
+      '<strong>DB last saved:</strong> ' + (savedAt !== '—' ? new Date(savedAt).toLocaleString() : '—'),
+      '<strong>Properties:</strong> ' + propCount + ' · <strong>Transactions:</strong> ' + txnCount,
+      '<strong>Demo seeded:</strong> ' + seeded + ' · <strong>Migrated:</strong> ' + migrated,
+      '<strong>Tip:</strong> If stuck on old version, open the GitHub Pages URL in Safari directly, then re-add to Home Screen.',
+    ].join('<br>');
+  }
+
   function updateStorageStats() {
     try {
       const raw  = localStorage.getItem('nestAndNest_db') || '{}';
@@ -6413,6 +6471,51 @@
   }
 
 
+  /* ── SCHEMA MIGRATION — runs on every load, idempotent ─────
+     Backfills new fields onto existing records so old localStorage
+     data works with new code without requiring a data wipe.
+  ────────────────────────────────────────────────────────────── */
+  function migrateSchema() {
+    const APP_SCHEMA = 4;  // bump this whenever new fields are added
+    const storedSchema = parseInt(localStorage.getItem('hml_app_schema') || '0', 10);
+    if (storedSchema >= APP_SCHEMA) return;
+
+    let dirty = false;
+
+    // v4: backfill new property fields
+    if (storedSchema < 4) {
+      activeRecords('properties').forEach(p => {
+        let changed = false;
+        // New fields added to inline property form
+        if (p.cleaningFee           === undefined) { p.cleaningFee           = '';    changed = true; }
+        if (p.cleaningFeeRefundable === undefined) { p.cleaningFeeRefundable = false; changed = true; }
+        if (p.petDepositRefundable  === undefined) { p.petDepositRefundable  = false; changed = true; }
+        if (p.storage               === undefined) { p.storage               = '';    changed = true; }
+        if (p.parking               === undefined) { p.parking               = '';    changed = true; }
+        if (p.maintenanceResp       === undefined) { p.maintenanceResp       = '';    changed = true; }
+        if (changed) {
+          p.updatedAt = now();
+          dirty = true;
+        }
+      });
+
+      // v4: backfill new transaction fields
+      activeRecords('transactions').forEach(t => {
+        let changed = false;
+        if (t.isRecurring === undefined) { t.isRecurring = false; changed = true; }
+        if (t.frequency   === undefined) { t.frequency   = null;  changed = true; }
+        if (changed) {
+          t.updatedAt = now();
+          dirty = true;
+        }
+      });
+    }
+
+    if (dirty) saveDB();
+    localStorage.setItem('hml_app_schema', APP_SCHEMA.toString());
+    console.log('[HML] Schema migration complete → v' + APP_SCHEMA);
+  }
+
   // One-time migration: backfill seed properties that were saved without full display fields
   function migrateSeedProperties() {
     if (localStorage.getItem('hml_seed_migrated_v1')) return;
@@ -7349,6 +7452,7 @@
     loadDB();
     seedDemoData();
     migrateSeedProperties();
+    migrateSchema();
     loadOwnerProfileToSettings();
     // Seed nav history with home as root
     NAV_HISTORY.push('home');
