@@ -7885,6 +7885,112 @@
    on the real DB *before* calling upsert, and lbToast() / lbActiveRecords()
    that delegate through window.* only as a call (not a stored reference).
 ─────────────────────────────────────────────────────────────────*/
+/* ── iOS-SAFE CONFIRM / PROMPT (replaces native dialogs blocked in PWA) ── */
+function lbConfirm(message, onYes, onNo) {
+  var existing = document.getElementById('lb-ios-confirm');
+  if (existing) existing.remove();
+  var d = document.createElement('div');
+  d.id = 'lb-ios-confirm';
+  d.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(17,28,51,0.6);display:flex;align-items:center;justify-content:center;padding:24px;';
+  d.innerHTML = '<div style="background:#fff;border-radius:16px;padding:24px 20px;width:100%;max-width:340px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.3);">'
+    + '<div style="font-size:0.9375rem;line-height:1.5;color:#111;margin-bottom:20px;">'+message+'</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+    + '<button onclick="document.getElementById(&quot;lb-ios-confirm&quot;).remove();if(window._lbConfirmNo)window._lbConfirmNo();" style="padding:12px;border:1.5px solid #ddd;border-radius:10px;font-size:0.9375rem;cursor:pointer;background:#fff;">Cancel</button>'
+    + '<button onclick="document.getElementById(&quot;lb-ios-confirm&quot;).remove();if(window._lbConfirmYes)window._lbConfirmYes();" style="padding:12px;border:none;border-radius:10px;font-size:0.9375rem;font-weight:700;cursor:pointer;background:#1B2B4B;color:#fff;">Confirm</button>'
+    + '</div></div>';
+  window._lbConfirmYes = onYes;
+  window._lbConfirmNo  = onNo || null;
+  document.body.appendChild(d);
+}
+
+function lbPromptOverlay(message, placeholder, onSubmit) {
+  var existing = document.getElementById('lb-ios-prompt');
+  if (existing) existing.remove();
+  var d = document.createElement('div');
+  d.id = 'lb-ios-prompt';
+  d.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(17,28,51,0.6);display:flex;align-items:center;justify-content:center;padding:24px;';
+  d.innerHTML = '<div style="background:#fff;border-radius:16px;padding:24px 20px;width:100%;max-width:340px;box-shadow:0 8px 40px rgba(0,0,0,0.3);">'
+    + '<div style="font-size:0.875rem;color:#555;margin-bottom:12px;line-height:1.5;">'+message+'</div>'
+    + '<input id="lb-ios-prompt-input" type="text" placeholder="'+placeholder+'" style="width:100%;padding:10px 12px;border:1.5px solid #ddd;border-radius:10px;font-size:0.9375rem;margin-bottom:16px;box-sizing:border-box;" />'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+    + '<button onclick="document.getElementById(&quot;lb-ios-prompt&quot;).remove();" style="padding:12px;border:1.5px solid #ddd;border-radius:10px;font-size:0.9375rem;cursor:pointer;background:#fff;">Cancel</button>'
+    + '<button onclick="var v=document.getElementById(&quot;lb-ios-prompt-input&quot;).value;document.getElementById(&quot;lb-ios-prompt&quot;).remove();if(window._lbPromptCb)window._lbPromptCb(v);" style="padding:12px;border:none;border-radius:10px;font-size:0.9375rem;font-weight:700;cursor:pointer;background:#1B2B4B;color:#fff;">OK</button>'
+    + '</div></div>';
+  window._lbPromptCb = onSubmit;
+  document.body.appendChild(d);
+  setTimeout(function(){ var inp = document.getElementById('lb-ios-prompt-input'); if(inp) inp.focus(); }, 80);
+}
+
+/* Synchronous download helper — stays within the user gesture frame */
+function lbDownloadNow(filename, content, mimeType) {
+  // Path 1: Web Share API with files (iOS 15+, requires HTTPS + gesture)
+  try {
+    var shareBlob = new Blob([content], { type: mimeType });
+    var shareFile = new File([shareBlob], filename, { type: mimeType });
+    if (navigator.canShare && navigator.canShare({ files: [shareFile] })) {
+      navigator.share({ files: [shareFile], title: filename })
+        .then(function() { if (window.lbToast) window.lbToast('✅ ' + filename); })
+        .catch(function(err) { if (err.name !== 'AbortError') { lbShowContent(filename, content); } });
+      return true;
+    }
+  } catch(e1) {}
+
+  // Path 2: blob URL download (works on desktop/Android)
+  try {
+    var dlBlob = new Blob([content], { type: mimeType });
+    var dlUrl  = URL.createObjectURL(dlBlob);
+    var dlA    = document.createElement('a');
+    dlA.href = dlUrl; dlA.download = filename;
+    document.body.appendChild(dlA); dlA.click(); document.body.removeChild(dlA);
+    setTimeout(function(){ URL.revokeObjectURL(dlUrl); }, 1500);
+    if (window.lbToast) window.lbToast('✅ ' + filename);
+    return true;
+  } catch(e2) {}
+
+  // Path 3 (iOS PWA fallback): show content in copy modal
+  lbShowContent(filename, content);
+  return true;
+}
+
+// Show lease content in a full-screen overlay for manual copy/share
+// — the guaranteed iOS fallback: always works, user can long-press to share
+function lbShowContent(filename, text) {
+  var existing = document.getElementById('lb-content-overlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'lb-content-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10002;background:#fff;display:flex;flex-direction:column;';
+  var safeText = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  overlay.innerHTML = [
+    '<div style="background:#1B2B4B;color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">',
+      '<div>',
+        '<div style="font-weight:700;font-size:0.9375rem;">' + filename + '</div>',
+        '<div style="font-size:0.75rem;opacity:0.7;">Tap Share &#8599; or long-press to copy</div>',
+      '</div>',
+      '<button id="lb-content-close" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:8px;padding:8px 14px;font-size:0.875rem;cursor:pointer;">&#x2715; Close</button>',
+    '</div>',
+    '<div style="padding:12px 14px;background:#f5f5f5;border-bottom:1px solid #ddd;display:flex;gap:8px;flex-shrink:0;">',
+      '<button id="lb-copy-btn" style="flex:1;padding:10px;background:#1B2B4B;color:#fff;border:none;border-radius:8px;font-size:0.875rem;font-weight:600;cursor:pointer;">&#x1F4CB; Copy All</button>',
+      '<button id="lb-share-btn" style="flex:1;padding:10px;background:#F0A500;color:#1B2B4B;border:none;border-radius:8px;font-size:0.875rem;font-weight:600;cursor:pointer;">&#x2197; Share</button>',
+    '</div>',
+    '<textarea id="lb-content-text" readonly style="flex:1;padding:14px;font-family:monospace;font-size:0.75rem;border:none;resize:none;outline:none;-webkit-user-select:all;user-select:all;background:#fff;color:#000;">' + safeText + '</textarea>',
+  ].join('');
+  document.body.appendChild(overlay);
+  document.getElementById('lb-content-close').onclick = function(){ overlay.remove(); };
+  document.getElementById('lb-copy-btn').onclick = function() {
+    var ta = document.getElementById('lb-content-text');
+    var btn = document.getElementById('lb-copy-btn');
+    ta.select();
+    navigator.clipboard && navigator.clipboard.writeText(text)
+      .then(function(){ btn.textContent = '✅ Copied!'; btn.style.background = '#4A7C59'; })
+      .catch(function(){ btn.textContent = 'Select text above'; });
+  };
+  document.getElementById('lb-share-btn').onclick = function() {
+    try { navigator.share({ text: text, title: filename }); } catch(e) {}
+  };
+}
+
 function lbBridge() {
   /* jshint ignore:start */
   if (typeof showToast  === 'function' && !window._lbToastBridged) {
@@ -7892,6 +7998,7 @@ function lbBridge() {
     window._lbToastBridged = true;
   }
   if (typeof saveFileAs    === 'function' && !window.saveFileAs)    window.saveFileAs    = saveFileAs;
+  if (typeof showCopyModal === 'function' && !window.showCopyModal) window.showCopyModal = showCopyModal;
   if (typeof activeRecords === 'function' && !window.activeRecords) window.activeRecords = activeRecords;
   if (typeof genId         === 'function' && !window.genId)         window.genId         = genId;
   if (typeof now           === 'function' && !window.now)           window.now           = now;
@@ -8150,22 +8257,22 @@ window.lbCascadeLease = function() {
     if (fullAddr) payAddr.value = fullAddr;
   }
 
-  // Auto-derive governing state from property record
-  var stateEl = document.getElementById('lb-state');
-  if (stateEl && prop && prop.state) {
+  // Auto-derive governing state from property record — write to hidden input + display
+  var stateHidden  = document.getElementById('lb-state');
+  var stateDisplay = document.getElementById('lb-state-display');
+  if (prop && prop.state) {
     var propState = prop.state.trim();
-    // Match to select options
-    var matched = false;
-    Array.prototype.forEach.call(stateEl.options, function(opt) {
-      if (opt.value.toLowerCase() === propState.toLowerCase() ||
-          propState.toLowerCase().indexOf(opt.value.toLowerCase()) === 0) {
-        stateEl.value = opt.value;
-        matched = true;
-      }
+    var knownStates = ['Virginia','Arizona','California','Florida','Texas','Nevada','Colorado','Washington'];
+    var matched = knownStates.find(function(s) {
+      return s.toLowerCase() === propState.toLowerCase() || propState.toLowerCase().startsWith(s.toLowerCase());
     });
-    // If not matched, set to 'Other' and store the actual state for token substitution
-    if (!matched) { stateEl.value = 'Other'; LB.customState = propState; }
-    else { LB.customState = null; }
+    var resolvedState = matched || propState;
+    if (stateHidden)  stateHidden.value = resolvedState;
+    if (stateDisplay) stateDisplay.textContent = resolvedState;
+    LB.customState = matched ? null : propState;
+  } else {
+    if (stateDisplay) stateDisplay.textContent = 'Not set — select property first';
+    LB.customState = null;
   }
 
   // Pre-fill Step 2 property detail fields from property record (overrideable by user)
@@ -8252,6 +8359,42 @@ window.lbCascadeLease = function() {
 
   // Update pay-in-full calculator with linked lease data
   try { lbUpdatePayInFull(); } catch(e) {}
+};
+
+window.lbOverrideState = function() {
+  var wrap = document.getElementById('lb-state-override');
+  var sel  = document.getElementById('lb-state-select');
+  var cur  = (document.getElementById('lb-state')||{}).value || 'Virginia';
+  if (wrap) wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
+  if (sel) {
+    // Pre-select current value
+    Array.prototype.forEach.call(sel.options, function(o) {
+      o.selected = (o.value === cur);
+    });
+    if (!sel.value) { sel.options[sel.options.length-1].selected = true; }
+  }
+};
+
+window.lbSetStateOverride = function(val) {
+  var otherInp = document.getElementById('lb-state-other');
+  if (val === 'Other') {
+    if (otherInp) otherInp.style.display = 'block';
+    return; // wait for text input
+  }
+  if (otherInp) otherInp.style.display = 'none';
+  var hidden  = document.getElementById('lb-state');
+  var display = document.getElementById('lb-state-display');
+  if (hidden)  hidden.value = val;
+  if (display) display.textContent = val;
+  LB.customState = null;
+};
+
+window.lbSetStateOther = function(val) {
+  var hidden  = document.getElementById('lb-state');
+  var display = document.getElementById('lb-state-display');
+  if (hidden)  hidden.value = val;
+  if (display) display.textContent = val || '—';
+  LB.customState = val;
 };
 
 window.lbSaveApiKey = function() {
@@ -8521,8 +8664,9 @@ function lbGetTokens() {
   var furnSel  = (document.getElementById('lb-furnished')||{}).value || 'fully';
   var furnDesc = furnSel === 'fully' ? 'House is fully furnished' :
                  furnSel === 'partial' ? 'House is partially furnished' : 'No furnishings provided';
-  var stateRaw = g('lb-state') || 'Virginia';
-  var stateVal = (stateRaw === 'Other' && LB.customState) ? LB.customState : stateRaw;
+  // lb-state hidden input always holds the resolved state value (never 'Other')
+  var stateRaw = g('lb-state') || LB.customState || 'Virginia';
+  var stateVal = stateRaw;
   var stateRef = stateVal === 'Virginia' ? 'Commonwealth of Virginia' :
                  stateVal === 'Arizona'  ? 'State of Arizona' : stateVal;
   var occupants = lease ? tenantFull : '___________';
@@ -8605,8 +8749,8 @@ window.lbInitClauses = function() {
 };
 
 window.lbNewDraft = function() {
-  if (!confirm('Start a new draft? Any unsaved changes will be lost.')) return;
-  LB.clauses = [];
+  lbConfirm('Start a new draft? Any unsaved changes will be lost.', function() {
+    LB.clauses = [];
   LB.linkedLeaseId    = null;
   LB.linkedPropertyId = null;
   LB.agreementId      = null;
@@ -8632,6 +8776,7 @@ window.lbNewDraft = function() {
   var lbl = document.getElementById('lb-property-label');
   if (lbl) lbl.textContent = 'Select a property to begin';
   if (window.lbToast) window.lbToast('📋 New draft started');
+  }); // end lbConfirm callback
 };
 
 /* ── CLAUSE RENDER ───────────────────────────────────────────── */
@@ -9057,7 +9202,14 @@ window.lbExecute = function() {
   var toastFn  = window.lbToast || function(){};
 
   if (!LB.linkedLeaseId) { toastFn('⚠️ No lease linked'); return; }
-  if (!confirm('Mark this agreement as Executed? This creates a permanent snapshot of the current lease terms and marks the agreement as signed.')) return;
+  lbConfirm('Mark this agreement as Executed?\n\nThis creates a permanent snapshot and marks the agreement as signed.', function() { lbExecuteConfirmed(); });
+};
+window.lbExecuteConfirmed = function() {
+  lbBridge();
+  var upsertFn = window.lbUpsert;
+  var getCol   = window.lbGetCollection || function(){ return []; };
+  var toastFn  = window.lbToast || function(){};
+  if (!LB.linkedLeaseId) { toastFn('⚠️ No lease linked'); return; }
 
   var lease = getCol('leases').find(function(l){ return l.id === LB.linkedLeaseId; });
   var prop  = getCol('properties').find(function(p){ return p.id === LB.linkedPropertyId; });
@@ -9201,7 +9353,9 @@ window.lbOpenAgreement = function(agreementId) {
       set('lb-storage',      bf.storage);
       set('lb-parking',      bf.parking);
       set('lb-maint-resp',   bf.maintResp);
-      set('lb-state',        bf.state);
+      set('lb-state', bf.state);
+      var sd = document.getElementById('lb-state-display');
+      if (sd && bf.state) sd.textContent = bf.state;
       // Restore LB state fields
       LB.customState = bf.customState || null;
       LB.payInFull   = bf.payInFull   || null;
@@ -9213,9 +9367,14 @@ window.lbOpenAgreement = function(agreementId) {
       if (agreement.clauses && agreement.clauses.length) {
         LB.clauses = agreement.clauses.map(function(sc) {
           var def = LB_CLAUSE_DEFS.find(function(d){ return d.id === sc.id; }) || {};
+          var freshText = def.text || sc.text;
+          // If user never edited this clause (saved text matches any prior default),
+          // use the current definition so updated clause language takes effect automatically.
+          var userEdited = sc.modified || (sc.text !== sc.defaultText && sc.text !== freshText);
           return {
             id: sc.id, num: def.num||sc.id, title: def.title||sc.id,
-            defaultText: def.text||sc.text, text: sc.text,
+            defaultText: freshText,
+            text: userEdited ? sc.text : freshText,
             included: sc.included, required: def.required||false,
             expanded: false, editing: false,
           };
@@ -9236,7 +9395,17 @@ window.lbOpenDraft = window.lbOpenAgreement;
 window.lbDeleteAgreement = function(agreementId, tenantName) {
   lbBridge();
   var toastFn = window.lbToast || function(){};
-  if (!confirm('Delete this lease agreement for ' + (tenantName||'this tenant') + '? The linked lease record will not be affected.')) return;
+  lbConfirm('Delete this lease agreement for ' + (tenantName||'this tenant') + '?\n\nThe linked lease record will not be affected.', function() {
+    lbDeleteConfirmed(agreementId, tenantName);
+  });
+  return; // rest runs inside callback
+  void 0; // marker
+};
+window.lbDeleteConfirmed = function(agreementId, tenantName) {
+  lbBridge();
+  var upsertFn = window.lbUpsert;
+  var getCol   = window.lbGetCollection || function(){ return []; };
+  var toastFn  = window.lbToast || function(){};
   var getCol   = window.lbGetCollection || function(){ return []; };
   var upsertFn = window.lbUpsert;
   if (typeof upsertFn === 'function') {
@@ -9287,7 +9456,6 @@ window.lbExportDocx = function() {
     rtf += para('', false, 11);
   });
 
-  rtf += para('RECEIPT', true, 11);
   (function(){
     var lease2 = LB.linkedLeaseId ? (window.lbGetCollection||function(){return[];})('leases').find(function(l){return l.id===LB.linkedLeaseId;}) : null;
     var rentAmt = parseFloat(tokens['{{RENT}}']||0);
@@ -9305,6 +9473,7 @@ window.lbExportDocx = function() {
     }
     if (!proratedAmt) rtf += para('First Month Rent:   $'+rentAmt.toFixed(2), false, 11);
   }());
+  rtf += para('RECEIPT', true, 11);
   rtf += para('Security Deposit:   $' + parseFloat(secDep).toFixed(2), false, 11);
   if (parseFloat(cleanDep)) rtf += para(cleanLabel + ':  $' + parseFloat(cleanDep).toFixed(2), false, 11);
   if (parseFloat(petFee))   rtf += para(petLabel   + ':  $' + parseFloat(petFee).toFixed(2),   false, 11);
@@ -9319,20 +9488,10 @@ window.lbExportDocx = function() {
   rtf += para('By: _________________________________   Date: ___________', false, 11);
   rtf += '}';
 
-  var blob = new Blob([rtf], { type: 'application/msword' });
-  if (typeof window.saveFileAs === 'function') {
-    window.saveFileAs(fname, blob, 'application/msword').then(function(r) {
-      if (r && !r.aborted && window.lbToast) window.lbToast('✅ Exported as ' + fname);
-    });
-  } else {
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url; a.download = fname;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
-    if (window.lbToast) window.lbToast('✅ Exported as ' + fname);
-  }
+  // Use lbDownloadNow — synchronous gesture-safe path: Web Share → blob URL → lbShowContent
+  lbDownloadNow(fname, rtf, 'application/msword');
 };
+
 
 /* ── EXPORT TXT (plain text fallback) ───────────────────────── */
 window.lbExportTxt = function() {
@@ -9344,10 +9503,10 @@ window.lbExportTxt = function() {
   var secDep      = tokens['{{SEC_DEP}}']   || '0';
   var cleanDep    = tokens['{{CLEAN_DEP}}'] || '0';
   var petFee      = tokens['{{PET_FEE}}']   || '0';
-  var totalDep    = (parseFloat(secDep)+parseFloat(cleanDep)).toString();
   var totalDep    = (parseFloat(secDep)+parseFloat(cleanDep)+parseFloat(petFee)).toFixed(2);
   var cleanLabel  = tokens['{{CLEANING_FEE_LABEL}}'] || 'Cleaning Fee';
   var petLabel    = tokens['{{PET_FEE_LABEL}}']      || 'Pet Fee';
+
   var lines = [
     stateVal.toUpperCase() + ' RESIDENTIAL LEASE AGREEMENT', '',
     'This Lease Agreement (the "Agreement") is made and entered on ' + effDate,
@@ -9360,17 +9519,16 @@ window.lbExportTxt = function() {
     lines.push(lbSubstitute(c.text));
     lines.push('');
   });
-  lines.push('', 'RECEIPT');
+
   (function(){
     var lease2 = LB.linkedLeaseId ? (window.lbGetCollection||function(){return[];})('leases').find(function(l){return l.id===LB.linkedLeaseId;}) : null;
     var rentAmt = parseFloat(tokens['{{RENT}}']||0);
     var proratedAmt = 0;
     if (lease2 && lease2.startDate) {
       var sd2 = new Date(lease2.startDate+'T12:00:00');
-      var startDay2 = sd2.getDate();
-      if (startDay2 !== 1) {
+      if (sd2.getDate() !== 1) {
         var dim2 = new Date(sd2.getFullYear(), sd2.getMonth()+1, 0).getDate();
-        var rem2 = dim2 - startDay2 + 1;
+        var rem2 = dim2 - sd2.getDate() + 1;
         proratedAmt = Math.round((rentAmt/dim2)*rem2*100)/100;
         lines.push('Prorated First Month ('+rem2+'/'+dim2+' days):  $'+proratedAmt.toFixed(2));
         lines.push('Second Month Rent:   $'+rentAmt.toFixed(2));
@@ -9378,6 +9536,7 @@ window.lbExportTxt = function() {
     }
     if (!proratedAmt) lines.push('First Month Rent:    $'+rentAmt.toFixed(2));
   }());
+  lines.push('', 'RECEIPT');
   lines.push('Security Deposit:  $' + parseFloat(secDep).toFixed(2));
   if (parseFloat(cleanDep)) lines.push(cleanLabel.padEnd(19) + '$' + parseFloat(cleanDep).toFixed(2));
   if (parseFloat(petFee))   lines.push(petLabel.padEnd(19)   + '$' + parseFloat(petFee).toFixed(2));
@@ -9392,24 +9551,21 @@ window.lbExportTxt = function() {
   var fname = 'lease-' + tenantFull.replace(/\s+/g,'-').toLowerCase() + '-' + (effDate !== '___________' ? effDate : 'draft') + '.txt';
   var blob  = new Blob([text], { type: 'text/plain' });
 
-  if (typeof window.saveFileAs === 'function') {
-    window.saveFileAs(fname, blob, 'text/plain').then(function(r) {
-      if (r && !r.aborted && window.lbToast) window.lbToast('✅ Exported as ' + fname);
-    });
-  } else {
-    navigator.clipboard && navigator.clipboard.writeText(text)
-      .then(function() { if (window.lbToast) window.lbToast('📋 Lease copied to clipboard'); });
-  }
+  // Use lbDownloadNow — synchronous gesture-safe path: Web Share → blob URL → lbShowContent
+  lbDownloadNow(fname, text, 'text/plain');
 };
-
 
 /* ── PROMPT AMEND ────────────────────────────────────────────── */
 window.lbPromptAmend = function() {
-  var summary = prompt('Briefly describe this amendment (e.g. "Rent increase to $2,800", "Pet added — Beagle"):');
-  if (summary === null) return;
-  if (!summary.trim()) summary = 'Amendment';
-  lbAmend(summary.trim());
-  lbUpdateStep4Buttons();
+  lbPromptOverlay(
+    'Briefly describe this amendment:',
+    'e.g. Rent increase to $2,800, Pet added',
+    function(summary) {
+      if (summary === null || summary === undefined) return;
+      lbAmend((summary.trim()) || 'Amendment');
+      lbUpdateStep4Buttons();
+    }
+  );
 };
 
 window.lbUpdateStep4Buttons = lbUpdateStep4Buttons;
@@ -9485,13 +9641,10 @@ window.lbExportSnapshot = function(agreementId, versionHint) {
 
   var text  = lines.join('\n');
   var fname = 'lease-snapshot-'+tenantFull.replace(/\s+/g,'-').toLowerCase()+'.txt';
-  var blob  = new Blob([text], { type: 'text/plain' });
-
-  if (typeof window.saveFileAs === 'function') {
-    window.saveFileAs(fname, blob, 'text/plain').then(function(r) {
-      if (r && !r.aborted && window.lbToast) window.lbToast('✅ Snapshot exported — '+vLabel);
-    });
-  } else {
+  // Synchronous download — preserves iOS gesture context
+  var ok2 = lbDownloadNow(fname, text, 'text/plain');
+  if (ok2 && window.lbToast) window.lbToast('✅ Snapshot exported — ' + vLabel);
+  if (!ok2) {
     navigator.clipboard && navigator.clipboard.writeText(text)
       .then(function(){ if (window.lbToast) window.lbToast('📋 Snapshot copied — '+vLabel); });
   }
@@ -9559,64 +9712,64 @@ window.lbExportPdf = function() {
     return;
   }
 
-  // Inject a print-only stylesheet the first time
-  if (!document.getElementById('lb-print-style')) {
-    var style = document.createElement('style');
-    style.id = 'lb-print-style';
-    style.textContent = [
-      '@media print {',
-      '  body > *:not(#lb-print-frame) { display: none !important; }',
-      '  #lb-print-frame {',
-      '    display: block !important;',
-      '    position: static;',
-      '    width: 100%;',
-      '    background: #fff;',
-      '    font-family: Georgia, serif;',
-      '    font-size: 11pt;',
-      '    line-height: 1.7;',
-      '    color: #000;',
-      '    padding: 0.75in;',
-      '    box-sizing: border-box;',
-      '  }',
-      '  #lb-print-frame h1 { font-size: 14pt; text-align: center; margin-bottom: 4pt; }',
-      '  #lb-print-frame h2 { font-size: 9pt; text-align: center; color: #555; margin-bottom: 18pt; letter-spacing: 0.04em; text-transform: uppercase; }',
-      '  #lb-print-frame p { margin-bottom: 8pt; }',
-      '  #lb-print-frame .lb-clause-preview { margin-bottom: 10pt; page-break-inside: avoid; }',
-      '  #lb-print-frame .lb-sig-block { margin-top: 24pt; border-top: 1px solid #000; padding-top: 16pt; page-break-inside: avoid; }',
-      '  #lb-print-frame .lb-sig-row { display: flex; gap: 40pt; }',
-      '  #lb-print-frame .lb-sig-col { flex: 1; }',
-      '  #lb-print-frame .lb-sig-line { border-bottom: 1px solid #000; margin: 24pt 0 4pt; }',
-      '  #lb-print-frame table { width: 100%; border-collapse: collapse; margin: 8pt 0; font-size: 10pt; }',
-      '  #lb-print-frame table td { padding: 4pt 6pt; border: 1px solid #ccc; }',
-      '}',
-    ].join('\n');
-    document.head.appendChild(style);
-  }
+  var tokens = lbGetTokens();
+  var tenantFull = tokens['{{TENANT_FULL_NAME}}'] || 'tenant';
+  var effDate    = tokens['{{EFF_DATE}}'] !== '___________' ? tokens['{{EFF_DATE}}'] : 'draft';
+  var fname      = 'lease-' + tenantFull.replace(/\s+/g,'-').toLowerCase() + '-' + effDate + '.html';
 
-  // Build a print frame with clean content
-  var existing = document.getElementById('lb-print-frame');
-  if (existing) existing.remove();
+  // Self-contained HTML file — opens in any browser, prints to PDF natively,
+  // and is accepted by DocuSign / HelloSign / Adobe Sign for e-signing
+  var html = [
+    '<!DOCTYPE html><html lang="en"><head>',
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width,initial-scale=1">',
+    '<title>Lease Agreement — ' + tenantFull + '</title>',
+    '<style>',
+    '*{box-sizing:border-box;margin:0;padding:0;}',
+    'body{font-family:Georgia,"Times New Roman",serif;font-size:11pt;line-height:1.75;',
+    '     color:#000;background:#fff;padding:1in;max-width:8.5in;margin:0 auto;}',
+    'h1{font-size:16pt;text-align:center;margin-bottom:6pt;font-weight:bold;letter-spacing:.02em;}',
+    'h2{font-size:9pt;text-align:center;color:#555;margin-bottom:24pt;',
+    '   letter-spacing:.06em;text-transform:uppercase;font-weight:normal;}',
+    'p{margin-bottom:9pt;orphans:3;widows:3;}',
+    '.lb-clause-preview{margin-bottom:14pt;page-break-inside:avoid;}',
+    '.lb-clause-preview strong{font-weight:bold;}',
+    '.lb-sig-block{margin-top:32pt;border-top:1.5px solid #000;padding-top:20pt;page-break-inside:avoid;}',
+    '.lb-sig-block h2{text-align:left;margin-bottom:14pt;font-size:11pt;',
+    '                  text-transform:none;letter-spacing:0;color:#000;font-weight:bold;}',
+    '.lb-sig-row{display:flex;gap:60pt;margin-bottom:10pt;}',
+    '.lb-sig-col{flex:1;}',
+    '.lb-sig-line{border-bottom:1px solid #000;margin:32pt 0 5pt;}',
+    '.lb-receipt-table{width:100%;border-collapse:collapse;margin:12pt 0;',
+    '                   font-size:10pt;page-break-inside:avoid;}',
+    '.lb-receipt-table td{padding:5pt 8pt;border:1px solid #999;vertical-align:top;}',
+    '.lb-receipt-table td:first-child{font-weight:bold;width:44%;}',
+    '.lb-receipt-table td:nth-child(2){width:20%;}',
+    '[style*="rgba(74,124,89"]{display:none!important;}',
+    '@media print{',
+    '  body{padding:.75in;}',
+    '  .no-print{display:none!important;}',
+    '  .lb-clause-preview,.lb-sig-block,.lb-receipt-table{page-break-inside:avoid;}',
+    '}',
+    '</style></head><body>',
+    '<div class="no-print" style="background:#1B2B4B;color:#fff;padding:14px 20px;',
+    '     margin:-1in -1in 1in;display:flex;justify-content:space-between;align-items:center;">',
+    '  <div style="font-size:.875rem;">',
+    '    <strong>Lease Agreement</strong> — ',
+    '    <span style="opacity:.8;">Open in Safari and tap Share &#8599; → Print to save as PDF</span>',
+    '  </div>',
+    '  <button onclick="window.print()" style="background:#F0A500;color:#1B2B4B;border:none;',
+    '    border-radius:8px;padding:8px 16px;font-weight:700;font-size:.875rem;cursor:pointer;">',
+    '    &#x1F5A8; Print / PDF',
+    '  </button>',
+    '</div>',
+    previewEl.innerHTML,
+    '</body></html>'
+  ].join('\n');
 
-  var frame = document.createElement('div');
-  frame.id = 'lb-print-frame';
-  // Copy the rendered preview HTML (already has substituted values)
-  frame.innerHTML = previewEl.innerHTML;
-  document.body.appendChild(frame);
-
-  if (window.lbToast) window.lbToast('📄 Opening print / Save as PDF…');
-
-  // Small delay so toast renders, then print
-  setTimeout(function() {
-    window.print();
-    // Clean up print frame after dialog closes
-    setTimeout(function() {
-      var f = document.getElementById('lb-print-frame');
-      if (f) f.remove();
-    }, 1500);
-  }, 180);
+  // Use lbDownloadNow — synchronous gesture-safe path: Web Share → blob URL → lbShowContent
+  lbDownloadNow(fname, html, 'text/html;charset=utf-8');
 };
-
-/* ── MODAL OPEN / CLOSE ──────────────────────────────────────────── */
 window.openLeaseBuilder = function() {
   // Build HTML for the modal if not already present
   var existing = document.getElementById('hml-lb-modal');
@@ -9691,10 +9844,28 @@ window.openLeaseBuilder = function() {
               '<a id="lb-edit-lease-link" onclick="" style="font-size:0.72rem;color:var(--navy);cursor:pointer;text-decoration:underline;opacity:0.7;">Edit in Tenants →</a>',
             '</div>',
 
-            // Governing state (only field needing input after cascade)
-            '<div class="field">',
-              '<label>Governing State</label>',
-              '<select id="lb-state"><option value="Virginia">Virginia</option><option value="Arizona">Arizona</option><option value="Other">Other</option></select>',
+            // Governing state — auto-resolved from property, read-only display
+            '<div style="margin-top:12px;">',
+              '<div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;">Governing State</div>',
+              '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);">',
+                '<span id="lb-state-display" style="font-size:0.9375rem;font-weight:600;color:var(--navy);">—</span>',
+                '<a onclick="lbOverrideState()" style="font-size:0.75rem;color:var(--muted);cursor:pointer;text-decoration:underline;">Override</a>',
+              '</div>',
+              '<input type="hidden" id="lb-state" value="" />',
+              '<div id="lb-state-override" style="display:none;margin-top:8px;">',
+                '<select id="lb-state-select" onchange="lbSetStateOverride(this.value)" style="width:100%;padding:8px 10px;border:1.5px solid var(--amber);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);">',
+                  '<option value="Virginia">Virginia</option>',
+                  '<option value="Arizona">Arizona</option>',
+                  '<option value="California">California</option>',
+                  '<option value="Florida">Florida</option>',
+                  '<option value="Texas">Texas</option>',
+                  '<option value="Nevada">Nevada</option>',
+                  '<option value="Colorado">Colorado</option>',
+                  '<option value="Washington">Washington</option>',
+                  '<option value="Other">Other (specify)</option>',
+                '</select>',
+                '<input type="text" id="lb-state-other" placeholder="Enter state name" style="display:none;margin-top:6px;width:100%;padding:8px 10px;border:1.5px solid var(--amber);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" oninput="lbSetStateOther(this.value)" />',
+              '</div>',
             '</div>',
 
             // AI key (collapsed)
@@ -9815,7 +9986,7 @@ window.openLeaseBuilder = function() {
           '<div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap;">',
             '<button class="btn btn-primary btn-sm" style="flex:1;" onclick="lbExportDocx()" title="Word-compatible RTF">⬇ .doc</button>',
             '<button class="btn btn-primary btn-sm" style="flex:1;background:#4A7C59;border-color:#4A7C59;" onclick="lbExportTxt()" title="Plain text">⬇ .txt</button>',
-            '<button class="btn btn-primary btn-sm" style="flex:1;background:var(--red);border-color:var(--red);" onclick="lbExportPdf()" title="Print / Save as PDF">⬇ PDF</button>',
+            '<button class="btn btn-primary btn-sm" style="flex:1;background:var(--red);border-color:var(--red);" onclick="lbExportPdf()" title="Save as HTML — open to print or e-sign">⬇ HTML</button>',
           '</div>',
           '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">',
             '<button class="btn btn-outline btn-sm" style="flex:1;font-size:0.7rem;" onclick="lbExportSnapshot()" title="Export frozen snapshot of executed agreement">📜 Export Snapshot</button>',
@@ -9838,6 +10009,7 @@ window.openLeaseBuilder = function() {
     lbPopulateSelects();
   }, 50);
 };
+
 
 window.closeLeaseBuilder = function() {
   var modal = document.getElementById('hml-lb-modal');
