@@ -1503,7 +1503,7 @@
         <div class="dot-menu-wrap">
           <button class="edit-btn" onclick="toggleDotMenu('prop-menu')">⋯</button>
           <div class="dot-menu-dropdown" id="prop-menu">
-            <button class="dot-menu-item" onclick="closeDotMenu('prop-menu'); openPropertyForm(currentProperty)">✏️ Edit Property</button>
+            <button class="dot-menu-item" onclick="closeDotMenu('prop-menu'); switchPropTab('info'); document.getElementById('content').scrollTo({top:0,behavior:'smooth'});">✏️ Edit Property</button>
             <button class="dot-menu-item danger" onclick="closeDotMenu('prop-menu'); confirmDelete('property', currentProperty?.name || 'this property', () => { softDelete('properties', currentProperty.id); softDelete('leases', null, currentProperty.id); currentProperty = null; currentLease = null; navigate('properties'); showToast('Property deleted'); })">🗑 Delete Property</button>
           </div>
         </div>
@@ -1519,54 +1519,7 @@
 
       <!-- INFO TAB -->
       <div class="prop-tab-panel active" id="ptab-info">
-        <!-- Core property details card -->
-        <div class="card" style="padding:0; overflow:hidden; margin-bottom:12px;">
-          <div style="padding:14px 16px; border-bottom:1px solid var(--border);">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted);">Property Details</div>
-              <button class="edit-btn" onclick="openPropertyForm(currentProperty)">✏️ Edit</button>
-            </div>
-            <div class="info-grid">
-              <div class="info-row"><span class="info-label">Bedrooms</span><span class="info-val">3</span></div>
-              <div class="info-row"><span class="info-label">Bathrooms</span><span class="info-val">2</span></div>
-              <div class="info-row"><span class="info-label">Furnished</span><span class="info-val">Yes — fully</span></div>
-              <div class="info-row"><span class="info-label">Pets allowed</span><span class="info-val">Yes</span></div>
-              <div class="info-row"><span class="info-label">Pet deposit</span><span class="info-val">$300</span></div>
-              <div class="info-row"><span class="info-label">Security deposit</span><span class="info-val">$500</span></div>
-              <div class="info-row"><span class="info-label">Monthly rate</span><span class="info-val">$950/mo</span></div>
-              <div class="info-row"><span class="info-label">Type</span><span class="info-val">Short-term</span></div>
-            </div>
-          </div>
-          <div style="padding:14px 16px;">
-            <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:6px;">Listing Platforms</div>
-            <div style="display:flex; flex-wrap:wrap; gap:6px;" id="prop-platforms-display">
-              <span class="platform-tag">Furnished Finder</span>
-              <span class="platform-tag">Direct</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Amenities — separate manager -->
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <p class="section-label" style="margin:0;">Amenities</p>
-          <button class="edit-btn" onclick="openAmenitiesModal()">+ Manage</button>
-        </div>
-        <div class="card" style="padding:14px 16px; margin-bottom:12px;">
-          <div id="prop-amenities-display" style="display:flex; flex-wrap:wrap; gap:6px;">
-            <span class="amenity-tag">WiFi</span>
-            <span class="amenity-tag">Washer/Dryer</span>
-            <span class="amenity-tag">Parking</span>
-            <span class="amenity-tag">AC</span>
-            <span class="amenity-tag">Pool access</span>
-            <span class="amenity-tag">Smart TV</span>
-          </div>
-        </div>
-
-        <!-- Description -->
-        <div class="card card-body" style="margin-bottom:12px;">
-          <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:6px;">Notes</div>
-          <div style="font-size:0.875rem; color:var(--muted); line-height:1.5;">Fully furnished 3/2. Pet-friendly. Available for short-term stays 3–6 months.</div>
-        </div>
+        <!-- Rendered by renderPropertyDetail() -->
       </div>
 
       <!-- TENANTS TAB -->
@@ -1724,6 +1677,7 @@
             <button class="filter-chip" onclick="setFilter(this,'expense')">Expenses</button>
             <button class="filter-chip" onclick="setFilter(this,'rental')">Rental</button>
             <button class="filter-chip" onclick="setFilter(this,'resale')">Resale</button>
+            <button class="filter-chip" onclick="setFilter(this,'bills')">🔁 Bills</button>
           </div>
           <button class="btn btn-amber btn-sm" style="flex-shrink:0;" onclick="openTxnForm()">+ Add</button>
         </div>
@@ -2251,6 +2205,27 @@
             <div class="receipt-sub">Tap to attach receipt image</div>
           </div>
         </div>
+        <!-- Recurring bill toggle -->
+        <div id="expense-recurring-wrap" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:4px;">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:0;">
+            <input type="checkbox" id="expense-is-recurring" onchange="toggleRecurringFields()" style="accent-color:var(--navy);width:17px;height:17px;flex-shrink:0;" />
+            <span style="font-size:0.875rem;font-weight:600;color:var(--navy);">Recurring bill</span>
+          </label>
+          <div id="expense-recurring-fields" style="display:none;margin-top:10px;">
+            <label style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);display:block;margin-bottom:6px;">Frequency</label>
+            <div style="display:flex;gap:8px;">
+              <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:0.8125rem;" id="freq-monthly-label">
+                <input type="radio" name="expense-frequency" value="monthly" checked style="accent-color:var(--navy);" /> Monthly
+              </label>
+              <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:0.8125rem;" id="freq-quarterly-label">
+                <input type="radio" name="expense-frequency" value="quarterly" style="accent-color:var(--navy);" /> Quarterly
+              </label>
+              <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:0.8125rem;" id="freq-annually-label">
+                <input type="radio" name="expense-frequency" value="annually" style="accent-color:var(--navy);" /> Annually
+              </label>
+            </div>
+          </div>
+        </div>
         <div style="display:flex; gap:10px;">
           <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-expense')">Cancel</button>
           <button class="btn btn-primary" style="flex:2;" onclick="saveTransaction('modal-expense','expense')">Save Expense</button>
@@ -2549,6 +2524,24 @@
           </select>
         </div>
         <div class="field"><label>Platform Booking ID (optional)</label><input data-field="bookingId" type="text" placeholder="Booking reference number" /></div>
+        <div class="field">
+          <label>Preferred Payment Method</label>
+          <select data-field="paymentMethod" onchange="(function(v){var w=document.getElementById('lease-modal-payment-note-wrap');if(w)w.style.display=(v&&v!=='Cash')?'':'none';})(this.value)">
+            <option value="">— Not specified —</option>
+            <option value="Zelle">Zelle</option>
+            <option value="Venmo">Venmo</option>
+            <option value="Cash">Cash</option>
+            <option value="Check">Check</option>
+            <option value="Bank Transfer">Bank Transfer / ACH</option>
+            <option value="Money Order">Money Order</option>
+            <option value="Credit Card">Credit Card</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field" id="lease-modal-payment-note-wrap" style="display:none;">
+          <label>Payment Detail / Handle <span style="font-size:0.7rem;color:var(--muted);font-weight:400;">(e.g. @username, last 4 digits)</span></label>
+          <input data-field="paymentNote" type="text" placeholder="e.g. @gracecruiz" />
+        </div>
         <div class="field">
           <label>Lease Status</label>
           <select data-field="leaseStatus">
@@ -3421,16 +3414,25 @@
         notes: '',
       };
     }
+    // Persist ID on detail screen so buttons can re-hydrate currentProperty
+    // if iOS BFCache restores the DOM but resets JS state to null
+    const detailScreen = document.getElementById('screen-property-detail');
+    if (detailScreen) detailScreen.dataset.propertyId = currentProperty.id;
+
     const nameEl = document.getElementById('detail-prop-name');
     const addrEl = document.getElementById('detail-prop-addr');
     const badgeEl = document.getElementById('detail-prop-badge');
     if (nameEl) nameEl.textContent = currentProperty.name || '';
     if (addrEl) addrEl.textContent =
       `${currentProperty.address||''}, ${currentProperty.city||''} ${currentProperty.state||''} ${currentProperty.zip||''}`.trim();
-    const isVacant = currentProperty._status === 'vacant' || !currentProperty.currentTenant;
-    if (badgeEl) badgeEl.outerHTML = isVacant
-      ? '<span id="detail-prop-badge" class="badge badge-red">● Vacant</span>'
-      : '<span id="detail-prop-badge" class="badge badge-green">● Active</span>';
+    const { occupied } = getPropertyDisplay(currentProperty);
+    const hasProspect = activeRecords('leases').some(l => l.propertyId === currentProperty.id && l.status === 'prospect');
+    const badgeHtml = occupied
+      ? '<span id="detail-prop-badge" class="badge badge-green">● Active</span>'
+      : hasProspect
+      ? '<span id="detail-prop-badge" class="badge" style="background:#FFF3CD;color:#856404;">Prospect</span>'
+      : '<span id="detail-prop-badge" class="badge badge-red">● Vacant</span>';
+    if (badgeEl) badgeEl.outerHTML = badgeHtml;
     renderPropertyDetail(currentProperty);
     switchPropTab('info');
     navigate('property-detail');
@@ -3587,6 +3589,7 @@
     if (f === 'expense') data = data.filter(t => t.type === 'expense');
     if (f === 'rental')  data = data.filter(t => t.property && t.property !== 'Resale');
     if (f === 'resale')  data = data.filter(t => t.property === 'Resale');
+    if (f === 'bills')   data = data.filter(t => t.isRecurring === true);
     if (q) data = data.filter(t =>
       (t.description||'').toLowerCase().includes(q) ||
       (t.category||'').toLowerCase().includes(q) ||
@@ -3605,6 +3608,13 @@
   function renderTransactionTable() {
     const body = document.getElementById('txn-table-body');
     if (!body) return;
+
+    // ── BILLS VIEW ──────────────────────────────────────────────
+    if (TXN_STATE.filter === 'bills') {
+      renderBillsView(body);
+      return;
+    }
+
     const all   = getFilteredTxns();
     const total = all.length;
 
@@ -3804,6 +3814,162 @@
     renderTransactionTable();
   }
 
+  function renderBillsView(body) {
+    const props = activeRecords('properties');
+    const bills = activeRecords('transactions').filter(t => t.isRecurring && t.type === 'expense');
+
+    if (!bills.length) {
+      body.innerHTML = `
+        <div style="padding:40px 24px;text-align:center;color:var(--muted);">
+          <div style="font-size:2rem;margin-bottom:10px;">🔁</div>
+          <div style="font-weight:700;color:var(--navy);margin-bottom:6px;">No recurring bills yet</div>
+          <div style="font-size:0.875rem;margin-bottom:18px;">Mark an expense as a recurring bill when logging it.</div>
+          <button class="btn btn-primary btn-sm" onclick="openTransactionForm('modal-expense')">+ Log a Bill</button>
+        </div>`;
+      return;
+    }
+
+    // For each property (+ unassigned), find the unique recurring bill templates
+    // A "template" = the most recent transaction per unique property+category+frequency combo
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    const billKey = t => `${t.propertyId||''}|${t.category||''}|${t.frequency||'monthly'}`;
+    const templateMap = {};
+    // Sort newest first so first-found = most recent per key
+    [...bills].sort((a,b) => new Date(b.date||0) - new Date(a.date||0)).forEach(t => {
+      const k = billKey(t);
+      if (!templateMap[k]) templateMap[k] = t;
+    });
+    const templates = Object.values(templateMap);
+
+    // Group by property
+    const byProp = {};
+    templates.forEach(t => {
+      const key = t.propertyId || '__none__';
+      if (!byProp[key]) byProp[key] = [];
+      byProp[key].push(t);
+    });
+
+    const fmt = n => '$' + parseFloat(n||0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const freqLabel = f => f === 'annually' ? 'Annual' : f === 'quarterly' ? 'Quarterly' : 'Monthly';
+    const freqColor = f => f === 'annually' ? 'var(--navy)' : f === 'quarterly' ? 'var(--amber)' : 'var(--green)';
+
+    const isDue = t => {
+      if (!t.date) return false;
+      const last = new Date(t.date + 'T12:00:00');
+      const freq = t.frequency || 'monthly';
+      const ms = freq === 'annually' ? 365*86400000 : freq === 'quarterly' ? 91*86400000 : 31*86400000;
+      return (today - last) >= ms;
+    };
+
+    const lastLoggedStr = t => {
+      if (!t.date) return 'Never logged';
+      const d = new Date(t.date + 'T12:00:00');
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `Last: ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    };
+
+    let html = `<div style="padding:10px 0;">`;
+
+    // Summary row across all properties
+    const monthlyTotal = templates.reduce((sum, t) => {
+      const amt = parseFloat(t.amount || 0);
+      const f = t.frequency || 'monthly';
+      return sum + (f === 'annually' ? amt/12 : f === 'quarterly' ? amt/3 : amt);
+    }, 0);
+    html += `
+      <div style="padding:10px 12px;margin-bottom:12px;background:var(--navy);border-radius:var(--radius-md);display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:0.6875rem;font-weight:700;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;">Est. Monthly Bills</div>
+          <div style="font-size:1.25rem;font-weight:800;color:#fff;">${fmt(monthlyTotal)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:0.6875rem;color:rgba(255,255,255,0.6);">${templates.length} recurring bill${templates.length!==1?'s':''}</div>
+          <button class="btn btn-sm" style="margin-top:6px;background:var(--amber);color:var(--navy);border:none;font-weight:700;" onclick="openTransactionForm('modal-expense')">+ Add Bill</button>
+        </div>
+      </div>`;
+
+    Object.entries(byProp).forEach(([propId, propBills]) => {
+      const prop = props.find(p => p.id === propId);
+      const propName = prop ? prop.name : 'Unassigned';
+      const propMonthly = propBills.reduce((sum, t) => {
+        const amt = parseFloat(t.amount || 0);
+        const f = t.frequency || 'monthly';
+        return sum + (f === 'annually' ? amt/12 : f === 'quarterly' ? amt/3 : amt);
+      }, 0);
+      const dueBills = propBills.filter(isDue);
+
+      html += `
+        <div style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface);border-radius:var(--radius-md) var(--radius-md) 0 0;border-bottom:1px solid var(--border);">
+            <div style="font-weight:700;color:var(--navy);font-size:0.9375rem;">${propName}</div>
+            <div style="text-align:right;">
+              ${dueBills.length ? `<span style="font-size:0.75rem;font-weight:700;color:var(--amber);margin-right:8px;">⚠ ${dueBills.length} due</span>` : ''}
+              <span style="font-size:0.75rem;color:var(--muted);">${fmt(propMonthly)}/mo</span>
+            </div>
+          </div>
+          <div class="card" style="border-radius:0 0 var(--radius-md) var(--radius-md);padding:0;overflow:hidden;">`;
+
+      propBills.forEach((t, i) => {
+        const due = isDue(t);
+        const border = i < propBills.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
+        const dueBadge = due
+          ? `<span style="font-size:0.7rem;font-weight:700;background:#FFF3CD;color:#856404;padding:2px 7px;border-radius:99px;margin-left:6px;">Due</span>`
+          : '';
+        html += `
+          <div style="${border}padding:12px 14px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:0.875rem;display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+                ${t.category||'Expense'}${dueBadge}
+              </div>
+              <div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">
+                <span style="color:${freqColor(t.frequency||'monthly')};font-weight:600;">${freqLabel(t.frequency||'monthly')}</span>
+                ${t.vendor ? ` · ${t.vendor}` : ''}
+                <span style="display:block;margin-top:1px;">${lastLoggedStr(t)}</span>
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;margin-left:12px;">
+              <div style="font-weight:700;font-size:0.9375rem;color:var(--navy);">${fmt(t.amount)}</div>
+              <button onclick="logBill('${t.id}')" style="margin-top:5px;padding:5px 12px;background:${due?'var(--amber)':'var(--surface)'};color:${due?'var(--navy)':'var(--text)'};border:1.5px solid ${due?'var(--amber)':'var(--border)'};border-radius:var(--radius-sm);font-size:0.75rem;font-weight:700;cursor:pointer;">
+                ${due ? '⚡ Log Now' : 'Log'}
+              </button>
+            </div>
+          </div>`;
+      });
+
+      html += `</div></div>`;
+    });
+
+    html += `</div>`;
+    body.innerHTML = html;
+  }
+
+  function toggleRecurringFields() {
+    const chk    = document.getElementById('expense-is-recurring');
+    const fields = document.getElementById('expense-recurring-fields');
+    if (fields) fields.style.display = chk?.checked ? 'block' : 'none';
+  }
+
+  function logBill(templateId) {
+    // Pre-fill expense modal from the most recent transaction with this id as template
+    const tmpl = activeRecords('transactions').find(t => t.id === templateId);
+    if (!tmpl) return;
+    openTransactionForm('modal-expense', {
+      ...tmpl,
+      id: null,           // new record
+      date: new Date().toISOString().split('T')[0],
+      createdAt: null,
+    });
+    // Restore recurring state on the newly opened modal
+    setTimeout(() => {
+      const chk = document.getElementById('expense-is-recurring');
+      if (chk) { chk.checked = true; toggleRecurringFields(); }
+      const freqRadio = document.querySelector(`input[name="expense-frequency"][value="${tmpl.frequency||'monthly'}"]`);
+      if (freqRadio) freqRadio.checked = true;
+    }, 80);
+  }
+
   /* ── CSV EXPORT ─────────────────────────────────────────── */
   function toCSV(rows, headers) {
     const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -3874,6 +4040,11 @@
   }
 
   function openAmenitiesModal() {
+    _rehydrateCurrentProperty();
+    if (!currentProperty) {
+      showToast('Property not loaded — tap a property from the list first.', 3000);
+      return;
+    }
     const selected = _getSelectedAmenities();
     // Collect all chips to show: presets + any custom ones not in presets
     const custom = selected.filter(a => !AMENITY_PRESETS.includes(a));
@@ -4340,7 +4511,7 @@
   /* ── MODALS — low-level open/close ──────────────────────── */
   function openModal(id) {
     const el = document.getElementById(id);
-    if (!el) return;
+    if (!el) { showToast('⚠ Modal not found: ' + id, 3000); return; }
     el.classList.add('open');
     document.body.style.overflow = 'hidden';
     el.querySelectorAll('input[type="date"]').forEach(inp => {
@@ -4371,12 +4542,28 @@
   /* ════════════════════════════════════════════════════════════
      PROPERTY
   ════════════════════════════════════════════════════════════ */
+  function _rehydrateCurrentProperty() {
+    // Re-hydrate currentProperty from DB using the ID stored on the detail screen element.
+    // Handles iOS BFCache: DOM is restored but JS variables reset to null.
+    if (currentProperty) return true;
+    const id = document.getElementById('screen-property-detail')?.dataset?.propertyId;
+    if (!id) return false;
+    const p = activeRecords('properties').find(r => r.id === id);
+    if (p) { currentProperty = p; return true; }
+    return false;
+  }
+
   function openPropertyForm(record) {
-    record = record || null;
+    // Always attempt rehydration first regardless of record state
+    _rehydrateCurrentProperty();
+    record = record || currentProperty || null;
+    if (!record) { showToast('⚠ No property loaded', 2500); return; }
     EDIT.property = record;
     const m = 'modal-add-property';
     const r = record || {};
-    document.getElementById('prop-modal-title').textContent = record ? 'Edit Property' : 'Add Property';
+    const titleEl = document.getElementById('prop-modal-title');
+    if (!titleEl) { showToast('⚠ Modal title missing', 2500); return; }
+    titleEl.textContent = record ? 'Edit Property' : 'Add Property';
     fSet(m, 'nickname',         r.name || '');
     fSet(m, 'address',          r.address || '');
     fSet(m, 'city',             r.city || '');
@@ -4529,46 +4716,269 @@
 
   function renderPropertyDetail(record) {
     if (!record) return;
-    // Update info tab display fields
-    const setInfo = (label, val) => {
-      document.querySelectorAll('.info-row').forEach(row => {
-        if (row.querySelector('.info-label')?.textContent.toLowerCase().includes(label.toLowerCase())) {
-          const valEl = row.querySelector('.info-val');
-          if (valEl) valEl.textContent = val;
-        }
-      });
-    };
-    setInfo('Bedrooms',         record.bedrooms || '—');
-    setInfo('Bathrooms',        record.bathrooms || '—');
-    setInfo('Furnished',        record.furnished || '—');
-    setInfo('Pets allowed',     record.petsAllowed || '—');
-    setInfo('Pet deposit',      record.petDeposit ? `$${record.petDeposit}` : '—');
-    setInfo('Security deposit', record.securityDeposit ? `$${record.securityDeposit}` : '—');
-    setInfo('Monthly rate',     record.monthlyRate ? `$${record.monthlyRate}/mo` : '—');
-    setInfo('Type',             record.rentalType || '—');
-    // Update platforms display
-    const platDisplay = document.getElementById('prop-platforms-display');
-    if (platDisplay && record.platforms) {
-      platDisplay.innerHTML = record.platforms.length
-        ? record.platforms.map(p => `<span class="platform-tag">${p}</span>`).join('')
-        : '<span style="color:var(--muted);font-size:0.875rem;">No platforms added</span>';
-    }
-    // Update amenities display
-    const amenDisplay = document.getElementById('prop-amenities-display');
-    if (amenDisplay && record.amenities && record.amenities.length) {
-      amenDisplay.innerHTML = record.amenities.map(a =>
-        `<span class="amenity-tag">${a}</span>`).join('');
-    }
+
     // Update header
     const nameEl = document.getElementById('detail-prop-name');
     const addrEl = document.getElementById('detail-prop-addr');
     if (nameEl && record.name) nameEl.textContent = record.name;
     if (addrEl) addrEl.textContent = `${record.address || ''}, ${record.city || ''} ${record.state || ''} ${record.zip || ''}`.trim();
+
+    // Re-render full info tab inline (no modal required)
+    const tab = document.getElementById('ptab-info');
+    if (!tab) return;
+
+    const PLATFORMS_ALL = ['Furnished Finder','Airbnb','VRBO','Direct','Other'];
+    const curPlatforms  = record.platforms || [];
+    const AMENITY_LIST  = ['WiFi','Washer/Dryer','Parking','AC','Heating','Pool access',
+                           'Hot tub','Smart TV','Cable/Streaming','Dishwasher','Garage',
+                           'Backyard','Pet area','EV charger','Security system','Gym access'];
+    const curAmenities  = record.amenities || [];
+
+    tab.innerHTML = `
+      <!-- ADDRESS CARD -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Address</div>
+        </div>
+        <div style="padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="field" style="grid-column:span 2;margin:0;">
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Street</label>
+            <input id="pi-address" type="text" value="${record.address||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">City</label>
+            <input id="pi-city" type="text" value="${record.city||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="field" style="margin:0;">
+              <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">State</label>
+              <input id="pi-state" type="text" value="${record.state||''}" maxlength="2" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+            </div>
+            <div class="field" style="margin:0;">
+              <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">ZIP</label>
+              <input id="pi-zip" type="text" value="${record.zip||''}" inputmode="numeric" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROPERTY DETAILS CARD -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Property Details</div>
+        </div>
+        <div style="padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="field" style="margin:0;">
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Bedrooms</label>
+            <input id="pi-bedrooms" type="number" inputmode="numeric" min="0" value="${record.bedrooms||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Bathrooms</label>
+            <input id="pi-bathrooms" type="number" inputmode="decimal" min="0" step="0.5" value="${record.bathrooms||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Monthly Rate ($)</label>
+            <input id="pi-monthlyRate" type="number" inputmode="decimal" value="${record.monthlyRate||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Security Deposit ($)</label>
+            <input id="pi-securityDeposit" type="number" inputmode="decimal" value="${record.securityDeposit||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Pets Allowed</label>
+            <select id="pi-petsAllowed" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);">
+              <option ${record.petsAllowed==='Yes'?'selected':''}>Yes</option>
+              <option ${record.petsAllowed==='No'?'selected':''}>No</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Furnished</label>
+            <select id="pi-furnished" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);">
+              <option ${(record.furnished||'').includes('fully')?'selected':''}>Yes — fully furnished</option>
+              <option ${(record.furnished||'').includes('partial')?'selected':''}>Yes — partially</option>
+              <option ${record.furnished==='No'?'selected':''}>No</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Rental Type</label>
+            <select id="pi-rentalType" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);">
+              <option ${(record.rentalType||'').includes('Short')?'selected':''}>Short-term (3–6 months)</option>
+              <option ${(record.rentalType||'').includes('Long')?'selected':''}>Long-term (12 months)</option>
+              <option ${(record.rentalType||'').includes('Vacation')?'selected':''}>Vacation / nightly</option>
+            </select>
+          </div>
+        </div>
+        <div style="padding:0 16px 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="field" style="margin:0;">
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Storage / Garage</label>
+            <input id="pi-storage" type="text" value="${record.storage||''}" placeholder="e.g. Garage, Shed" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Parking</label>
+            <input id="pi-parking" type="text" value="${record.parking||''}" placeholder="e.g. Driveway, Street" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+          </div>
+          <div class="field" style="grid-column:span 2;margin:0;">
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Tenant Maintenance Responsibilities</label>
+            <input id="pi-maintResp" type="text" value="${record.maintenanceResp||record.maintResp||''}" placeholder="e.g. Yard areas" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+          </div>
+          <div class="field" style="grid-column:span 2;margin:0;">
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Notes</label>
+            <textarea id="pi-notes" rows="2" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);resize:vertical;">${record.notes||''}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- FEES CARD -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Fees & Deposits</div>
+        </div>
+        <div style="padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;display:block;margin-bottom:4px;">Cleaning Fee ($)</label>
+            <input id="pi-cleaningFee" type="number" inputmode="decimal" value="${record.cleaningFee||''}" placeholder="0" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+            <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:0.8125rem;cursor:pointer;">
+              <input type="checkbox" id="pi-cleaningRefundable" ${record.cleaningFeeRefundable?'checked':''} style="accent-color:var(--navy);width:15px;height:15px;" />
+              Refundable
+            </label>
+          </div>
+          <div>
+            <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;display:block;margin-bottom:4px;">Pet Deposit ($)</label>
+            <input id="pi-petDeposit2" type="number" inputmode="decimal" value="${record.petDeposit||''}" placeholder="0" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+            <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:0.8125rem;cursor:pointer;">
+              <input type="checkbox" id="pi-petRefundable" ${record.petDepositRefundable?'checked':''} style="accent-color:var(--navy);width:15px;height:15px;" />
+              Refundable
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- PLATFORMS CARD -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Listing Platforms</div>
+        </div>
+        <div style="padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;" id="pi-platforms-wrap">
+          ${[...new Set([...PLATFORMS_ALL, ...curPlatforms])].map(p => `<label style="display:flex;align-items:center;gap:5px;font-size:0.875rem;cursor:pointer;"><input type="checkbox" value="${p}" ${curPlatforms.includes(p)?'checked':''} style="accent-color:var(--navy);width:16px;height:16px;" />${p}</label>`).join('')}
+        </div>
+        <div style="padding:0 16px 12px;display:flex;gap:8px;">
+          <input id="pi-platform-custom" type="text" placeholder="Add platform…" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.8125rem;background:var(--surface);color:var(--text);" />
+          <button onclick="piAddPlatform()" style="padding:7px 14px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);font-size:0.8125rem;font-weight:600;cursor:pointer;">Add</button>
+        </div>
+      </div>
+
+      <!-- AMENITIES CARD -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Amenities</div>
+        </div>
+        <div style="padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;" id="pi-amenities-wrap">
+          ${[...new Set([...AMENITY_LIST, ...curAmenities])].map(a => `<label style="display:flex;align-items:center;gap:5px;font-size:0.875rem;cursor:pointer;"><input type="checkbox" value="${a}" ${curAmenities.includes(a)?'checked':''} style="accent-color:var(--navy);width:16px;height:16px;" />${a}</label>`).join('')}
+        </div>
+        <div style="padding:0 16px 12px;display:flex;gap:8px;">
+          <input id="pi-amenity-custom" type="text" placeholder="Add amenity…" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.8125rem;background:var(--surface);color:var(--text);" />
+          <button onclick="piAddAmenity()" style="padding:7px 14px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);font-size:0.8125rem;font-weight:600;cursor:pointer;">Add</button>
+        </div>
+      </div>
+
+      <!-- SAVE BUTTON -->
+      <button onclick="savePropertyInline()" style="width:100%;padding:14px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-size:0.9375rem;font-weight:700;cursor:pointer;margin-bottom:8px;">Save Property</button>
+    `;
+  }
+
+  function piAddPlatform() {
+    const inp = document.getElementById('pi-platform-custom');
+    const val = inp?.value.trim();
+    if (!val) return;
+    const wrap = document.getElementById('pi-platforms-wrap');
+    if (!wrap) return;
+    // Check for duplicate
+    const existing = [...wrap.querySelectorAll('input[type=checkbox]')].map(c => c.value.toLowerCase());
+    if (existing.includes(val.toLowerCase())) { inp.value = ''; return; }
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:0.875rem;cursor:pointer;';
+    lbl.innerHTML = `<input type="checkbox" value="${val}" checked style="accent-color:var(--navy);width:16px;height:16px;" />${val}`;
+    wrap.appendChild(lbl);
+    inp.value = '';
+  }
+
+  function piAddAmenity() {
+    const inp = document.getElementById('pi-amenity-custom');
+    const val = inp?.value.trim();
+    if (!val) return;
+    const wrap = document.getElementById('pi-amenities-wrap');
+    if (!wrap) return;
+    const existing = [...wrap.querySelectorAll('input[type=checkbox]')].map(c => c.value.toLowerCase());
+    if (existing.includes(val.toLowerCase())) { inp.value = ''; return; }
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:0.875rem;cursor:pointer;';
+    lbl.innerHTML = `<input type="checkbox" value="${val}" checked style="accent-color:var(--navy);width:16px;height:16px;" />${val}`;
+    wrap.appendChild(lbl);
+    inp.value = '';
+  }
+
+  function savePropertyInline() {
+    _rehydrateCurrentProperty();
+    if (!currentProperty) { showToast('No property loaded', 2500); return; }
+    const g = id => document.getElementById(id);
+    const platforms = [...document.querySelectorAll('#pi-platforms-wrap input[type=checkbox]:checked')].map(c => c.value);
+    const amenities = [...document.querySelectorAll('#pi-amenities-wrap input[type=checkbox]:checked')].map(c => c.value);
+    const record = {
+      ...currentProperty,
+      address:               g('pi-address')?.value.trim()      || currentProperty.address,
+      city:                  g('pi-city')?.value.trim()         || currentProperty.city,
+      state:                 g('pi-state')?.value.trim()        || currentProperty.state,
+      zip:                   g('pi-zip')?.value.trim()          || currentProperty.zip,
+      bedrooms:              g('pi-bedrooms')?.value            || currentProperty.bedrooms,
+      bathrooms:             g('pi-bathrooms')?.value           || currentProperty.bathrooms,
+      monthlyRate:           g('pi-monthlyRate')?.value         || currentProperty.monthlyRate,
+      securityDeposit:       g('pi-securityDeposit')?.value     || currentProperty.securityDeposit,
+      petDeposit:            g('pi-petDeposit2')?.value         || currentProperty.petDeposit,
+      petDepositRefundable:  g('pi-petRefundable')?.checked     ?? currentProperty.petDepositRefundable,
+      cleaningFee:           g('pi-cleaningFee')?.value         || currentProperty.cleaningFee || '',
+      cleaningFeeRefundable: g('pi-cleaningRefundable')?.checked ?? currentProperty.cleaningFeeRefundable,
+      petsAllowed:           g('pi-petsAllowed')?.value         || currentProperty.petsAllowed,
+      furnished:             g('pi-furnished')?.value           || currentProperty.furnished,
+      rentalType:            g('pi-rentalType')?.value          || currentProperty.rentalType,
+      notes:                 g('pi-notes')?.value               || '',
+      storage:               g('pi-storage')?.value             || '',
+      parking:               g('pi-parking')?.value             || '',
+      maintenanceResp:       g('pi-maintResp')?.value           || '',
+      platforms,
+      amenities,
+      updatedAt: now(),
+    };
+    if (!record.name) { showToast('Property nickname is required', 2500); return; }
+    upsert('properties', record);
+    currentProperty = record;
+    // Update header address
+    const addrEl = document.getElementById('detail-prop-addr');
+    if (addrEl) addrEl.textContent = `${record.address||''}, ${record.city||''} ${record.state||''} ${record.zip||''}`.trim();
+    renderPropertyList();
+    renderDashboard();
+    showToast('Property saved ✓');
   }
 
   /* ════════════════════════════════════════════════════════════
      TRANSACTION (rent payment + expense unified)
   ════════════════════════════════════════════════════════════ */
+
+  // Quick entry: open rent modal pre-filled for a specific lease
+  function openLogRent(leaseId) {
+    const lease = activeRecords('leases').find(l => l.id === leaseId);
+    if (!lease) { openTransactionForm('modal-rent'); return; }
+    const name  = `${lease.firstName||''} ${lease.lastName||''}`.trim();
+    const fmt   = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}) : '?';
+    const synth = {
+      propertyId: lease.propertyId,
+      amount:     lease.monthlyRent || '',
+      category:   `${name} – ${fmt(lease.startDate)}–${fmt(lease.endDate)}`,
+      date:       new Date().toISOString().split('T')[0],
+      description: `Rent – ${name}${lease.paymentMethod ? ' via '+lease.paymentMethod : ''}`,
+    };
+    openTransactionForm('modal-rent', synth);
+  }
+
   function openTransactionForm(modalId, record) {
     EDIT.transaction = record || null;
 
@@ -4622,6 +5032,21 @@
       if (currentProperty) fSet(modalId, 'property', currentProperty.id);
     }
     openModal(modalId);
+
+    // Restore recurring bill state if editing an existing recurring transaction
+    const rec = EDIT.transaction;
+    if (rec?.isRecurring && modalId === 'modal-expense') {
+      setTimeout(() => {
+        const chk = document.getElementById('expense-is-recurring');
+        if (chk) { chk.checked = true; toggleRecurringFields(); }
+        const fr = document.querySelector(`input[name="expense-frequency"][value="${rec.frequency||'monthly'}"]`);
+        if (fr) fr.checked = true;
+      }, 40);
+    } else if (modalId === 'modal-expense') {
+      // Reset recurring state for fresh opens
+      const chk = document.getElementById('expense-is-recurring');
+      if (chk) { chk.checked = false; toggleRecurringFields(); }
+    }
   }
 
   function saveTransaction(modalId, type) {
@@ -4638,6 +5063,11 @@
       description: fGet(modalId, 'description'),
       vendor:      fGet(modalId, 'vendor'),
       taxYear:     new Date(fGet(modalId, 'date') || Date.now()).getFullYear().toString(),
+      serviceRequestId: EDIT.transaction?.serviceRequestId || null,
+      isRecurring: modalId === 'modal-expense' && !!document.getElementById('expense-is-recurring')?.checked,
+      frequency:   modalId === 'modal-expense' && document.getElementById('expense-is-recurring')?.checked
+                     ? (document.querySelector('input[name="expense-frequency"]:checked')?.value || 'monthly')
+                     : (EDIT.transaction?.frequency || null),
       createdAt:   EDIT.transaction?.createdAt || now(),
     };
     if (!record.amount) { alert('Amount is required.'); return; }
@@ -4647,6 +5077,29 @@
     renderDashboard();
     closeModal(modalId);
     EDIT.transaction = null;
+
+    // Suggest creating a service request for maintenance expenses
+    // Only prompt when: expense type, maintenance category, no linked SR, and has a property
+    const maintenanceCats = ['Cleaning & maintenance', 'Repairs', 'Cleaning & Maintenance', 'Maintenance'];
+    if (record.type === 'expense' &&
+        maintenanceCats.some(c => record.category && record.category.toLowerCase().includes(c.toLowerCase().split(' ')[0])) &&
+        !record.serviceRequestId &&
+        record.propertyId) {
+      setTimeout(function() {
+        if (confirm(
+          `Log "${record.description || record.category}" as a service request too?\n\n` +
+          `This creates a traceable record under the property's service history.`
+        )) {
+          openServiceRequestForm({
+            propertyId:    record.propertyId,
+            title:         record.description || record.category,
+            estimatedCost: record.amount,
+            status:        'closed',
+            priority:      'low',
+          });
+        }
+      }, 300);
+    }
   }
 
   function renderTransactionLists() {
@@ -4692,6 +5145,11 @@
     fSet(m, 'cleaningDeposit',r.cleaningDeposit || '');
     fSet(m, 'platform',       r.platform || 'Direct');
     fSet(m, 'bookingId',      r.bookingId || '');
+    fSet(m, 'paymentMethod',  r.paymentMethod || '');
+    fSet(m, 'paymentNote',    r.paymentNote || '');
+    // Show/hide payment note field based on method
+    const noteWrap = document.getElementById('lease-modal-payment-note-wrap');
+    if (noteWrap) noteWrap.style.display = r.paymentMethod && r.paymentMethod !== 'Cash' ? '' : 'none';
     fSet(m, 'leaseStatus',    r.status === 'prospect' ? 'prospect' : 'active');
     openModal(m);
   }
@@ -4718,6 +5176,8 @@
       cleaningDeposit: fGet(m, 'cleaningDeposit'),
       platform:        fGet(m, 'platform'),
       bookingId:       fGet(m, 'bookingId'),
+      paymentMethod:   fGet(m, 'paymentMethod'),
+      paymentNote:     fGet(m, 'paymentNote'),
       status:          fGet(m, 'leaseStatus') || EDIT.lease?.status || 'active',
       createdAt:       EDIT.lease?.createdAt || now(),
     };
@@ -4936,6 +5396,11 @@
           ${l.phone||l.email ? `<div style="font-size:0.8125rem;display:flex;flex-direction:column;gap:3px;">
             ${l.phone ? `<div>📞 ${l.phone}</div>` : ''}
             ${l.email ? `<div>✉️ ${l.email}</div>` : ''}
+          </div>` : ''}
+          ${l.paymentMethod ? `<div style="font-size:0.8125rem;margin-top:6px;display:flex;align-items:center;gap:6px;">
+            <span style="color:var(--muted);">💳 Pays via</span>
+            <span style="font-weight:600;color:var(--navy);">${l.paymentMethod}${l.paymentNote ? ' · '+l.paymentNote : ''}</span>
+            <button onclick="openLogRent('${l.id}')" style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:0.7rem;cursor:pointer;color:var(--navy);">Log Rent</button>
           </div>` : ''}
           ${l.status === 'active' ? `
           <div style="display:flex;gap:8px;margin-top:12px;">
@@ -5923,8 +6388,17 @@
      stale if a prospect was added after an active lease was recorded.
   ────────────────────────────────────────────────────────── */
   function getActiveLease(propertyId) {
-    return activeRecords('leases')
-      .find(l => l.propertyId === propertyId && l.status === 'active') || null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const leases = activeRecords('leases').filter(l => l.propertyId === propertyId && l.status === 'active');
+    // Auto-expire any active leases whose endDate has passed
+    leases.forEach(l => {
+      if (l.endDate && new Date(l.endDate + 'T23:59:59') < today) {
+        upsert('leases', { ...l, status: 'completed', updatedAt: now() });
+      }
+    });
+    // Return only leases that are still within their date range (or have no end date)
+    return leases.find(l => !l.endDate || new Date(l.endDate + 'T23:59:59') >= today) || null;
   }
 
   function getPropertyDisplay(p) {
@@ -5939,15 +6413,62 @@
   }
 
 
+  // One-time migration: backfill seed properties that were saved without full display fields
+  function migrateSeedProperties() {
+    if (localStorage.getItem('hml_seed_migrated_v1')) return;
+    const mesa = activeRecords('properties').find(p => p.id === 'prop-mesa-739');
+    if (mesa && !mesa.bedrooms) {
+      upsert('properties', {
+        ...mesa,
+        address: mesa.address?.includes(',') ? '739 W. University Dr' : (mesa.address || '739 W. University Dr'),
+        city: mesa.city || 'Mesa', state: mesa.state || 'AZ', zip: mesa.zip || '85201',
+        bedrooms: '3', bathrooms: '2',
+        monthlyRate: mesa.monthlyRate || '2450',
+        securityDeposit: mesa.securityDeposit || '1000',
+        petDeposit: mesa.petDeposit || '200',
+        petsAllowed: mesa.petsAllowed || 'Yes',
+        furnished: mesa.furnished || 'Yes — fully furnished',
+        rentalType: mesa.rentalType || 'Long-term (12 months)',
+        platforms: mesa.platforms || ['Furnished Finder', 'Direct'],
+        amenities: mesa.amenities || ['WiFi', 'Washer/Dryer', 'Parking', 'AC', 'Pool access', 'Smart TV'],
+        updatedAt: now(),
+      });
+    }
+    const norfolk = activeRecords('properties').find(p => p.id === 'prop-norfolk-1320');
+    if (norfolk && !norfolk.bedrooms) {
+      upsert('properties', {
+        ...norfolk,
+        address: norfolk.address?.includes(',') ? '1320 Virgilina Ave' : (norfolk.address || '1320 Virgilina Ave'),
+        city: norfolk.city || 'Norfolk', state: norfolk.state || 'VA', zip: norfolk.zip || '23503',
+        bedrooms: '3', bathrooms: '2',
+        monthlyRate: norfolk.monthlyRate || '2450',
+        securityDeposit: norfolk.securityDeposit || '1000',
+        petDeposit: norfolk.petDeposit || '200',
+        petsAllowed: norfolk.petsAllowed || 'Yes',
+        furnished: norfolk.furnished || 'Yes — fully furnished',
+        rentalType: norfolk.rentalType || 'Long-term (12 months)',
+        platforms: norfolk.platforms || ['Furnished Finder', 'Direct'],
+        amenities: norfolk.amenities || ['WiFi', 'Washer/Dryer', 'Parking', 'AC'],
+        updatedAt: now(),
+      });
+    }
+    localStorage.setItem('hml_seed_migrated_v1', '1');
+  }
+
   function seedDemoData() {
     if (localStorage.getItem('hml_seeded')) return;
     const ts = now();
     const prop1Id = 'prop-mesa-739';
     upsert('properties', {
       id: prop1Id, name: 'Mesa, AZ',
-      address: '739 W. University Dr, Mesa, AZ 85201',
-      _status: 'occupied', currentTenant: 'Kayli & Cole Hardin',
-      leaseEnd: '2026-05-31', monthlyRent: 2450, createdAt: ts,
+      address: '739 W. University Dr', city: 'Mesa', state: 'AZ', zip: '85201',
+      bedrooms: '3', bathrooms: '2',
+      monthlyRate: '2450', securityDeposit: '1000', petDeposit: '200',
+      petsAllowed: 'Yes', furnished: 'Yes — fully furnished',
+      rentalType: 'Long-term (12 months)',
+      platforms: ['Furnished Finder', 'Direct'],
+      amenities: ['WiFi', 'Washer/Dryer', 'Parking', 'AC', 'Pool access', 'Smart TV'],
+      notes: '', createdAt: ts,
     });
     upsert('leases', {
       id: 'lease-hardin-2025', propertyId: prop1Id,
@@ -5962,16 +6483,21 @@
     const prop2Id = 'prop-norfolk-1320';
     upsert('properties', {
       id: prop2Id, name: 'Norfolk, VA',
-      address: '1320 Virgilina, Norfolk, Virginia 23503',
-      _status: 'occupied', currentTenant: 'Autumn Kramer',
-      leaseEnd: '2026-08-31', monthlyRent: 2450, createdAt: ts,
+      address: '1320 Virgilina Ave', city: 'Norfolk', state: 'VA', zip: '23503',
+      bedrooms: '3', bathrooms: '2',
+      monthlyRate: '2450', securityDeposit: '1000', petDeposit: '200',
+      petsAllowed: 'Yes', furnished: 'Yes — fully furnished',
+      rentalType: 'Long-term (12 months)',
+      platforms: ['Furnished Finder', 'Direct'],
+      amenities: ['WiFi', 'Washer/Dryer', 'Parking', 'AC'],
+      notes: '', createdAt: ts,
     });
     upsert('leases', {
       id: 'lease-kramer-2026', propertyId: prop2Id,
       firstName: 'Autumn', lastName: 'Kramer',
       email: '', phone: '', emergencyName: '', emergencyPhone: '',
       relationship: '', pets: '', petDesc: '',
-      startDate: '', endDate: '2026-08-31',
+      startDate: '2025-09-01', endDate: '2026-08-31',
       monthlyRent: '2450', securityDeposit: '1000', petDeposit: '200',
       platform: '', bookingId: '', status: 'active', createdAt: ts,
     });
@@ -6019,11 +6545,14 @@
         const dl = daysLeft(l.endDate);
         const dlColor = dl===null?'var(--muted)':dl<=30?'var(--red)':dl<=60?'var(--amber)':'var(--green)';
         const name = ((l.firstName||'')+' '+(l.lastName||'')).trim()||'—';
-        const badge = l.status==='active'
-          ? '<span class="badge badge-green">Active</span>'
+        const isExpired = l.status === 'active' && l.endDate && new Date(l.endDate + 'T23:59:59') < new Date();
+        const badge = (l.status==='active' && !isExpired)
+          ? '<span class=\"badge badge-green\">Active</span>'
+          : isExpired
+          ? '<span class=\"badge badge-navy\">Ended</span>'
           : l.status==='prospect'
-          ? '<span class="badge" style="background:#FFF3CD;color:#856404;">Prospect</span>'
-          : '<span class="badge badge-navy">'+(l.status||'Past')+'</span>';
+          ? '<span class=\"badge\" style=\"background:#FFF3CD;color:#856404;\">Prospect</span>'
+          : '<span class=\"badge badge-navy\">'+(l.status||'Past')+'</span>';
         const swId = 'ts-'+l.id;
         return '<div class="swipe-wrap" id="'+swId+'">'
           +'<div class="swipe-content" style="padding:13px 16px;" onclick="toggleSwipe(\''+swId+'\')">'
@@ -6044,8 +6573,9 @@
       }).join('') : '<div style="padding:14px 16px;color:var(--muted);font-size:0.875rem;">No '
         +(_tenantFilter==='active'?'active ':'')+'leases.</div>';
 
-      const headerBg = propLeases.some(l=>l.status==='active') ? 'background:var(--green-light);' : 'background:var(--surface);';
-      const statusBadge = propLeases.some(l=>l.status==='active')
+      const hasActiveLease = propLeases.some(l => l.status === 'active' && (!l.endDate || new Date(l.endDate + 'T23:59:59') >= new Date()));
+      const headerBg = hasActiveLease ? 'background:var(--green-light);' : 'background:var(--surface);';
+      const statusBadge = hasActiveLease
         ? '<span class="badge badge-green">Occupied</span>'
         : propLeases.some(l=>l.status==='prospect')
         ? '<span class="badge" style="background:#FFF3CD;color:#856404;">Prospect</span>'
@@ -6645,8 +7175,35 @@
   }
 
   function closeSR(id) {
-    const sr = activeRecords('serviceRequests').find(x=>x.id===id);
-    if (sr) { upsert('serviceRequests',{...sr,status:'closed',closedAt:now()}); renderServiceRequests(); }
+    const sr = activeRecords('serviceRequests').find(x => x.id === id);
+    if (!sr) return;
+    upsert('serviceRequests', {...sr, status:'closed', closedAt:now()});
+    renderServiceRequests();
+
+    // If the SR has a cost, offer to log it as an expense
+    if (sr.estimatedCost && sr.estimatedCost > 0) {
+      const shouldLog = confirm(
+        `Log $${sr.estimatedCost.toLocaleString('en-US')} as an expense?\n\n` +
+        `"${sr.title}"${sr.propertyId ? ' — '+( activeRecords('properties').find(p=>p.id===sr.propertyId)?.name || '') : ''}\n\n` +
+        `This will open the expense form pre-filled for your records.`
+      );
+      if (shouldLog) {
+        const prop = sr.propertyId ? activeRecords('properties').find(p => p.id === sr.propertyId) : null;
+        const expRecord = {
+          propertyId:  sr.propertyId || '',
+          property:    prop?.name || '',
+          amount:      sr.estimatedCost,
+          date:        new Date().toISOString().split('T')[0],
+          category:    'Cleaning & maintenance',
+          description: sr.title + (sr.description ? ' — ' + sr.description : ''),
+          vendor:      sr.assignedTo || '',
+          // Link back to the service request
+          serviceRequestId: sr.id,
+        };
+        openTransactionForm('modal-expense', expRecord);
+        return; // skip the showToast — they'll see it after saving the expense
+      }
+    }
     showToast('✅ Request closed');
   }
 
@@ -6791,6 +7348,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     loadDB();
     seedDemoData();
+    migrateSeedProperties();
     loadOwnerProfileToSettings();
     // Seed nav history with home as root
     NAV_HISTORY.push('home');
@@ -7271,6 +7829,7 @@ var LB = {
   linkedLeaseId:      null,  // FK → DB.leases[].id
   linkedPropertyId:   null,  // FK → DB.properties[].id
   agreementId:        null,  // FK → DB.leaseAgreements[].id (set when editing existing)
+  customState:        null,  // free-text state when property.state doesn't match a select option
 };
 
 /* ── INIT ─────────────────────────────────────────────────────── */
@@ -7330,32 +7889,50 @@ window.lbCascadeProperty = function() {
   var leaseSel = document.getElementById('lb-lease-select');
   if (!propSel || !leaseSel) return;
   var propId = propSel.value;
-  var leases = getCol('leases').filter(function(l){ return l.propertyId === propId; });
+  var allLeases   = getCol('leases').filter(function(l){ return l.propertyId === propId; });
+  var active      = allLeases.filter(function(l){ return l.status === 'active'; });
+  var prospects   = allLeases.filter(function(l){ return l.status === 'prospect'; });
   var fmtMo  = function(d){ return d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'2-digit'}) : '?'; };
 
   if (!propId) {
     leaseSel.innerHTML = '<option value="">— Choose a property first —</option>';
     leaseSel.disabled = true;
-  } else if (!leases.length) {
-    leaseSel.innerHTML = '<option value="">— No leases for this property yet —</option>';
-    leaseSel.disabled = true;
+  } else if (!allLeases.length) {
+    // No leases at all — still enable with a prompt to add new
+    leaseSel.disabled = false;
+    leaseSel.innerHTML =
+      '<option value="">— No tenants yet —</option>' +
+      '<option value="__new__">+ Add new tenant for this property…</option>';
     var sp = document.getElementById('lb-select-prompt');
-    if (sp) sp.innerHTML = '⚠️ This property has no lease records. <a onclick="closeLeaseBuilder();navigate(\'tenants\')" style="color:var(--amber);cursor:pointer;text-decoration:underline;">Add a lease →</a> then return.';
-    if (sp) sp.style.display = '';
+    if (sp) {
+      sp.innerHTML = 'No existing lease records for this property. Choose <em>+ Add new tenant</em> above or <a onclick="closeLeaseBuilder();openProperty(\''+propId+'\');setTimeout(function(){switchPropTab(\'tenants\');openLeaseForm(null);},200);" style="color:var(--amber);cursor:pointer;text-decoration:underline;">add a lease record first →</a>';
+      sp.style.display = '';
+    }
   } else {
     leaseSel.disabled = false;
-    leaseSel.innerHTML = '<option value="">— Choose a lease —</option>' +
-      leases.map(function(l){
-        var name = ((l.firstName||'')+' '+(l.lastName||'')).trim() || 'Unnamed';
-        var dot  = l.status === 'active' ? ' ●' : '';
-        return '<option value="'+l.id+'">'+name+' · '+fmtMo(l.startDate)+'–'+fmtMo(l.endDate)+dot+'</option>';
-      }).join('');
+    var opts = '<option value="">— Choose a tenant —</option>';
+    if (active.length) {
+      opts += '<optgroup label="Active Leases">' +
+        active.map(function(l){
+          var name = ((l.firstName||'')+' '+(l.lastName||'')).trim() || 'Unnamed';
+          return '<option value="'+l.id+'">● '+name+' · '+fmtMo(l.startDate)+'–'+fmtMo(l.endDate)+'</option>';
+        }).join('') + '</optgroup>';
+    }
+    if (prospects.length) {
+      opts += '<optgroup label="Prospects">' +
+        prospects.map(function(l){
+          var name = ((l.firstName||'')+' '+(l.lastName||'')).trim() || 'Unnamed';
+          return '<option value="'+l.id+'">◌ '+name+'</option>';
+        }).join('') + '</optgroup>';
+    }
+    opts += '<optgroup label="Add"><option value="__new__">+ Add new tenant for this property…</option></optgroup>';
+    leaseSel.innerHTML = opts;
   }
 
   var rp = document.getElementById('lb-resolved-panel');
   var sp = document.getElementById('lb-select-prompt');
   if (rp) rp.style.display = 'none';
-  if (leases.length && sp) sp.style.display = '';
+  if (allLeases.length && sp) sp.style.display = '';
   LB.linkedLeaseId    = null;
   LB.linkedPropertyId = propId || null;
 };
@@ -7365,6 +7942,20 @@ window.lbCascadeLease = function() {
   var getCol   = window.lbGetCollection || function(){ return []; };
   var leaseSel = document.getElementById('lb-lease-select');
   if (!leaseSel || !leaseSel.value) return;
+
+  // Handle "add new tenant" option
+  if (leaseSel.value === '__new__') {
+    var propId = LB.linkedPropertyId;
+    closeLeaseBuilder();
+    if (propId) {
+      openProperty(propId);
+      setTimeout(function(){ switchPropTab('tenants'); openLeaseForm(null); }, 200);
+    } else {
+      navigate('tenants');
+    }
+    return;
+  }
+
   var leaseId  = leaseSel.value;
   var lease    = getCol('leases').find(function(l){ return l.id === leaseId; });
   if (!lease) return;
@@ -7403,14 +7994,139 @@ window.lbCascadeLease = function() {
       (lease.cleaningDeposit ? '&nbsp;·&nbsp;Cleaning: '+cur(lease.cleaningDeposit) : '');
   }
 
+  // Pre-fill cleaning fee and pet deposit on lease from property defaults
+  try {
+    if (prop) {
+      var needsUpdate = false;
+      var leaseUpdate = {};
+      if (!lease.cleaningDeposit && prop.cleaningFee) {
+        leaseUpdate.cleaningDeposit = prop.cleaningFee;
+        needsUpdate = true;
+      }
+      if (!lease.petDeposit && prop.petDeposit) {
+        leaseUpdate.petDeposit = prop.petDeposit;
+        needsUpdate = true;
+      }
+      if (needsUpdate && typeof lbUpsert === 'function') {
+        lbUpsert('leases', Object.assign({}, lease, leaseUpdate));
+        lease = Object.assign({}, lease, leaseUpdate);
+      }
+    }
+
+    // Show refundable labels in tenant card
+    if (tnEl && prop) {
+      var refLabels = [];
+      if (lease.cleaningDeposit) {
+        var cRef = prop.cleaningFeeRefundable ? 'refundable' : 'non-refundable';
+        refLabels.push('Cleaning $'+parseFloat(lease.cleaningDeposit||0).toLocaleString('en-US')+' ('+cRef+')');
+      }
+      if (lease.petDeposit && prop.petsAllowed === 'Yes') {
+        var pRef = prop.petDepositRefundable ? 'refundable' : 'non-refundable';
+        refLabels.push('Pet $'+parseFloat(lease.petDeposit||0).toLocaleString('en-US')+' ('+pRef+')');
+      }
+      if (refLabels.length) {
+        tnEl.innerHTML += '<br><span style="font-size:0.8125rem;color:var(--muted);">'+refLabels.join(' · ')+'</span>';
+      }
+    }
+  } catch(e) { console.warn('LB cascade fee pre-fill:', e); }
+
   // Edit link
   var el = document.getElementById('lb-edit-lease-link');
   if (el && lease.propertyId) el.setAttribute('onclick',
     'closeLeaseBuilder();openProperty(\''+lease.propertyId+'\');setTimeout(function(){switchPropTab(\'tenants\');},200);');
 
-  // Pre-fill owner address into payment field if blank
+  // Pre-fill payment address — full city/state/zip from owner profile
   var payAddr = document.getElementById('lb-pay-address');
-  if (payAddr && !payAddr.value && owner.address) payAddr.value = owner.address;
+  if (payAddr && !payAddr.value) {
+    var fullAddr = owner.address || '';
+    // If owner address doesn't include city/state/zip, try to append from profile
+    if (fullAddr && owner.city) fullAddr += ', ' + owner.city;
+    if (fullAddr && owner.state) fullAddr += ', ' + owner.state;
+    if (fullAddr && owner.zip)   fullAddr += ' ' + owner.zip;
+    if (fullAddr) payAddr.value = fullAddr;
+  }
+
+  // Auto-derive governing state from property record
+  var stateEl = document.getElementById('lb-state');
+  if (stateEl && prop && prop.state) {
+    var propState = prop.state.trim();
+    // Match to select options
+    var matched = false;
+    Array.prototype.forEach.call(stateEl.options, function(opt) {
+      if (opt.value.toLowerCase() === propState.toLowerCase() ||
+          propState.toLowerCase().indexOf(opt.value.toLowerCase()) === 0) {
+        stateEl.value = opt.value;
+        matched = true;
+      }
+    });
+    // If not matched, set to 'Other' and store the actual state for token substitution
+    if (!matched) { stateEl.value = 'Other'; LB.customState = propState; }
+    else { LB.customState = null; }
+  }
+
+  // Pre-fill Step 2 property detail fields from property record (overrideable by user)
+  function lbSetField(id, val) {
+    var el = document.getElementById(id);
+    if (el && val) el.value = val;
+  }
+
+  // Appliances — derive from prop.amenities filtered by appliance keywords
+  var appEl = document.getElementById('lb-appliances');
+  if (appEl && prop) {
+    var propAppliances = prop.appliances || '';
+    if (!propAppliances && prop.amenities && prop.amenities.length) {
+      var applianceKeywords = ['stove','oven','refrigerator','fridge','washer','dryer',
+        'dishwasher','microwave','freezer','range','disposal'];
+      var derived = prop.amenities.filter(function(a) {
+        return applianceKeywords.some(function(k){ return a.toLowerCase().indexOf(k) >= 0; });
+      });
+      propAppliances = derived.join(', ');
+    }
+    if (propAppliances) appEl.value = propAppliances;
+  }
+
+  // Storage — derive from amenities (garage, storage keywords) or prop.storage
+  var storageEl = document.getElementById('lb-storage');
+  if (storageEl && prop && !storageEl.value) {
+    var storageDerived = prop.storage || '';
+    if (!storageDerived && prop.amenities) {
+      var storageKw = ['garage','storage','shed','basement','attic'];
+      storageDerived = prop.amenities.filter(function(a) {
+        return storageKw.some(function(k){ return a.toLowerCase().indexOf(k) >= 0; });
+      }).join(', ');
+    }
+    if (storageDerived) storageEl.value = storageDerived;
+  }
+
+  // Parking — derive from amenities or prop.parking
+  var parkingEl = document.getElementById('lb-parking');
+  if (parkingEl && prop && !parkingEl.value) {
+    var parkingDerived = prop.parking || '';
+    if (!parkingDerived && prop.amenities) {
+      var parkingKw = ['parking','driveway','garage','carport','street'];
+      parkingDerived = prop.amenities.filter(function(a) {
+        return parkingKw.some(function(k){ return a.toLowerCase().indexOf(k) >= 0; });
+      }).join(', ');
+    }
+    // Fallback default based on property type
+    if (!parkingDerived) parkingDerived = 'Driveway & Street parking';
+    parkingEl.value = parkingDerived;
+  }
+
+  // Furnished — map prop.furnished to LB select value
+  var furnEl = document.getElementById('lb-furnished');
+  if (furnEl && prop && prop.furnished) {
+    var fv = prop.furnished.toLowerCase();
+    if (fv.indexOf('fully') >= 0)    furnEl.value = 'fully';
+    else if (fv.indexOf('partial') >= 0) furnEl.value = 'partial';
+    else if (fv === 'no')            furnEl.value = 'no';
+  }
+
+  // Maintenance responsibilities — from prop.maintenanceResp or default
+  var maintEl = document.getElementById('lb-maint-resp');
+  if (maintEl && prop && !maintEl.value) {
+    maintEl.value = prop.maintenanceResp || prop.maintResp || 'Yard areas';
+  }
 
   // Header sub-label
   var sub = document.getElementById('lb-property-label');
@@ -7429,6 +8145,9 @@ window.lbCascadeLease = function() {
   var sp = document.getElementById('lb-select-prompt');
   if (rp) rp.style.display = '';
   if (sp) sp.style.display = 'none';
+
+  // Update pay-in-full calculator with linked lease data
+  try { lbUpdatePayInFull(); } catch(e) {}
 };
 
 window.lbSaveApiKey = function() {
@@ -7485,6 +8204,9 @@ window.lbGoStep = function(step) {
     if (panel) panel.classList.toggle('active', s===step);
     if (tab)   tab.classList.toggle('active',   s===step);
   });
+  if (step === 'terms') {
+    try { lbUpdatePayInFull(); } catch(e) {}
+  }
   if (step === 'clauses') {
     lbInitClauses();
     lbRenderClauses();
@@ -7497,7 +8219,59 @@ window.lbGoStep = function(step) {
   if (body) body.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-/* ── STEP 4 BUTTON STATE ─────────────────────────────────────── */
+/* ── PAY IN FULL CALCULATOR ──────────────────────────────────── */
+window.lbUpdatePayInFull = function() {
+  var getCol = window.lbGetCollection || function(){ return []; };
+  var lease  = LB.linkedLeaseId ? getCol('leases').find(function(l){ return l.id === LB.linkedLeaseId; }) : null;
+  var bkEl   = document.getElementById('lb-payinfull-breakdown');
+  var totEl  = document.getElementById('lb-payinfull-total');
+  var noteEl = document.getElementById('lb-payinfull-note');
+  var chk    = document.getElementById('lb-payinfull-check');
+  if (!bkEl || !totEl) return;
+
+  var cur = function(v){ return v ? '$'+parseFloat(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '$0.00'; };
+
+  var rent    = lease ? parseFloat(lease.monthlyRent||0)       : 0;
+  var secDep  = lease ? parseFloat(lease.securityDeposit||0)   : 0;
+  var cleanDp = lease ? parseFloat(lease.cleaningDeposit||0)   : 0;
+  var petFee  = lease ? parseFloat(lease.petDeposit||0)        : 0;
+
+  // Pro-rate calculation: if start date is not the 1st, add prorated first month
+  var prorated = 0;
+  var proratedNote = '';
+  if (lease && lease.startDate) {
+    var startDay = new Date(lease.startDate + 'T12:00:00').getDate();
+    if (startDay !== 1) {
+      var daysInMonth = new Date(new Date(lease.startDate + 'T12:00:00').getFullYear(),
+                                 new Date(lease.startDate + 'T12:00:00').getMonth() + 1, 0).getDate();
+      var remainingDays = daysInMonth - startDay + 1;
+      prorated = Math.round((rent / daysInMonth) * remainingDays * 100) / 100;
+      proratedNote = ' ('+remainingDays+'/'+daysInMonth+' days of first month)';
+    }
+  }
+
+  var firstMonthRent = prorated > 0 ? prorated : rent;
+  var total = firstMonthRent + rent + secDep + cleanDp + petFee; // prorated + 2nd month + deposits
+
+  var rows = [];
+  if (prorated > 0) {
+    rows.push('<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Prorated first month'+proratedNote+'</span><span>'+cur(prorated)+'</span></div>');
+    rows.push('<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Second month rent</span><span>'+cur(rent)+'</span></div>');
+  } else {
+    rows.push('<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">First month rent</span><span>'+cur(rent)+'</span></div>');
+  }
+  var prop2 = LB.linkedPropertyId ? getCol('properties').find(function(p){ return p.id === LB.linkedPropertyId; }) : null;
+  var cleanLbl = prop2 ? (prop2.cleaningFeeRefundable ? 'Cleaning deposit (refundable)' : 'Cleaning fee (non-refundable)') : 'Cleaning fee';
+  var petLbl   = prop2 ? (prop2.petDepositRefundable  ? 'Pet deposit (refundable)'      : 'Pet fee (non-refundable)')      : 'Pet fee';
+  if (secDep)  rows.push('<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Security deposit</span><span>'+cur(secDep)+'</span></div>');
+  if (cleanDp) rows.push('<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">'+cleanLbl+'</span><span>'+cur(cleanDp)+'</span></div>');
+  if (petFee)  rows.push('<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">'+petLbl+'</span><span>'+cur(petFee)+'</span></div>');
+
+  bkEl.innerHTML = rows.join('') || '<div style="color:var(--muted);">Link a lease in Step 1 to calculate.</div>';
+  totEl.textContent = rows.length ? cur(total) : '—';
+  LB.payInFull = chk && chk.checked ? { total: total, breakdown: { firstMonth: firstMonthRent, prorated: prorated, secDep, cleanDp, petFee } } : null;
+  if (noteEl) noteEl.style.display = (chk && chk.checked) ? '' : 'none';
+};
 function lbUpdateStep4Buttons() {
   var getCol    = window.lbGetCollection || function(){ return []; };
   var executeBtn = document.getElementById('lb-btn-execute');
@@ -7532,7 +8306,7 @@ var LB_CLAUSE_DEFS = [
   { id:'c5',  num:'5',  title:'Rent',                  required:true,
     text:'Tenant will pay to Landlord rent in the amount of ${{RENT}}.00 (the "Rent"), payable in advance on the {{DUE_DAY}}st day of each month, and is delinquent on the next day. If that day falls on a weekend or legal holiday, the rent is due on the next business day. There will be no rent increases through the initial term of the lease. Landlord may increase the rent that will be paid during any month-to-month renewal period by providing at least 30 days written notice to Tenant.\n\nPayments should be sent to: {{PAY_ADDRESS}}\n\nAcceptable forms of payment: Personal check, Money order, Cashier\'s check, Direct deposit, Paypal, Zelle.\n\nRent payments for any partial month will be pro-rated at the rate of 1/30th of the monthly rent payment per day.' },
   { id:'c6',  num:'6',  title:'Security Deposit',      required:true,
-    text:'At the time of signing this Agreement, Tenant must pay to Landlord a security deposit in the amount of ${{SEC_DEP}}.00 (the "Security Deposit") and a refundable cleaning fee in the amount of ${{CLEAN_DEP}}.00 (the "Cleaning Fee"), for a total deposit of ${{TOTAL_DEP}}.00.\n\nThe Security Deposit, together with any interest if required by law, will be returned to the Tenant within forty-five (45) days after the tenancy ends, along with an itemized accounting for all deductions made.' },
+    text:'At the time of signing this Agreement, Tenant must pay to Landlord the following amounts due at signing:\n\n\u2022 Security Deposit: ${{SEC_DEP}}.00\n\u2022 {{CLEANING_FEE_LABEL}}: ${{CLEAN_DEP}}.00\n\u2022 {{PET_FEE_LABEL}}: ${{PET_FEE}}.00\n\nTotal due at signing: ${{TOTAL_DEP}}.00\n\nThe Security Deposit will be returned to the Tenant within forty-five (45) days after the tenancy ends, along with an itemized accounting for any deductions. The {{CLEANING_FEE_LABEL}} is {{CLEAN_DEP_REFUNDABLE}}. The {{PET_FEE_LABEL}} is {{PET_FEE_REFUNDABLE}}.' },
   { id:'c7',  num:'7',  title:'Non-Sufficient Funds',  required:false,
     text:'Tenant will be charged a monetary fee of ${{NSF_FEE}}.00 as reimbursement of the expenses incurred by Landlord for each check that is returned to Landlord for lack of sufficient funds. Landlord and Tenant agree that three (3) returned checks in any 12 month period constitutes frequent return of checks due to insufficient funds and may be considered a just cause for eviction.' },
   { id:'c8',  num:'8',  title:'Late Payments',         required:false,
@@ -7556,7 +8330,7 @@ var LB_CLAUSE_DEFS = [
   { id:'c18', num:'18', title:'Roof/Fire Escapes',      required:false,
     text:'Use of the roof and/or the fire escapes by Tenants and/or guests is limited to emergency use only. No other use is permitted, including but not limited to, the placement of personal property.' },
   { id:'c19', num:'19', title:'Pets',                   required:false,
-    text:'Tenant is not allowed to keep any animals or pets on or about the Property without Landlord\'s prior written consent, except for the following:\n\nNumber of pets allowed: {{PET_COUNT}}\nType of pets allowed: {{PET_TYPES}}\nWeight limit: {{PET_WEIGHT}}\n\nTenant will be required to pay an additional nonrefundable pet fee in the amount of ${{PET_FEE}}.00. Tenant will be responsible for all costs that are reasonably necessary to remedy any damage to the Property which may be a result of any animal or pet.' },
+    text:'Tenant is not allowed to keep any animals or pets on or about the Property without Landlord\'s prior written consent, except for the following:\n\nNumber of pets allowed: {{PET_COUNT}}\nType of pets allowed: {{PET_TYPES}}\nWeight limit: {{PET_WEIGHT}}\n\nTenant will be required to pay a {{PET_FEE_LABEL}} in the amount of ${{PET_FEE}}.00. Tenant will be responsible for all costs that are reasonably necessary to remedy any damage to the Property which may be a result of any animal or pet.' },
   { id:'c20', num:'20', title:'Keys and Locks',         required:false,
     text:'Tenant will be given a set number of keys for the Property. If all keys are not returned to Landlord following termination of the Agreement, Tenant will be charged a monetary fee to replace the keys. Tenant is not permitted to change any lock or place additional locking devices on any door or window of the Property without Landlord\'s approval prior to installation.' },
   { id:'c21', num:'21', title:'Smoking',                required:false,
@@ -7637,13 +8411,14 @@ function lbGetTokens() {
   var secDep          = parseFloat(lease ? (lease.securityDeposit||'0') : '0');
   var cleanDep        = parseFloat(lease ? (lease.cleaningDeposit||'0') : '0');
   var petFee          = parseFloat(lease ? (lease.petDeposit||'0')      : '0');
-  var totalDep        = secDep + cleanDep;
+  var totalDep        = secDep + cleanDep + petFee;
 
   // Builder-specific (form only)
   var furnSel  = (document.getElementById('lb-furnished')||{}).value || 'fully';
   var furnDesc = furnSel === 'fully' ? 'House is fully furnished' :
                  furnSel === 'partial' ? 'House is partially furnished' : 'No furnishings provided';
-  var stateVal = g('lb-state') || 'Virginia';
+  var stateRaw = g('lb-state') || 'Virginia';
+  var stateVal = (stateRaw === 'Other' && LB.customState) ? LB.customState : stateRaw;
   var stateRef = stateVal === 'Virginia' ? 'Commonwealth of Virginia' :
                  stateVal === 'Arizona'  ? 'State of Arizona' : stateVal;
   var occupants = lease ? tenantFull : '___________';
@@ -7676,10 +8451,14 @@ function lbGetTokens() {
     '{{LATE_FEE}}':         g('lb-late-fee')     || '100',
     '{{LATE_DAYS}}':        g('lb-late-days')    || '7',
     '{{PAY_ADDRESS}}':      g('lb-pay-address')  || landlordAddress,
-    '{{SEC_DEP}}':          secDep.toString(),
-    '{{CLEAN_DEP}}':        cleanDep.toString(),
-    '{{TOTAL_DEP}}':        totalDep.toString(),
-    '{{PET_FEE}}':          petFee.toString(),
+    '{{SEC_DEP}}':               secDep.toString(),
+    '{{CLEAN_DEP}}':             cleanDep.toString(),
+    '{{TOTAL_DEP}}':             totalDep.toString(),
+    '{{PET_FEE}}':               petFee.toString(),
+    '{{CLEAN_DEP_REFUNDABLE}}':  prop ? (prop.cleaningFeeRefundable ? 'refundable' : 'non-refundable') : 'refundable',
+    '{{PET_FEE_REFUNDABLE}}':    prop ? (prop.petDepositRefundable  ? 'refundable' : 'non-refundable') : 'non-refundable',
+    '{{CLEANING_FEE_LABEL}}':    prop ? (prop.cleaningFeeRefundable ? 'Cleaning Deposit (Refundable)' : 'Cleaning Fee (Non-Refundable)') : 'Cleaning Fee',
+    '{{PET_FEE_LABEL}}':         prop ? (prop.petDepositRefundable  ? 'Pet Deposit (Refundable)'      : 'Pet Fee (Non-Refundable)')      : 'Pet Deposit',
     '{{NSF_FEE}}':          g('lb-nsf-fee')      || '50',
     '{{EARLY_FEE}}':        g('lb-early-fee')    || '800',
     '{{EARLY_NOTICE}}':     g('lb-early-notice') || '60',
@@ -7727,6 +8506,8 @@ window.lbNewDraft = function() {
   LB.linkedLeaseId    = null;
   LB.linkedPropertyId = null;
   LB.agreementId      = null;
+  LB.customState      = null;
+  LB.payInFull        = null;
   lbInitClauses();
   lbGoStep('parties');
   // Reset selects and resolved panel
@@ -7964,7 +8745,9 @@ window.lbRenderPreview = function() {
   var secDep      = tokens['{{SEC_DEP}}']   || '0';
   var cleanDep    = tokens['{{CLEAN_DEP}}'] || '0';
   var petFee      = tokens['{{PET_FEE}}']   || '0';
-  var totalDep    = (parseFloat(secDep)+parseFloat(cleanDep)).toString();
+  var cleanLabel  = tokens['{{CLEANING_FEE_LABEL}}'] || 'Cleaning Fee';
+  var petLabel    = tokens['{{PET_FEE_LABEL}}']      || 'Pet Fee';
+  var totalDep    = (parseFloat(secDep)+parseFloat(cleanDep)+parseFloat(petFee)).toFixed(2);
 
   // Status banner for non-draft agreements
   var getCol = window.lbGetCollection || function(){ return []; };
@@ -8000,11 +8783,36 @@ window.lbRenderPreview = function() {
     + '<div class="lb-sig-block">'
       + '<h2 style="text-align:left;margin-bottom:12px;font-size:0.9rem;color:var(--navy);text-transform:none;letter-spacing:0;">Receipt</h2>'
       + '<table class="lb-receipt-table">'
-        + '<tr><td>Security Deposit:</td><td>$'+secDep+'.00</td><td>Tenant ______</td><td>Landlord ______</td></tr>'
-        + '<tr><td>Cleaning Fee:</td><td>$'+cleanDep+'.00</td><td>Tenant ______</td><td>Landlord ______</td></tr>'
-        + '<tr><td>Pet Fee:</td><td>$'+petFee+'.00</td><td>Tenant ______</td><td>Landlord ______</td></tr>'
-        + '<tr><td style="font-weight:700;color:var(--navy);">Total Received:</td><td style="font-weight:700;">$'+totalDep+'.00</td><td></td><td></td></tr>'
+        + (function(){
+            // Prorated first month — computed independently from linked lease start date
+            var lease2 = LB.linkedLeaseId ? (window.lbGetCollection||function(){return[];})('leases').find(function(l){return l.id===LB.linkedLeaseId;}) : null;
+            var rentAmt = parseFloat(tokens['{{RENT}}']||0);
+            var proratedAmt = 0;
+            var proratedNote = '';
+            if (lease2 && lease2.startDate) {
+              var sd = new Date(lease2.startDate + 'T12:00:00');
+              var startDay = sd.getDate();
+              if (startDay !== 1) {
+                var dim = new Date(sd.getFullYear(), sd.getMonth()+1, 0).getDate();
+                var remDays = dim - startDay + 1;
+                proratedAmt = Math.round((rentAmt / dim) * remDays * 100) / 100;
+                proratedNote = ' ('+remDays+'/'+dim+' days)';
+              }
+            }
+            if (proratedAmt > 0) {
+              return '<tr><td>Prorated First Month'+proratedNote+':</td><td>$'+proratedAmt.toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>'
+                   + '<tr><td>Second Month Rent:</td><td>$'+rentAmt.toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+            }
+            return '<tr><td>First Month Rent:</td><td>$'+rentAmt.toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+          }())
+        + '<tr><td>Security Deposit:</td><td>$'+parseFloat(secDep).toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>'
+        + (parseFloat(cleanDep) ? '<tr><td>'+cleanLabel+':</td><td>$'+parseFloat(cleanDep).toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>' : '')
+        + (parseFloat(petFee)   ? '<tr><td>'+petLabel+':</td><td>$'+parseFloat(petFee).toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>' : '')
+        + (LB.payInFull
+            ? '<tr><td style="font-weight:700;color:var(--green);">Move-in Total (Paid in Full):</td><td style="font-weight:700;color:var(--green);">$'+LB.payInFull.total.toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>'
+            : '<tr><td style="font-weight:700;color:var(--navy);">Total Received:</td><td style="font-weight:700;">$'+totalDep+'</td><td></td><td></td></tr>')
       + '</table>'
+      + (LB.payInFull ? '<p style="margin-top:8px;font-size:0.8125rem;color:var(--green);font-weight:600;">✓ Tenant is paying all move-in costs in full at signing.</p>' : '')
       + '<p style="margin-top:16px;font-weight:600;">IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement as of the Effective Date.</p>'
       + '<div class="lb-sig-row">'
         + '<div class="lb-sig-col"><div style="font-weight:700;margin-bottom:16px;">Landlord:</div><div class="lb-sig-line"></div><div>'+landlordName+'</div><div style="color:var(--muted);font-size:0.75rem;margin-top:4px;">Date: ___________</div></div>'
@@ -8064,6 +8872,8 @@ window.lbSaveDraft = function() {
     parking:      g('lb-parking'),
     maintResp:    g('lb-maint-resp'),
     state:        g('lb-state'),
+    customState:  LB.customState || null,
+    payInFull:    LB.payInFull || null,
   };
 
   // Check if an agreement for this lease already exists
@@ -8108,6 +8918,25 @@ window.lbSaveDraft = function() {
 
   upsertFn('leaseAgreements', record);
   LB.agreementId = record.id;
+
+  // Visual confirmation on the Save Draft button itself
+  var saveBtn = document.querySelector('#lb-panel-preview .btn-amber');
+  if (saveBtn) {
+    var origText = saveBtn.innerHTML;
+    saveBtn.innerHTML = '✅ Saved!';
+    saveBtn.style.background = 'var(--green)';
+    saveBtn.disabled = true;
+    setTimeout(function() {
+      saveBtn.innerHTML = origText;
+      saveBtn.style.background = '';
+      saveBtn.disabled = false;
+    }, 2000);
+  }
+
+  // Ensure toast appears above the modal (z-index guard)
+  var toastEl = document.getElementById('hml-toast');
+  if (toastEl) toastEl.style.zIndex = '10000';
+
   toastFn('💾 Draft saved — v'+record.version + (existing ? ' (updated)' : ' (new)'));
   try { lbUpdateStep4Buttons(); } catch(e) {}
   try { if (typeof renderLbDraftsTable === 'function') renderLbDraftsTable(); } catch(e) {}
@@ -8201,6 +9030,8 @@ window.lbAmend = function(summary) {
     furnished: g('lb-furnished'), appliances: g('lb-appliances'),
     storage: g('lb-storage'), parking: g('lb-parking'), maintResp: g('lb-maint-resp'),
     state: g('lb-state'),
+    customState: LB.customState || null,
+    payInFull:   LB.payInFull   || null,
   };
 
   var changeEntry = {
@@ -8267,6 +9098,13 @@ window.lbOpenAgreement = function(agreementId) {
       set('lb-parking',      bf.parking);
       set('lb-maint-resp',   bf.maintResp);
       set('lb-state',        bf.state);
+      // Restore LB state fields
+      LB.customState = bf.customState || null;
+      LB.payInFull   = bf.payInFull   || null;
+      // Restore pay-in-full checkbox if applicable
+      var pfChk = document.getElementById('lb-payinfull-check');
+      if (pfChk) pfChk.checked = !!LB.payInFull;
+      try { lbUpdatePayInFull(); } catch(e) {}
       // Restore clauses
       if (agreement.clauses && agreement.clauses.length) {
         LB.clauses = agreement.clauses.map(function(sc) {
@@ -8316,7 +9154,9 @@ window.lbExportDocx = function() {
   var secDep      = tokens['{{SEC_DEP}}']   || '0';
   var cleanDep    = tokens['{{CLEAN_DEP}}'] || '0';
   var petFee      = tokens['{{PET_FEE}}']   || '0';
-  var totalDep    = (parseFloat(secDep)+parseFloat(cleanDep)).toString();
+  var totalDep    = (parseFloat(secDep)+parseFloat(cleanDep)+parseFloat(petFee)).toFixed(2);
+  var cleanLabel  = tokens['{{CLEANING_FEE_LABEL}}'] || 'Cleaning Fee';
+  var petLabel    = tokens['{{PET_FEE_LABEL}}']      || 'Pet Fee';
   var startDate   = tokens['{{EFF_DATE}}'] !== '___________' ? tokens['{{EFF_DATE}}'] : 'draft';
   var fname       = 'lease-' + tenantFull.replace(/\s+/g,'-').toLowerCase() + '-' + startDate + '.doc';
 
@@ -8344,10 +9184,27 @@ window.lbExportDocx = function() {
   });
 
   rtf += para('RECEIPT', true, 11);
-  rtf += para('Security Deposit:   $' + secDep + '.00', false, 11);
-  rtf += para('Cleaning Fee:       $' + cleanDep + '.00', false, 11);
-  rtf += para('Pet Fee:            $' + petFee + '.00', false, 11);
-  rtf += para('Total Received:     $' + totalDep + '.00', true, 11);
+  (function(){
+    var lease2 = LB.linkedLeaseId ? (window.lbGetCollection||function(){return[];})('leases').find(function(l){return l.id===LB.linkedLeaseId;}) : null;
+    var rentAmt = parseFloat(tokens['{{RENT}}']||0);
+    var proratedAmt = 0;
+    if (lease2 && lease2.startDate) {
+      var sd2 = new Date(lease2.startDate+'T12:00:00');
+      var startDay2 = sd2.getDate();
+      if (startDay2 !== 1) {
+        var dim2 = new Date(sd2.getFullYear(), sd2.getMonth()+1, 0).getDate();
+        var rem2 = dim2 - startDay2 + 1;
+        proratedAmt = Math.round((rentAmt/dim2)*rem2*100)/100;
+        rtf += para('Prorated First Month ('+rem2+'/'+dim2+' days): $'+proratedAmt.toFixed(2), false, 11);
+        rtf += para('Second Month Rent:  $'+rentAmt.toFixed(2), false, 11);
+      }
+    }
+    if (!proratedAmt) rtf += para('First Month Rent:   $'+rentAmt.toFixed(2), false, 11);
+  }());
+  rtf += para('Security Deposit:   $' + parseFloat(secDep).toFixed(2), false, 11);
+  if (parseFloat(cleanDep)) rtf += para(cleanLabel + ':  $' + parseFloat(cleanDep).toFixed(2), false, 11);
+  if (parseFloat(petFee))   rtf += para(petLabel   + ':  $' + parseFloat(petFee).toFixed(2),   false, 11);
+  rtf += para('Total Received:     $' + totalDep, true, 11);
   rtf += para('', false, 11);
   rtf += para('IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement as of the Effective Date.', false, 11);
   rtf += para('', false, 11);
@@ -8384,7 +9241,9 @@ window.lbExportTxt = function() {
   var cleanDep    = tokens['{{CLEAN_DEP}}'] || '0';
   var petFee      = tokens['{{PET_FEE}}']   || '0';
   var totalDep    = (parseFloat(secDep)+parseFloat(cleanDep)).toString();
-
+  var totalDep    = (parseFloat(secDep)+parseFloat(cleanDep)+parseFloat(petFee)).toFixed(2);
+  var cleanLabel  = tokens['{{CLEANING_FEE_LABEL}}'] || 'Cleaning Fee';
+  var petLabel    = tokens['{{PET_FEE_LABEL}}']      || 'Pet Fee';
   var lines = [
     stateVal.toUpperCase() + ' RESIDENTIAL LEASE AGREEMENT', '',
     'This Lease Agreement (the "Agreement") is made and entered on ' + effDate,
@@ -8398,10 +9257,27 @@ window.lbExportTxt = function() {
     lines.push('');
   });
   lines.push('', 'RECEIPT');
-  lines.push('Security Deposit:  $' + secDep + '.00');
-  lines.push('Cleaning Fee:      $' + cleanDep + '.00');
-  lines.push('Pet Fee:           $' + petFee + '.00');
-  lines.push('Total Received:    $' + totalDep + '.00');
+  (function(){
+    var lease2 = LB.linkedLeaseId ? (window.lbGetCollection||function(){return[];})('leases').find(function(l){return l.id===LB.linkedLeaseId;}) : null;
+    var rentAmt = parseFloat(tokens['{{RENT}}']||0);
+    var proratedAmt = 0;
+    if (lease2 && lease2.startDate) {
+      var sd2 = new Date(lease2.startDate+'T12:00:00');
+      var startDay2 = sd2.getDate();
+      if (startDay2 !== 1) {
+        var dim2 = new Date(sd2.getFullYear(), sd2.getMonth()+1, 0).getDate();
+        var rem2 = dim2 - startDay2 + 1;
+        proratedAmt = Math.round((rentAmt/dim2)*rem2*100)/100;
+        lines.push('Prorated First Month ('+rem2+'/'+dim2+' days):  $'+proratedAmt.toFixed(2));
+        lines.push('Second Month Rent:   $'+rentAmt.toFixed(2));
+      }
+    }
+    if (!proratedAmt) lines.push('First Month Rent:    $'+rentAmt.toFixed(2));
+  }());
+  lines.push('Security Deposit:  $' + parseFloat(secDep).toFixed(2));
+  if (parseFloat(cleanDep)) lines.push(cleanLabel.padEnd(19) + '$' + parseFloat(cleanDep).toFixed(2));
+  if (parseFloat(petFee))   lines.push(petLabel.padEnd(19)   + '$' + parseFloat(petFee).toFixed(2));
+  lines.push('Total Received:    $' + totalDep);
   lines.push('', 'IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement.', '');
   lines.push('Landlord: ' + landlordName);
   lines.push('By: _________________________________  Date: ___________', '');
@@ -8459,10 +9335,12 @@ window.lbExportSnapshot = function(agreementId, versionHint) {
   var cur = function(v) { return v ? parseFloat(v).toLocaleString('en-US') : '0'; };
   var tenantFull   = ((tn.firstName||'')+' '+(tn.lastName||'')).trim() || '___________';
   var landlordName = ld.name || '___________';
-  var secDep   = cur(tn.securityDeposit);
-  var cleanDep = cur(tn.cleaningDeposit);
-  var petFee   = cur(tn.petDeposit);
-  var totalDep = ((parseFloat(tn.securityDeposit)||0)+(parseFloat(tn.cleaningDeposit)||0)).toLocaleString('en-US');
+  var secDep     = cur(tn.securityDeposit);
+  var cleanDep   = cur(tn.cleaningDeposit);
+  var petFee     = cur(tn.petDeposit);
+  var cleanLabel = (pr.cleaningFeeRefundable ? 'Cleaning Deposit (Refundable)' : 'Cleaning Fee (Non-Refundable)');
+  var petLabel   = (pr.petDepositRefundable  ? 'Pet Deposit (Refundable)'      : 'Pet Fee (Non-Refundable)');
+  var totalDep   = ((parseFloat(tn.securityDeposit)||0)+(parseFloat(tn.cleaningDeposit)||0)+(parseFloat(tn.petDeposit)||0)).toLocaleString('en-US');
 
   var lines = [
     (bf.state||'Virginia').toUpperCase()+' RESIDENTIAL LEASE AGREEMENT',
@@ -8487,12 +9365,12 @@ window.lbExportSnapshot = function(agreementId, versionHint) {
     lines.push('');
   });
 
+  var receiptLines = ['', 'RECEIPT', 'Security Deposit:  $'+secDep];
+  if (parseFloat(tn.cleaningDeposit)) receiptLines.push(cleanLabel+':  $'+cleanDep);
+  if (parseFloat(tn.petDeposit))      receiptLines.push(petLabel+':  $'+petFee);
+  receiptLines.push('Total Received:    $'+totalDep);
   lines.push(
-    '', 'RECEIPT',
-    'Security Deposit:  $'+secDep,
-    'Cleaning Fee:      $'+cleanDep,
-    'Pet Fee:           $'+petFee,
-    'Total Received:    $'+totalDep,
+    ...receiptLines,
     '', 'IN WITNESS WHEREOF, the parties have executed this Agreement.', '',
     'Landlord: '+landlordName,
     'By: _________________________________  Date: ___________',
@@ -8586,13 +9464,12 @@ window.lbExportPdf = function() {
       '  body > *:not(#lb-print-frame) { display: none !important; }',
       '  #lb-print-frame {',
       '    display: block !important;',
-      '    position: fixed;',
-      '    inset: 0;',
+      '    position: static;',
       '    width: 100%;',
       '    background: #fff;',
       '    font-family: Georgia, serif;',
       '    font-size: 11pt;',
-      '    line-height: 1.65;',
+      '    line-height: 1.7;',
       '    color: #000;',
       '    padding: 0.75in;',
       '    box-sizing: border-box;',
@@ -8788,6 +9665,23 @@ window.openLeaseBuilder = function() {
             '<div class="field"><label>Parking</label><input id="lb-parking" type="text" placeholder="Driveway, Street" /></div>',
           '</div>',
           '<div class="field"><label>Tenant Maintenance Responsibilities</label><input id="lb-maint-resp" type="text" placeholder="Yard areas" /></div>',
+
+          '<div class="lb-section-head" style="margin-top:18px;">Move-In / Pay in Full</div>',
+          '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:0.8125rem;" id="lb-payinfull-summary">',
+            '<div style="color:var(--muted);font-size:0.75rem;margin-bottom:8px;">Estimated move-in total (resolved from lease record)</div>',
+            '<div id="lb-payinfull-breakdown" style="line-height:2;"></div>',
+            '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">',
+              '<strong>Move-in Total:</strong>',
+              '<strong id="lb-payinfull-total" style="font-size:1rem;color:var(--navy);">—</strong>',
+            '</div>',
+            '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;">',
+              '<input type="checkbox" id="lb-payinfull-check" onchange="lbUpdatePayInFull()" style="width:16px;height:16px;cursor:pointer;" />',
+              '<label for="lb-payinfull-check" style="font-size:0.8125rem;cursor:pointer;color:var(--navy);font-weight:600;">Tenant paying in full at move-in</label>',
+            '</div>',
+            '<div id="lb-payinfull-note" style="display:none;margin-top:8px;padding:8px 10px;background:var(--green-light);border-radius:6px;font-size:0.75rem;color:var(--green);">',
+              '✓ Full move-in payment will be noted in the lease agreement and receipt.',
+            '</div>',
+          '</div>',
 
           '<div style="margin-top:20px;display:flex;gap:10px;">',
             '<button class="btn btn-outline" style="flex:1;" onclick="lbGoStep(\'parties\')">← Back</button>',
@@ -9439,6 +10333,7 @@ window.renderLeaseBuilder = function() {
   <div class="dk-tabs">
     <button class="dk-tab active" onclick="dkTab('log')"     id="dk-tab-log">Log</button>
     <button class="dk-tab"        onclick="dkTab('entries')" id="dk-tab-entries">Entries <span class="dk-tab-count" id="dk-entry-count">0</span></button>
+    <button class="dk-tab"        onclick="dkTab('map');if(!DK._mapLoaded){dkmInit();DK._mapLoaded=true;}" id="dk-tab-map">🗺 Map</button>
     <button class="dk-tab"        onclick="dkTab('state')"   id="dk-tab-state">State</button>
   </div>
 
@@ -9484,7 +10379,90 @@ window.renderLeaseBuilder = function() {
     <div id="dk-state"></div>
   </div>
 
+  <!-- ── MAP TAB ──────────────────────────────────────────────────── -->
+  <div class="dk-tab-panel" id="dk-panel-map">
+    <!-- Breadcrumb nav -->
+    <div id="dkm-breadcrumb" style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;display:flex;align-items:center;gap:5px;background:var(--card-alt,#f8f9fb)"></div>
+    <!-- Step 1: Screen picker -->
+    <div id="dkm-step-screen" style="padding:8px 0">
+      <div style="padding:4px 12px 6px;font-size:11px;color:var(--muted)">Select a screen to explore its interactions:</div>
+      <div id="dkm-screen-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 10px 8px"></div>
+    </div>
+    <!-- Step 2: Object list -->
+    <div id="dkm-step-object" style="display:none">
+      <div style="padding:6px 10px 0">
+        <input id="dkm-search" style="width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:12px;padding:7px 10px;border-radius:8px;outline:none;font-family:inherit" placeholder="🔍 Filter…" oninput="dkmRenderObjects()">
+      </div>
+      <div id="dkm-type-row" style="display:flex;gap:5px;padding:6px 10px 4px;overflow-x:auto;scrollbar-width:none"></div>
+      <div id="dkm-obj-list" style="padding:4px 0 8px"></div>
+    </div>
+    <!-- Step 3: Detail + edit form -->
+    <div id="dkm-step-detail" style="display:none;padding:8px 10px 12px">
+      <div id="dkm-detail-card" style="background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden"></div>
+      <div id="dkm-form-card" style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <div style="padding:10px 12px;border-bottom:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:6px">Desired Outcome</div>
+          <textarea id="dkm-desired" rows="4" style="width:100%;background:var(--bg,#f0f2f5);border:1px solid var(--border);color:var(--text);font-size:13px;padding:8px;border-radius:7px;font-family:inherit;resize:none;line-height:1.5;outline:none" placeholder="What should happen? Describe the exact behavior…"></textarea>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin:8px 0 4px">Notes / Edge Cases</div>
+          <textarea id="dkm-notes" rows="2" style="width:100%;background:var(--bg,#f0f2f5);border:1px solid var(--border);color:var(--text);font-size:12px;padding:7px 8px;border-radius:7px;font-family:inherit;resize:none;line-height:1.5;outline:none" placeholder="Edge cases, related element IDs, context…"></textarea>
+        </div>
+        <div style="padding:8px 12px;border-bottom:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:6px">Status</div>
+          <div style="display:flex;gap:5px" id="dkm-status-row"></div>
+        </div>
+        <div style="padding:8px 12px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:6px">Priority</div>
+          <div style="display:flex;gap:5px" id="dkm-pri-row"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px" id="dkm-detail-nav"></div>
+      <button onclick="dkmSaveDetail()" style="width:100%;margin-top:8px;padding:11px;border-radius:10px;background:var(--navy,#1a3557);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer">Save Changes</button>
+    </div>
+    <!-- New entry form (pre-filled from unrecognized tap) -->
+    <div id="dkm-step-new" style="display:none;padding:8px 10px 12px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5" id="dkm-new-ctx"></div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <div style="padding:10px 12px;border-bottom:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:5px">Object Name</div>
+          <input id="dkm-new-obj" style="width:100%;background:var(--bg,#f0f2f5);border:1px solid var(--border);color:var(--text);font-size:13px;padding:7px 9px;border-radius:7px;font-family:inherit;outline:none">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin:8px 0 5px">Screen</div>
+          <select id="dkm-new-form" style="width:100%;background:var(--bg,#f0f2f5);border:1px solid var(--border);color:var(--text);font-size:13px;padding:7px 9px;border-radius:7px;font-family:inherit;outline:none">
+            <option value="HOME">Home</option>
+            <option value="DASHBOARD">Dashboard</option>
+            <option value="PROPERTIES">Properties</option>
+            <option value="PROPERTY_DETAIL">Property Detail</option>
+            <option value="TENANTS">Tenants</option>
+            <option value="FINANCES">Finances</option>
+            <option value="RESALE">Resale</option>
+            <option value="SERVICE">Service Requests</option>
+            <option value="PERSONAL">Maintenance</option>
+            <option value="SETTINGS">Settings</option>
+            <option value="LEASE_BUILDER">Lease Builder</option>
+            <option value="MODALS">Modals</option>
+          </select>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin:8px 0 5px">Current Behavior</div>
+          <textarea id="dkm-new-current" rows="2" style="width:100%;background:var(--bg,#f0f2f5);border:1px solid var(--border);color:var(--text);font-size:12px;padding:7px 8px;border-radius:7px;font-family:inherit;resize:none;outline:none" placeholder="What does it do now?"></textarea>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin:8px 0 5px">Desired Outcome</div>
+          <textarea id="dkm-new-desired" rows="3" style="width:100%;background:var(--bg,#f0f2f5);border:1px solid var(--border);color:var(--text);font-size:13px;padding:8px;border-radius:7px;font-family:inherit;resize:none;line-height:1.5;outline:none" placeholder="What should happen instead?"></textarea>
+        </div>
+        <div style="padding:8px 12px;display:flex;gap:5px" id="dkm-new-status-row"></div>
+      </div>
+      <button onclick="dkmSaveNew()" style="width:100%;margin-top:8px;padding:11px;border-radius:10px;background:var(--navy,#1a3557);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer">Add to Map</button>
+    </div>
+  </div>
+
 </div><!-- /#dk-panel -->
+
+<!-- Inspect confirm bubble (sits outside panel so it overlays the app) -->
+<div id="dk-tag-bubble" style="display:none;position:fixed;z-index:1002;background:#fff;border:1.5px solid var(--navy,#1a3557);border-radius:12px;padding:10px 14px;box-shadow:0 8px 32px rgba(0,0,0,0.18);min-width:200px;max-width:270px">
+  <div style="font-size:11px;font-weight:700;color:var(--navy,#1a3557);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.4px">🔍 Element Tagged</div>
+  <div id="dk-tag-bubble-name" style="font-size:13px;font-weight:600;color:var(--text,#1a1a2e);margin-bottom:2px;line-height:1.3"></div>
+  <div id="dk-tag-bubble-ctx" style="font-size:11px;color:var(--muted,#888);margin-bottom:10px;line-height:1.4"></div>
+  <div style="display:flex;gap:6px">
+    <button onclick="dkmTagConfirm()" style="flex:1;padding:7px;border-radius:8px;background:rgba(26,53,87,0.1);border:1px solid rgba(26,53,87,0.3);color:var(--navy,#1a3557);font-size:12px;font-weight:700;cursor:pointer">Open in Map ›</button>
+    <button onclick="dkmTagDismiss()" style="padding:7px 10px;border-radius:8px;background:#f0f2f5;border:1px solid var(--border,#e0e4ec);color:#555;font-size:12px;font-weight:700;cursor:pointer">Log Only</button>
+  </div>
+</div>
 
 
 <!-- ── DEVKIT JS ──────────────────────────────────────────────────── -->
@@ -9501,12 +10479,21 @@ var DK_MAX_RECENT = 3;                   // entries shown in Log tab preview
 var DK = {
   active:      false,   // DevKit visible (toggle + badge shown)
   panelOpen:   false,   // panel slide-up open
-  activeTab:   'log',   // 'log' | 'entries' | 'state'
+  activeTab:   'log',   // 'log' | 'entries' | 'state' | 'map'
   activeCat:   'bug',   // selected log category
   pendingRef:  null,    // captured element ref string | null
   inspecting:  false,   // inspector overlay active
   tapCount:    0,
-  tapTimer:    null
+  tapTimer:    null,
+  // Map tab state
+  _mapLoaded:     false,   // dkmInit() has run
+  _tagEl:         null,    // tapped DOM element
+  _tagRowId:      null,    // matched DKM_ROWS id, or null
+  _tagScreen:     null,    // resolved screen key at tap time
+  _tagElDesc:     null,    // human label for bubble
+  _tagElContext:  null,    // full context string for new-entry pre-fill
+  _inspectHoverEl: null,    // element last highlighted (for cleanup)
+  _toastTimer:     null     // clearTimeout handle for dk-toast
 };
 
 /* ── ACTIVATION ─────────────────────────────────────────────────── */
@@ -9555,7 +10542,7 @@ window.dkTogglePanel = function() {
 /* ── TABS ───────────────────────────────────────────────────────── */
 window.dkTab = function(name) {
   DK.activeTab = name;
-  ['log','entries','state'].forEach(function(t) {
+  ['log','entries','state','map'].forEach(function(t) {
     var tab   = document.getElementById('dk-tab-' + t);
     var panel = document.getElementById('dk-panel-' + t);
     if (tab)   tab.classList.toggle('active', t === name);
@@ -9569,6 +10556,7 @@ window.dkRenderTab = function(name) {
   if (name === 'log')     { dkRenderRecent(); dkUpdateCount(); }
   if (name === 'entries') { dkRenderEntries(); dkUpdateCount(); }
   if (name === 'state')   { dkRenderState(); }
+  if (name === 'map')     { if(!DK._mapLoaded){ dkmInit(); DK._mapLoaded=true; } else { dkmRenderBreadcrumb(); } }
 };
 
 function dkUpdateCount() {
@@ -9866,32 +10854,121 @@ function dkCaptureTap(e) {
 
   if (!el) { dkOpenPanel(); return; }
 
-  // Walk up to find best identifier (skip dk- elements)
+  // ── Screen key resolution ─────────────────────────────────────────────
+  // Maps _applyScreen() screen names → DKM form keys
+  var screenKey = dkGetCurrentScreen().toUpperCase().replace(/-/g,'_');
+  // Normalise known variants
+  var _skMap = {
+    'HOME':'HOME', 'DASHBOARD':'DASHBOARD',
+    'PROPERTIES':'PROPERTIES', 'PROPERTY_DETAIL':'PROPERTY_DETAIL',
+    'TENANTS':'TENANTS', 'FINANCES':'FINANCES',
+    'RESALE':'RESALE', 'SERVICE':'SERVICE',
+    'PERSONAL':'PERSONAL', 'SETTINGS':'SETTINGS',
+    'LEASE_BUILDER':'LEASE_BUILDER'
+  };
+  screenKey = _skMap[screenKey] || 'MODALS';
+
+  // ── Build ref string for log chip ─────────────────────────────────────
   var best = null;
   var cur  = el;
   for (var i = 0; i < 8 && cur && cur !== document.body; i++) {
-    if (cur.id && !cur.id.startsWith('dk-')) {
-      best = '#' + cur.id;
-      break;
-    }
+    if (cur.id && !cur.id.startsWith('dk-')) { best = '#' + cur.id; break; }
     if (cur.className && typeof cur.className === 'string') {
       var cls = cur.className.trim().split(/\s+/)
-        .filter(function(c){ return !c.startsWith('dk-'); })[0];
+        .filter(function(c){ return c && !c.startsWith('dk-') && c !== 'active' && c !== 'open'; })[0];
       if (cls) { best = '.' + cls; break; }
     }
     cur = cur.parentElement;
   }
-
-  var label = el.textContent ? el.textContent.trim().slice(0, 28) : '';
+  var label = (el.textContent || el.placeholder || '').trim().slice(0, 40);
   var ref   = (best || el.tagName.toLowerCase()) + (label ? ' · "' + label + '"' : '');
-
   DK.pendingRef = ref;
+  DK._tagEl     = el;
 
-  // Pulse highlight
+  // ── Pulse highlight ───────────────────────────────────────────────────
+  if (DK._inspectHoverEl) DK._inspectHoverEl.classList.remove('dk-highlighted');
   el.classList.add('dk-highlighted');
-  setTimeout(function() { el.classList.remove('dk-highlighted'); }, 700);
+  DK._inspectHoverEl = el;
+  setTimeout(function() { if (el) el.classList.remove('dk-highlighted'); }, 1200);
 
-  dkOpenPanel();
+  // ── 3-pass DKM_ROWS matching ──────────────────────────────────────────
+  var matched = null;
+  if (typeof DKM_ROWS !== 'undefined') {
+    // Pass 1 — exact: tapped element itself matches domHint
+    DKM_ROWS.forEach(function(row) {
+      if (!row.domHint || matched) return;
+      row.domHint.split(',').forEach(function(h) {
+        h = h.trim(); if (!h || matched) return;
+        try { if (el.matches(h)) matched = row; } catch(err) {}
+      });
+    });
+    // Pass 2 — ancestor: tapped element is a child of a mapped container
+    if (!matched) {
+      DKM_ROWS.forEach(function(row) {
+        if (!row.domHint || matched) return;
+        row.domHint.split(',').forEach(function(h) {
+          h = h.trim(); if (!h || matched) return;
+          try { if (el.closest(h)) matched = row; } catch(err) {}
+        });
+      });
+    }
+    // Pass 3 — text fuzzy: screen-scoped partial name match
+    if (!matched && label) {
+      var q = label.toLowerCase();
+      var candidates = DKM_ROWS.filter(function(r) { return r.form === screenKey; });
+      candidates.forEach(function(r) {
+        if (matched) return;
+        var rn = r.object.toLowerCase();
+        if (rn.includes(q) || q.includes(rn.slice(0, 8))) matched = r;
+      });
+    }
+  }
+
+  DK._tagRowId      = matched ? matched.id : null;
+  DK._tagScreen     = screenKey;
+  DK._tagElDesc     = matched ? matched.object : (label.slice(0,40) || best || el.tagName.toLowerCase());
+  DK._tagElContext  = 'Tapped: ' + (best || el.tagName.toLowerCase()) +
+                      (label ? ' "' + label.slice(0,40) + '"' : '') + ' on ' + screenKey;
+
+  // ── Show confirm bubble ───────────────────────────────────────────────
+  var bubble  = document.getElementById('dk-tag-bubble');
+  var nameEl  = document.getElementById('dk-tag-bubble-name');
+  var ctxEl   = document.getElementById('dk-tag-bubble-ctx');
+  if (bubble && nameEl && ctxEl) {
+    nameEl.textContent = DK._tagElDesc;
+    var sm2 = (typeof DKM_SCREENS !== 'undefined' && matched) ? DKM_SCREENS[matched.form] : null;
+    if (matched) {
+      var stColor = matched.status === 'broken' ? '#d0342c' : matched.status === 'partial' ? '#b8860b' : '#2e7d32';
+      ctxEl.innerHTML = '<span style="color:var(--navy,#1a3557)">' + (sm2 ? sm2.icon + ' ' + sm2.name : matched.form) + '</span>'
+        + ' · ' + matched.type
+        + (matched.status !== 'ok' ? ' · <span style="color:' + stColor + '">' + matched.status + '</span>' : '');
+    } else {
+      ctxEl.innerHTML = '<span style="color:#888">' + screenKey + ' · No existing entry — will create</span>';
+    }
+    // Position near tap
+    var bw = 280, bh = 140;
+    var left = Math.min(x + 8, window.innerWidth - bw - 8);
+    var top  = y + 16;
+    if (top + bh > window.innerHeight - 50) top = y - bh - 12;
+    bubble.style.left    = left + 'px';
+    bubble.style.top     = top + 'px';
+    bubble.style.display = 'block';
+
+    // Dismiss on outside tap
+    setTimeout(function() {
+      function _outsideDismiss(ev) {
+        if (bubble.style.display === 'none') { document.removeEventListener('touchstart', _outsideDismiss, true); return; }
+        if (!bubble.contains(ev.target)) {
+          dkmTagDismiss(true); // silent — don't reopen panel
+          document.removeEventListener('touchstart', _outsideDismiss, true);
+        }
+      }
+      document.addEventListener('touchstart', _outsideDismiss, true);
+    }, 100);
+  } else {
+    // Fallback if bubble element not found — just open log panel with ref
+    dkOpenPanel();
+  }
 };
 
 function dkOpenPanel() {
@@ -9986,6 +11063,8 @@ function dkToast(msg) {
   clearTimeout(DK._toastTimer);
   DK._toastTimer = setTimeout(function() { el.classList.remove('show'); }, 2000);
 }
+// Alias used by DKM functions
+var dkShowToast = dkToast;
 
 /* ── UTILS ──────────────────────────────────────────────────────── */
 function _esc(s) {
@@ -9994,6 +11073,547 @@ function _esc(s) {
     .replace(/</g,'&lt;')
     .replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DKM — DevKit Interaction Map
+   3-step navigator: Screen → Object list → Detail+edit form
+   Base data lives in DKM_ROWS[]. User edits (desired/notes/status/
+   priority) are persisted to localStorage and merged on load, so
+   adding new rows to DKM_ROWS never clobbers existing user notes.
+   ═══════════════════════════════════════════════════════════════════ */
+
+var DKM_MAP_KEY = 'hml_imap_v1';
+
+var DKM_SCREENS = {
+  HOME:            {icon:'🏠', name:'Home'},
+  DASHBOARD:       {icon:'📊', name:'Dashboard'},
+  PROPERTIES:      {icon:'🏘', name:'Properties'},
+  PROPERTY_DETAIL: {icon:'🏡', name:'Property Detail'},
+  TENANTS:         {icon:'👤', name:'Tenants'},
+  FINANCES:        {icon:'💰', name:'Finances'},
+  RESALE:          {icon:'🛍', name:'Resale'},
+  SERVICE:         {icon:'🔧', name:'Service Requests'},
+  PERSONAL:        {icon:'🔩', name:'Maintenance'},
+  SETTINGS:        {icon:'⚙️', name:'Settings'},
+  LEASE_BUILDER:   {icon:'📄', name:'Lease Builder'},
+  MODALS:          {icon:'💬', name:'Modals'},
+};
+
+var DKM_TYPE_ICONS = {
+  BUTTON:'🔘', INPUT:'✏️', CARD:'🃏', ROW:'📋', TAB:'🗂', MODAL:'💬', NAV:'🧭', FORM:'📝', TOGGLE:'🔀'
+};
+
+// Base rows — domHint is a comma-separated list of CSS selectors.
+// Inspect uses these for 3-pass matching. status/desired/notes are
+// user-editable and stored separately in localStorage.
+var DKM_ROWS = [
+  // ── HOME ──────────────────────────────────────────────────────────
+  {id:1,  form:'HOME', object:'Log Rent Payment card',        type:'CARD',   trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'Opens rent transaction form (modal-rent)',                 desired:'',notes:'',domHint:'.qa-card.green'},
+  {id:2,  form:'HOME', object:'Add Expense card',             type:'CARD',   trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'Opens expense transaction form',                           desired:'',notes:'',domHint:'.qa-card.red'},
+  {id:3,  form:'HOME', object:'Add Document card',            type:'CARD',   trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'Opens document upload form',                               desired:'',notes:'',domHint:'.qa-card.navy'},
+  {id:4,  form:'HOME', object:'Lease Dates card',             type:'CARD',   trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'Opens tenant info panel',                                  desired:'',notes:'',domHint:'.qa-card.amber'},
+  {id:5,  form:'HOME', object:'Log Purchase card',            type:'CARD',   trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'Opens acquire modal',                                      desired:'',notes:'',domHint:'.qa-card.purple'},
+  {id:6,  form:'HOME', object:'Log a Sale card',              type:'CARD',   trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'Opens sale form',                                          desired:'',notes:'',domHint:'.qa-card.green'},
+  {id:7,  form:'HOME', object:'Maintenance card',             type:'CARD',   trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'Navigates to personal/maintenance screen',                 desired:'',notes:'',domHint:'.qa-card.navy'},
+  {id:8,  form:'HOME', object:'Service Requests card',        type:'CARD',   trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'Navigates to service screen',                              desired:'',notes:'',domHint:'.qa-card.red'},
+  {id:9,  form:'HOME', object:'Lease Builder card',           type:'CARD',   trigger:'tap',   stores:'no', status:'ok',     priority:2, current:'Opens lease builder modal (4-step wizard)',                desired:'',notes:'Full width, amber. grid-column:1/-1',domHint:'.qa-card.amber[onclick*=openLeaseBuilder]'},
+  {id:10, form:'HOME', object:'Property snapshot cells',      type:'CARD',   trigger:'state', stores:'no', status:'ok',     priority:3, current:'Renders active property count, total rent, occupancy',     desired:'',notes:'',domHint:'.snapshot-cell'},
+  {id:11, form:'HOME', object:'Recent transactions list',     type:'ROW',    trigger:'state', stores:'no', status:'ok',     priority:3, current:'Shows last 3 transactions with amount + description',      desired:'',notes:'',domHint:'.txn-item'},
+  {id:12, form:'HOME', object:'View all → resale link',       type:'NAV',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'Navigates to resale screen',                               desired:'',notes:'',domHint:'.view-all-link[onclick*=resale]'},
+  {id:13, form:'HOME', object:'View all → transactions link', type:'NAV',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'Navigates to finances/transactions',                       desired:'',notes:'',domHint:'.view-all-link[onclick*=finances]'},
+
+  // ── DASHBOARD ─────────────────────────────────────────────────────
+  {id:20, form:'DASHBOARD', object:'Alerts list',             type:'ROW',    trigger:'state', stores:'no', status:'ok',     priority:2, current:'Renders vacancy + lease-expiry alerts from computeAlerts()',desired:'',notes:'Alert cards have .alert-close dismiss button',domHint:'.alert-icon,.alert-text,.alert-close'},
+  {id:21, form:'DASHBOARD', object:'Alert dismiss button',    type:'BUTTON', trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'Removes alert from view via dismissAlert(id)',             desired:'',notes:'Does not persist dismissal across reload',domHint:'.alert-close'},
+
+  // ── PROPERTIES ────────────────────────────────────────────────────
+  {id:30, form:'PROPERTIES', object:'Property card',          type:'CARD',   trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'Calls openProperty(id) → navigates to property-detail',   desired:'',notes:'',domHint:'.prop-card,.prop-card *'},
+  {id:31, form:'PROPERTIES', object:'+ Add Property button',  type:'BUTTON', trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'Opens property form modal',                                desired:'',notes:'',domHint:'[onclick*=openPropertyForm]'},
+
+  // ── PROPERTY DETAIL ───────────────────────────────────────────────
+  {id:40, form:'PROPERTY_DETAIL', object:'Info tab',          type:'TAB',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'switchPropTab("info") — shows property info fields',       desired:'',notes:'',domHint:'#prop-tabs .inner-tab:nth-child(1)'},
+  {id:41, form:'PROPERTY_DETAIL', object:'Tenants tab',       type:'TAB',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'switchPropTab("tenants") → renderTenantsTab()',            desired:'',notes:'',domHint:'#prop-tabs .inner-tab:nth-child(2)'},
+  {id:42, form:'PROPERTY_DETAIL', object:'Docs tab',          type:'TAB',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'switchPropTab("docs") — lists documents for property',     desired:'',notes:'',domHint:'#prop-tabs .inner-tab:nth-child(3)'},
+  {id:43, form:'PROPERTY_DETAIL', object:'Financials tab',    type:'TAB',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'switchPropTab("financials") → renderPropertyFinancials()', desired:'',notes:'',domHint:'#prop-tabs .inner-tab:nth-child(4)'},
+  {id:44, form:'PROPERTY_DETAIL', object:'Edit Property ⋯ menu', type:'BUTTON', trigger:'tap', stores:'no', status:'ok',   priority:3, current:'toggleDotMenu("prop-menu") — shows edit/delete options',   desired:'',notes:'',domHint:'.edit-btn[onclick*=toggleDotMenu]'},
+  {id:45, form:'PROPERTY_DETAIL', object:'✏️ Edit Property',  type:'BUTTON', trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'switchPropTab(info) — inline edit form in info tab',      desired:'',notes:'No modal',domHint:'.dot-menu-item:not(.danger)'},
+  {id:46, form:'PROPERTY_DETAIL', object:'🗑 Delete Property', type:'BUTTON', trigger:'tap',   stores:'yes',status:'ok',     priority:2, current:'confirmDelete → softDelete property + leases → navigate properties', desired:'',notes:'Soft-deletes all leases for property', domHint:'.dot-menu-item.danger'},
+  {id:47, form:'PROPERTY_DETAIL', object:'Tenant lease row',  type:'ROW',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'toggleSwipe(id) — reveals swipe actions on lease row',    desired:'',notes:'swipe-btn-edit opens lease form; swipe-btn-delete confirms removal',domHint:'.swipe-content'},
+  {id:48, form:'PROPERTY_DETAIL', object:'+ New Lease button', type:'BUTTON', trigger:'tap',  stores:'no', status:'ok',     priority:2, current:'openLeaseBuilder() from property detail / tenants tab',    desired:'',notes:'',domHint:'[onclick*=openLeaseBuilder]'},
+  {id:49, form:'PROPERTY_DETAIL', object:'Document row',      type:'ROW',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'toggleSwipe() — reveals preview and delete swipe actions',  desired:'',notes:'👁 preview action opens file if present',domHint:'.doc-row,.doc-info'},
+  {id:50, form:'PROPERTY_DETAIL', object:'Info row fields',   type:'ROW',    trigger:'state', stores:'no', status:'ok',     priority:3, current:'Renders static property info (beds, baths, rate, type…)',   desired:'',notes:'',domHint:'.info-row'}  ,
+
+  // ── TENANTS ───────────────────────────────────────────────────────
+  {id:60, form:'TENANTS', object:'Tenant/lease row',          type:'ROW',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'toggleSwipe(id) — reveals edit + delete actions',          desired:'',notes:'Rendered dynamically by renderTenantsScreen()',domHint:'.swipe-content'},
+  {id:61, form:'TENANTS', object:'Activate Lease button',     type:'BUTTON', trigger:'tap',   stores:'yes',status:'ok',     priority:2, current:'activateLease(id) — sets status=active, updates property', desired:'',notes:'Re-reads record from DB after upsert to avoid flash bug',domHint:'[onclick*=activateLease]'},
+  {id:62, form:'TENANTS', object:'Days Remaining badge',      type:'ROW',    trigger:'state', stores:'no', status:'ok',     priority:3, current:'Shows days left or "Ended" badge for active leases',       desired:'',notes:'isEnded = remaining <= 0 renders navy "Ended" badge',domHint:'.badge-navy'},
+
+  // ── FINANCES ──────────────────────────────────────────────────────
+  {id:70, form:'FINANCES', object:'Overview tab',             type:'TAB',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'switchFinTab("overview") — summary cards',                 desired:'',notes:'',domHint:'#fin-tabs .inner-tab:nth-child(1),[onclick*=switchFinTab][onclick*=overview]'},
+  {id:71, form:'FINANCES', object:'Transactions tab',         type:'TAB',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'switchFinTab("transactions") → renderTransactionTable()',  desired:'',notes:'',domHint:'#fin-tabs .inner-tab:nth-child(2),[onclick*=switchFinTab][onclick*=transactions]'},
+  {id:72, form:'FINANCES', object:'Reports tab',              type:'TAB',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'switchFinTab("reports") — Schedule E/C view',              desired:'',notes:'',domHint:'#fin-tabs .inner-tab:nth-child(3),[onclick*=switchFinTab][onclick*=reports]'},
+  {id:73, form:'FINANCES', object:'Transaction filter chips', type:'BUTTON', trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'setFilter(this, type) — filters by all/income/expense/rental/resale', desired:'',notes:'',domHint:'.filter-chip[onclick*=setFilter]'},
+  {id:74, form:'FINANCES', object:'Transaction row',          type:'ROW',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'toggleTxnDetail(id) — expands inline edit row',            desired:'',notes:'',domHint:'.txn-row-btn'},
+  {id:75, form:'FINANCES', object:'Sort column headers',      type:'BUTTON', trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'sortTransactions(field) — toggles asc/desc',              desired:'',notes:'',domHint:'.txn-th[onclick*=sortTransactions]'},
+  {id:76, form:'FINANCES', object:'Load more button',         type:'BUTTON', trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'txnLoadMore() — increases TXN_STATE.visible',             desired:'',notes:'',domHint:'#txn-load-more-btn'},
+  {id:77, form:'FINANCES', object:'Export CSV button',        type:'BUTTON', trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'exportAllCSV() — exports all transactions as CSV',         desired:'',notes:'',domHint:'[onclick*=exportAllCSV]'},
+  {id:78, form:'FINANCES', object:'Schedule E CSV export',    type:'BUTTON', trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'exportScheduleE() — rental income/expense',               desired:'',notes:'',domHint:'[onclick*=exportScheduleE]'},
+  {id:79, form:'FINANCES', object:'Schedule C CSV export',    type:'BUTTON', trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'exportScheduleC() — resale income/expense',               desired:'',notes:'',domHint:'[onclick*=exportScheduleC]'},
+
+  // ── RESALE ────────────────────────────────────────────────────────
+  {id:80, form:'RESALE', object:'Inventory tab',              type:'TAB',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'switchResaleTab("inventory")',                             desired:'',notes:'',domHint:'#resale-tabs .inner-tab:nth-child(1)'},
+  {id:81, form:'RESALE', object:'Listings tab',               type:'TAB',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'switchResaleTab("listings")',                              desired:'',notes:'',domHint:'#resale-tabs .inner-tab:nth-child(2)'},
+  {id:82, form:'RESALE', object:'Sales tab',                  type:'TAB',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'switchResaleTab("sales")',                                 desired:'',notes:'',domHint:'#resale-tabs .inner-tab:nth-child(3)'},
+  {id:83, form:'RESALE', object:'Snapshot cells',             type:'ROW',    trigger:'state', stores:'no', status:'ok',     priority:3, current:'Shows inventory count, total sales, net P&L',              desired:'',notes:'Was flashing placeholder values on first load — fixed.',domHint:'.snapshot-cell'},
+  {id:84, form:'RESALE', object:'+ Acquire button',           type:'BUTTON', trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'openModal("modal-acquire") — log new inventory item',      desired:'',notes:'',domHint:'.btn-amber[onclick*=modal-acquire]'},
+
+  // ── SERVICE REQUESTS ──────────────────────────────────────────────
+  {id:90, form:'SERVICE', object:'Status filter chips',       type:'BUTTON', trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'setSRFilter(this, status) — all/open/in-progress/closed', desired:'',notes:'',domHint:'.filter-chip[onclick*=setSRFilter]'},
+  {id:91, form:'SERVICE', object:'Service request row',       type:'ROW',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'toggleSwipe() — opens swipe actions (edit/resolve/delete)',desired:'',notes:'',domHint:'.swipe-content'},
+
+  // ── PERSONAL (MAINTENANCE) ────────────────────────────────────────
+  {id:100,form:'PERSONAL', object:'Maintenance item row',     type:'ROW',    trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'Toggles swipe row to reveal edit/delete actions',          desired:'',notes:'Includes vehicle rows and air-filter rows',domHint:'.swipe-content'},
+
+  // ── SETTINGS ──────────────────────────────────────────────────────
+  {id:110,form:'SETTINGS', object:'Save app name button',     type:'BUTTON', trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'saveAppName() — writes hml_appName to localStorage',      desired:'',notes:'',domHint:'[onclick*=saveAppName]'},
+  {id:111,form:'SETTINGS', object:'Save owner profile button',type:'BUTTON', trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'saveOwnerProfileFromSettings()',                           desired:'',notes:'Pre-fills landlord fields in lease builder',domHint:'[onclick*=saveOwnerProfileFromSettings]'},
+  {id:112,form:'SETTINGS', object:'Reset app name button',    type:'BUTTON', trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'resetAppName() — clears hml_appName',                     desired:'',notes:'',domHint:'[onclick*=resetAppName]'},
+
+  // ── LEASE BUILDER ─────────────────────────────────────────────────
+  {id:120,form:'LEASE_BUILDER', object:'Step 1 — Parties tab',   type:'TAB',  trigger:'tap', stores:'no', status:'ok',     priority:3, current:'lbGoStep("parties") — landlord + tenant fields',            desired:'',notes:'',domHint:'#lb-tab-parties'},
+  {id:121,form:'LEASE_BUILDER', object:'Step 2 — Terms tab',     type:'TAB',  trigger:'tap', stores:'no', status:'ok',     priority:3, current:'lbGoStep("terms") — lease dates, rent, deposits',          desired:'',notes:'',domHint:'#lb-tab-terms'},
+  {id:122,form:'LEASE_BUILDER', object:'Step 3 — Clauses tab',   type:'TAB',  trigger:'tap', stores:'no', status:'ok',     priority:3, current:'lbGoStep("clauses") — 40 clause toggles',                  desired:'',notes:'Required clauses are locked on',domHint:'#lb-tab-clauses'},
+  {id:123,form:'LEASE_BUILDER', object:'Step 4 — Preview tab',   type:'TAB',  trigger:'tap', stores:'no', status:'ok',     priority:3, current:'lbGoStep("preview") — full rendered preview',              desired:'',notes:'',domHint:'#lb-tab-preview'},
+  {id:124,form:'LEASE_BUILDER', object:'Clause toggle',          type:'TOGGLE',trigger:'tap', stores:'no', status:'ok',     priority:3, current:'Toggles clause included/excluded — adds .excluded class',  desired:'',notes:'Required clauses have toggle disabled',domHint:'.lb-clause-toggle'},
+  {id:125,form:'LEASE_BUILDER', object:'Clause expand button',   type:'BUTTON',trigger:'tap', stores:'no', status:'ok',     priority:3, current:'Toggles .open class on .lb-clause — shows clause body',    desired:'',notes:'',domHint:'.lb-clause-expand'},
+  {id:126,form:'LEASE_BUILDER', object:'✨ AI Redraft button',   type:'BUTTON',trigger:'tap', stores:'no', status:'ok',     priority:2, current:'Sends clause + context to claude-sonnet for rewrite',      desired:'',notes:'Only shown when API key is set (hml_lb_apikey)',domHint:'.lb-clause-btn.ai-btn'},
+  {id:127,form:'LEASE_BUILDER', object:'Save Draft button',      type:'BUTTON',trigger:'tap', stores:'yes',status:'ok',     priority:2, current:'Saves full form state to leaseTemplates collection',       desired:'',notes:'',domHint:'[onclick*=lbSaveDraft]'},
+  {id:128,form:'LEASE_BUILDER', object:'Export / Copy button',   type:'BUTTON',trigger:'tap', stores:'no', status:'ok',     priority:2, current:'saveFileAs() → .txt, fallback clipboard',                 desired:'',notes:'',domHint:'[onclick*=lbExport],[onclick*=saveFileAs]'},
+  {id:129,form:'LEASE_BUILDER', object:'Continue / Back nav',    type:'BUTTON',trigger:'tap', stores:'no', status:'ok',     priority:3, current:'lbGoStep(step) — advances or retreats wizard steps',       desired:'',notes:'',domHint:'.btn-primary[onclick*=lbGoStep],.btn-outline[onclick*=lbGoStep]'},
+
+  // ── MODALS ────────────────────────────────────────────────────────
+  {id:140,form:'MODALS', object:'Rent transaction form',       type:'FORM',  trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'openTransactionForm("modal-rent") → save → renderDashboard', desired:'',notes:'',domHint:'#modal-rent'},
+  {id:141,form:'MODALS', object:'Expense form',                type:'FORM',  trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'openTransactionForm("modal-expense") → save',              desired:'',notes:'',domHint:'#modal-expense'},
+  {id:142,form:'MODALS', object:'Acquire item form',           type:'FORM',  trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'openModal("modal-acquire") → saveAcquire()',               desired:'',notes:'',domHint:'#modal-acquire'},
+  {id:143,form:'MODALS', object:'Property form',               type:'FORM',  trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'openPropertyForm() — new or edit property',                desired:'',notes:'',domHint:'#modal-property,[id*=modal-prop]'},
+  {id:144,form:'MODALS', object:'Tenant info panel',           type:'MODAL', trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'openTenantInfoPanel() — shows active lease + tenant cards', desired:'',notes:'',domHint:'#modal-tenant-info'},
+];
+
+// ── DKM Storage ───────────────────────────────────────────────────────────────
+var _DKM = {
+  step:'screen', screen:null, rowId:null, typeF:'ALL',
+  _editStatus:'tbd', _editPriority:2, _newStatus:'tbd'
+};
+
+function dkmSaveEdits() {
+  try {
+    localStorage.setItem(DKM_MAP_KEY, JSON.stringify(
+      DKM_ROWS.map(function(r){ return {id:r.id,desired:r.desired,notes:r.notes,status:r.status,priority:r.priority}; })
+    ));
+  } catch(e) {}
+}
+
+function dkmLoadEdits() {
+  try {
+    var saved = JSON.parse(localStorage.getItem(DKM_MAP_KEY) || '[]');
+    saved.forEach(function(s) {
+      var r = DKM_ROWS.find(function(x){ return x.id===s.id; });
+      if (r) {
+        if (s.desired  !== undefined) r.desired  = s.desired;
+        if (s.notes    !== undefined) r.notes    = s.notes;
+        if (s.status   !== undefined) r.status   = s.status;
+        if (s.priority !== undefined) r.priority = s.priority;
+      }
+    });
+  } catch(e) {}
+}
+
+// ── DKM Init ──────────────────────────────────────────────────────────────────
+function dkmInit() {
+  dkmLoadEdits();
+  dkmStep('screen');
+  dkmRenderScreens();
+}
+
+function dkmStep(step) {
+  _DKM.step = step;
+  ['screen','object','detail','new'].forEach(function(s) {
+    var el = document.getElementById('dkm-step-'+s);
+    if (el) el.style.display = s===step ? '' : 'none';
+  });
+  dkmRenderBreadcrumb();
+}
+
+function dkmRenderBreadcrumb() {
+  var bc = document.getElementById('dkm-breadcrumb');
+  if (!bc) return;
+  var navy = 'var(--navy,#1a3557)';
+  var muted = 'var(--muted,#888)';
+  var parts = ['<span style="color:'+muted+';cursor:pointer" onclick="dkmStep(\'screen\')">All</span>'];
+  if (_DKM.screen) {
+    var sm = DKM_SCREENS[_DKM.screen] || {icon:'',name:_DKM.screen};
+    parts.push('<span style="color:'+muted+'">›</span>');
+    var active = _DKM.step==='screen' ? '' : 'cursor:pointer;';
+    parts.push('<span style="color:'+navy+';'+active+'" onclick="dkmStep(\'object\')">'+sm.icon+' '+sm.name+'</span>');
+  }
+  if ((_DKM.step==='detail'||_DKM.step==='new') && _DKM.rowId) {
+    var row = DKM_ROWS.find(function(r){ return r.id===_DKM.rowId; });
+    if (row) {
+      parts.push('<span style="color:'+muted+'">›</span>');
+      var nm = row.object.length>20 ? row.object.slice(0,18)+'…' : row.object;
+      parts.push('<span style="color:var(--text,#1a1a2e)">'+nm+'</span>');
+    }
+  }
+  if (_DKM.step==='new') {
+    parts.push('<span style="color:'+muted+'">›</span>');
+    parts.push('<span style="color:var(--amber,#c8860a)">New Entry</span>');
+  }
+  bc.innerHTML = parts.join(' ');
+}
+
+// ── DKM Screen grid ───────────────────────────────────────────────────────────
+function dkmRenderScreens() {
+  var grid = document.getElementById('dkm-screen-grid');
+  if (!grid) return;
+  var html = '';
+  Object.keys(DKM_SCREENS).forEach(function(key) {
+    var meta    = DKM_SCREENS[key];
+    var rows    = DKM_ROWS.filter(function(r){ return r.form===key; });
+    var broken  = rows.filter(function(r){ return r.status==='broken'; }).length;
+    var partial = rows.filter(function(r){ return r.status==='partial'; }).length;
+    var badge   = broken
+      ? '<span style="position:absolute;top:5px;right:5px;background:rgba(208,52,44,0.15);color:#d0342c;font-size:10px;font-weight:800;padding:1px 5px;border-radius:8px">'+broken+'</span>'
+      : partial
+        ? '<span style="position:absolute;top:5px;right:5px;background:rgba(200,134,10,0.15);color:#c8860a;font-size:10px;font-weight:800;padding:1px 5px;border-radius:8px">'+partial+'</span>'
+        : '';
+    var border = broken ? 'rgba(208,52,44,0.3)' : partial ? 'rgba(200,134,10,0.25)' : 'var(--border,#e0e4ec)';
+    html += '<div style="background:var(--card,#fff);border:1px solid '+border+';border-radius:10px;padding:10px;cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent" ontouchstart="" onclick="dkmSelectScreen(\''+key+'\')">'
+      + badge
+      + '<div style="font-size:20px;margin-bottom:5px">'+meta.icon+'</div>'
+      + '<div style="font-size:12px;font-weight:700;color:var(--text,#1a1a2e);margin-bottom:2px;line-height:1.2">'+meta.name+'</div>'
+      + '<div style="font-size:10px;color:var(--muted,#888)">'+rows.length+' objects</div>'
+      + '</div>';
+  });
+  grid.innerHTML = html;
+}
+
+function dkmSelectScreen(key) {
+  _DKM.screen = key;
+  _DKM.typeF  = 'ALL';
+  var s = document.getElementById('dkm-search');
+  if (s) s.value = '';
+  dkmRenderTypeRow();
+  dkmRenderObjects();
+  dkmStep('object');
+}
+
+// ── DKM Object list ───────────────────────────────────────────────────────────
+function dkmRenderTypeRow() {
+  var row = document.getElementById('dkm-type-row');
+  if (!row) return;
+  var types = [];
+  DKM_ROWS.filter(function(r){ return r.form===_DKM.screen; }).forEach(function(r){
+    if (types.indexOf(r.type) < 0) types.push(r.type);
+  });
+  var navy = 'var(--navy,#1a3557)';
+  var chips = '<div style="padding:3px 9px;border-radius:14px;font-size:11px;font-weight:600;border:1px solid var(--border,#e0e4ec);background:'+(_DKM.typeF==='ALL'?'rgba(26,53,87,0.08)':'var(--card,#fff)')+';color:'+(_DKM.typeF==='ALL'?navy:'var(--muted,#888)')+';cursor:pointer;white-space:nowrap;flex-shrink:0" ontouchstart="" onclick="dkmSetType(\'ALL\')">All</div>';
+  types.forEach(function(t) {
+    var icon = DKM_TYPE_ICONS[t] || '•';
+    chips += '<div style="padding:3px 9px;border-radius:14px;font-size:11px;font-weight:600;border:1px solid var(--border,#e0e4ec);background:'+(_DKM.typeF===t?'rgba(26,53,87,0.08)':'var(--card,#fff)')+';color:'+(_DKM.typeF===t?navy:'var(--muted,#888)')+';cursor:pointer;white-space:nowrap;flex-shrink:0" ontouchstart="" onclick="dkmSetType(\''+t+'\')">'+icon+' '+t+'</div>';
+  });
+  row.innerHTML = chips;
+}
+
+function dkmSetType(t) { _DKM.typeF = t; dkmRenderTypeRow(); dkmRenderObjects(); }
+
+function _dkmSortRows(a,b) {
+  var sv = {broken:0,partial:1,ok:2,tbd:3};
+  if (sv[a.status] !== sv[b.status]) return sv[a.status]-sv[b.status];
+  return a.priority - b.priority;
+}
+
+function dkmRenderObjects() {
+  var list = document.getElementById('dkm-obj-list');
+  if (!list) return;
+  var q = ((document.getElementById('dkm-search')||{}).value||'').toLowerCase();
+  var rows = DKM_ROWS.filter(function(r){
+    if (r.form !== _DKM.screen) return false;
+    if (_DKM.typeF !== 'ALL' && r.type !== _DKM.typeF) return false;
+    if (q && !(r.object+r.current+r.desired+r.notes).toLowerCase().includes(q)) return false;
+    return true;
+  }).slice().sort(_dkmSortRows);
+
+  if (!rows.length) {
+    list.innerHTML = '<div style="padding:16px 12px;color:var(--muted,#888);font-size:12px;text-align:center">No objects match</div>';
+    return;
+  }
+
+  var sc  = {ok:'🟢', broken:'🔴', partial:'🟡', tbd:'⚪'};
+  var pc  = {'1':'#d0342c', '2':'#c8860a', '3':'var(--muted,#888)'};
+  var html = rows.map(function(r) {
+    var hasD = r.desired && r.desired.trim();
+    return '<div style="margin:0 8px 5px;background:var(--card-alt,#f8f9fb);border-radius:8px;border:1px solid var(--border,#e0e4ec);border-left:3px solid '+pc[r.priority]+';padding:9px 10px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:8px" ontouchstart="" onclick="dkmSelectRow('+r.id+')">'
+      + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:12px;font-weight:600;color:var(--text,#1a1a2e);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_esc(r.object)+'</div>'
+        + '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">'
+          + '<span style="font-size:10px">'+sc[r.status]+'</span>'
+          + '<span style="font-size:10px;color:var(--muted,#888)">'+(DKM_TYPE_ICONS[r.type]||'•')+' '+r.type+'</span>'
+          + (hasD?'<span style="font-size:9px;font-weight:700;color:var(--navy,#1a3557)">✎</span>':'')
+        + '</div>'
+      + '</div>'
+      + '<div style="color:var(--muted,#888);font-size:14px">›</div>'
+      + '</div>';
+  }).join('');
+  html += '<div style="margin:8px 8px 0;padding:9px 10px;border-radius:8px;border:1px dashed var(--border,#e0e4ec);cursor:pointer;text-align:center;color:var(--muted,#888);font-size:12px;font-weight:600;-webkit-tap-highlight-color:transparent" ontouchstart="" onclick="dkmNewRow()">+ Add New Object</div>';
+  list.innerHTML = html;
+}
+
+// ── DKM Detail view ───────────────────────────────────────────────────────────
+function dkmSelectRow(id) {
+  _DKM.rowId         = id;
+  var r = DKM_ROWS.find(function(r){ return r.id===id; });
+  _DKM._editStatus   = r ? r.status   : 'tbd';
+  _DKM._editPriority = r ? r.priority : 2;
+  dkmRenderDetail();
+  dkmStep('detail');
+}
+
+var _DKM_STATUS_LABELS = {ok:'🟢 Working', partial:'🟡 Partial', broken:'🔴 Broken', tbd:'⚪ TBD'};
+
+function dkmRenderDetail() {
+  var row = DKM_ROWS.find(function(r){ return r.id===_DKM.rowId; });
+  if (!row) return;
+  var sm    = DKM_SCREENS[row.form] || {icon:'', name:row.form};
+  var navy  = 'var(--navy,#1a3557)';
+  var muted = 'var(--muted,#888)';
+  var border = 'var(--border,#e0e4ec)';
+
+  var dc = document.getElementById('dkm-detail-card');
+  if (dc) dc.innerHTML =
+    '<div style="padding:10px 12px;border-bottom:1px solid '+border+'">'
+      + '<div style="font-size:13px;font-weight:700;color:var(--text,#1a1a2e);margin-bottom:4px">'+_esc(row.object)+'</div>'
+      + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">'
+        + '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(26,53,87,0.08);color:'+navy+';border:1px solid rgba(26,53,87,0.2)">'+sm.icon+' '+sm.name+'</span>'
+        + '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(26,53,87,0.05);color:'+navy+';border:1px solid rgba(26,53,87,0.12)">'+row.trigger+'</span>'
+        + (row.stores==='yes' ? '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(200,134,10,0.08);color:#c8860a;border:1px solid rgba(200,134,10,0.2)">💾 stores</span>' : '')
+      + '</div>'
+      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:'+muted+';margin-bottom:4px">Current Behavior</div>'
+      + '<div style="font-size:12px;color:var(--text-secondary,#555);line-height:1.5">'+_esc(row.current)+'</div>'
+      + (row.notes ? '<div style="font-size:11px;color:'+muted+';margin-top:6px;font-style:italic;line-height:1.4">'+_esc(row.notes)+'</div>' : '')
+    + '</div>';
+
+  var des = document.getElementById('dkm-desired');
+  var not = document.getElementById('dkm-notes');
+  if (des) des.value = row.desired || '';
+  if (not) not.value = row.notes   || '';
+
+  // Status buttons
+  var sr = document.getElementById('dkm-status-row');
+  if (sr) sr.innerHTML = ['ok','partial','broken','tbd'].map(function(s) {
+    var sel = s === row.status;
+    var bg  = sel ? (s==='ok'?'rgba(46,125,50,0.12)':s==='partial'?'rgba(200,134,10,0.1)':s==='broken'?'rgba(208,52,44,0.1)':'rgba(0,0,0,0.04)') : 'var(--card-alt,#f8f9fb)';
+    var col = sel ? (s==='ok'?'#2e7d32':s==='partial'?'#c8860a':s==='broken'?'#d0342c':'#555') : muted;
+    var bdr = sel ? (s==='ok'?'rgba(46,125,50,0.4)':s==='partial'?'rgba(200,134,10,0.35)':s==='broken'?'rgba(208,52,44,0.4)':'rgba(0,0,0,0.2)') : border;
+    return '<button style="flex:1;padding:7px 4px;border-radius:8px;font-size:11px;font-weight:700;border:1px solid '+bdr+';background:'+bg+';color:'+col+';cursor:pointer" data-s="'+s+'" onclick="dkmSetStatus(\''+s+'\')" ontouchstart="">'+_DKM_STATUS_LABELS[s]+'</button>';
+  }).join('');
+
+  // Priority buttons
+  var pr = document.getElementById('dkm-pri-row');
+  if (pr) pr.innerHTML = [1,2,3].map(function(p) {
+    var sel = p === row.priority;
+    var col = p===1?'#d0342c':p===2?'#c8860a':muted;
+    var bg  = sel ? (p===1?'rgba(208,52,44,0.1)':p===2?'rgba(200,134,10,0.08)':'rgba(0,0,0,0.04)') : 'var(--card-alt,#f8f9fb)';
+    var bdr = sel ? (p===1?'rgba(208,52,44,0.4)':p===2?'rgba(200,134,10,0.35)':'rgba(0,0,0,0.2)') : border;
+    var lbl = p===1?'1 — Must fix':p===2?'2 — Should fix':'3 — Nice to have';
+    return '<button style="flex:1;padding:7px 4px;border-radius:8px;font-size:11px;font-weight:700;border:1px solid '+bdr+';background:'+bg+';color:'+(sel?col:muted)+';cursor:pointer" data-p="'+p+'" onclick="dkmSetPri('+p+')" ontouchstart="">'+lbl+'</button>';
+  }).join('');
+
+  // Prev/Next nav
+  var peers = DKM_ROWS.filter(function(r){ return r.form===_DKM.screen; }).slice().sort(_dkmSortRows);
+  var idx = peers.findIndex(function(r){ return r.id===_DKM.rowId; });
+  var nav = document.getElementById('dkm-detail-nav');
+  if (nav) nav.innerHTML =
+    (idx>0 ? '<button style="flex:1;padding:8px;border-radius:8px;background:var(--card-alt,#f8f9fb);border:1px solid '+border+';color:#555;font-size:12px;font-weight:600;cursor:pointer" ontouchstart="" onclick="dkmNavDetail(-1)">← Prev</button>' : '') +
+    (idx<peers.length-1 ? '<button style="flex:1;padding:8px;border-radius:8px;background:var(--card-alt,#f8f9fb);border:1px solid '+border+';color:#555;font-size:12px;font-weight:600;cursor:pointer" ontouchstart="" onclick="dkmNavDetail(1)">Next →</button>' : '');
+}
+
+function dkmSetStatus(s) {
+  _DKM._editStatus = s;
+  var sr = document.getElementById('dkm-status-row');
+  if (!sr) return;
+  sr.querySelectorAll('button').forEach(function(b) {
+    var bs  = b.getAttribute('data-s');
+    var sel = bs === s;
+    var col = sel ? (bs==='ok'?'#2e7d32':bs==='partial'?'#c8860a':bs==='broken'?'#d0342c':'#555') : 'var(--muted,#888)';
+    var bg  = sel ? (bs==='ok'?'rgba(46,125,50,0.12)':bs==='partial'?'rgba(200,134,10,0.1)':bs==='broken'?'rgba(208,52,44,0.1)':'rgba(0,0,0,0.04)') : 'var(--card-alt,#f8f9fb)';
+    var bdr = sel ? (bs==='ok'?'rgba(46,125,50,0.4)':bs==='partial'?'rgba(200,134,10,0.35)':bs==='broken'?'rgba(208,52,44,0.4)':'rgba(0,0,0,0.2)') : 'var(--border,#e0e4ec)';
+    b.style.background = bg; b.style.color = col; b.style.borderColor = bdr;
+  });
+}
+
+function dkmSetPri(p) {
+  _DKM._editPriority = p;
+  var pr = document.getElementById('dkm-pri-row');
+  if (!pr) return;
+  pr.querySelectorAll('button').forEach(function(b) {
+    var bp  = parseInt(b.getAttribute('data-p'));
+    var sel = bp === p;
+    var col = bp===1?'#d0342c':bp===2?'#c8860a':'var(--muted,#888)';
+    var bg  = sel ? (bp===1?'rgba(208,52,44,0.1)':bp===2?'rgba(200,134,10,0.08)':'rgba(0,0,0,0.04)') : 'var(--card-alt,#f8f9fb)';
+    var bdr = sel ? (bp===1?'rgba(208,52,44,0.4)':bp===2?'rgba(200,134,10,0.35)':'rgba(0,0,0,0.2)') : 'var(--border,#e0e4ec)';
+    b.style.background = bg; b.style.borderColor = bdr;
+    b.style.color = sel ? col : 'var(--muted,#888)';
+  });
+}
+
+function dkmSaveDetail(silent) {
+  var row = DKM_ROWS.find(function(r){ return r.id===_DKM.rowId; });
+  if (!row) return;
+  var des = document.getElementById('dkm-desired');
+  var not = document.getElementById('dkm-notes');
+  row.desired  = des ? des.value.trim() : row.desired;
+  row.notes    = not ? not.value.trim() : row.notes;
+  row.status   = _DKM._editStatus;
+  row.priority = _DKM._editPriority;
+  dkmSaveEdits();
+  if (!silent) dkShowToast('Map entry saved ✓');
+}
+
+function dkmNavDetail(dir) {
+  dkmSaveDetail(true);
+  var peers = DKM_ROWS.filter(function(r){ return r.form===_DKM.screen; }).slice().sort(_dkmSortRows);
+  var idx   = peers.findIndex(function(r){ return r.id===_DKM.rowId; });
+  var next  = peers[idx + dir];
+  if (next) { _DKM.rowId=next.id; _DKM._editStatus=next.status; _DKM._editPriority=next.priority; dkmRenderDetail(); }
+}
+
+// ── DKM New row ───────────────────────────────────────────────────────────────
+function dkmNewRow(snap) {
+  var ctx = document.getElementById('dkm-new-ctx');
+  var obj = document.getElementById('dkm-new-obj');
+  var frm = document.getElementById('dkm-new-form');
+  var cur = document.getElementById('dkm-new-current');
+  var des = document.getElementById('dkm-new-desired');
+  var nsr = document.getElementById('dkm-new-status-row');
+  if (snap) {
+    if (ctx) ctx.textContent = 'Pre-filled from tapped element — edit as needed.';
+    if (obj) obj.value = snap.object || '';
+    if (frm) frm.value = snap.form   || _DKM.screen || 'HOME';
+    if (cur) cur.value = snap.current|| '';
+  } else {
+    if (ctx) ctx.textContent = 'Describe a new interaction not yet in the map.';
+    if (obj) obj.value = '';
+    if (frm) frm.value = _DKM.screen || 'HOME';
+    if (cur) cur.value = '';
+  }
+  if (des) des.value = '';
+  if (nsr) nsr.innerHTML = ['ok','partial','broken','tbd'].map(function(s) {
+    var lbl = _DKM_STATUS_LABELS[s];
+    return '<button style="flex:1;padding:6px 3px;border-radius:8px;font-size:10px;font-weight:700;border:1px solid var(--border,#e0e4ec);background:var(--card-alt,#f8f9fb);color:var(--muted,#888);cursor:pointer" data-s="'+s+'" onclick="dkmNewSetStatus(\''+s+'\')" ontouchstart="">'+lbl+'</button>';
+  }).join('');
+  _DKM._newStatus = 'tbd';
+  dkmStep('new');
+}
+
+function dkmNewSetStatus(s) {
+  _DKM._newStatus = s;
+  var nsr = document.getElementById('dkm-new-status-row');
+  if (!nsr) return;
+  nsr.querySelectorAll('button').forEach(function(b) {
+    var bs  = b.getAttribute('data-s');
+    var sel = bs === s;
+    b.style.background  = sel ? 'rgba(26,53,87,0.08)' : 'var(--card-alt,#f8f9fb)';
+    b.style.color       = sel ? 'var(--navy,#1a3557)' : 'var(--muted,#888)';
+    b.style.borderColor = sel ? 'rgba(26,53,87,0.3)'  : 'var(--border,#e0e4ec)';
+  });
+}
+
+function dkmSaveNew() {
+  var obj  = (document.getElementById('dkm-new-obj')     ||{}).value||'';
+  var form = (document.getElementById('dkm-new-form')    ||{}).value||'HOME';
+  var cur  = (document.getElementById('dkm-new-current') ||{}).value||'';
+  var des  = (document.getElementById('dkm-new-desired') ||{}).value||'';
+  if (!obj.trim()) { dkShowToast('Enter an object name'); return; }
+  var newId = Date.now();
+  DKM_ROWS.push({
+    id:newId, form:form, object:obj.trim(), type:'BUTTON', trigger:'tap',
+    stores:'no', status:_DKM._newStatus||'tbd', priority:2,
+    current:cur.trim(), desired:des.trim(), notes:'', domHint:''
+  });
+  dkmSaveEdits();
+  // Mirror to DevKit log
+  var entry = {id:Date.now()+1, ts:new Date().toISOString(), cat:'note',
+    msg:'[Map] New entry added: '+obj.trim()+' ('+form+')',
+    screen:form, ref:null, status:'open', mapRowId:newId};
+  var log = dkLoadLog(); log.unshift(entry); dkSaveLog(log);
+  dkShowToast('Added to map ✓');
+  _DKM.screen = form;
+  dkmSelectRow(newId);
+}
+
+// ── DKM Export ────────────────────────────────────────────────────────────────
+function dkmExport() {
+  var out = JSON.stringify(DKM_ROWS.map(function(r){
+    return {id:r.id,form:r.form,object:r.object,type:r.type,status:r.status,
+            priority:r.priority,current:r.current,desired:r.desired,notes:r.notes};
+  }), null, 2);
+  if (navigator.share) { navigator.share({title:'Homemade Lane Interaction Map',text:out}).catch(function(){}); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(out).then(function(){ dkShowToast('Map JSON copied ✓'); }).catch(function(){ _dkmFallbackCopy(out); });
+    return;
+  }
+  _dkmFallbackCopy(out);
+}
+
+function _dkmFallbackCopy(t) {
+  var ta = document.createElement('textarea');
+  ta.value = t; ta.style.cssText = 'position:fixed;left:-9999px';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand('copy'); dkShowToast('Map JSON copied ✓'); } catch(e) { dkShowToast('Copy failed'); }
+  document.body.removeChild(ta);
+}
+
+// ── Bubble confirm / dismiss ──────────────────────────────────────────────────
+function dkmTagConfirm() {
+  var savedRowId  = DK._tagRowId;
+  var savedScreen = DK._tagScreen || 'HOME';
+  var savedDesc   = DK._tagElDesc || '';
+  var savedCtx    = DK._tagElContext || '';
+  dkmTagDismiss(true); // silent — don't reopen log panel yet
+
+  // Open panel on Map tab
+  dkOpenPanel();
+  dkTab('map');
+  if (!DK._mapLoaded) { dkmInit(); DK._mapLoaded = true; }
+
+  if (savedRowId) {
+    var row = DKM_ROWS.find(function(r){ return r.id===savedRowId; });
+    if (row) { _DKM.screen = row.form; dkmSelectRow(row.id); }
+  } else {
+    var snap = {object:savedDesc, form:savedScreen, current:savedCtx};
+    _DKM.screen = savedScreen;
+    dkmRenderTypeRow();
+    dkmRenderObjects();
+    dkmStep('object');
+    setTimeout(function(){ dkmNewRow(snap); }, 200);
+  }
+}
+
+function dkmTagDismiss(silent) {
+  var bubble = document.getElementById('dk-tag-bubble');
+  if (bubble) bubble.style.display = 'none';
+  if (!silent && DK.pendingRef) {
+    // "Log Only" — reopen on Log tab with ref chip attached
+    dkOpenPanel();
+    dkTab('log');
+    dkRenderRefChip();
+  }
+  DK._tagEl         = null;
+  DK._tagRowId      = null;
+  DK._tagScreen     = null;
+  DK._tagElDesc     = null;
+  DK._tagElContext  = null;
 }
 
 /* ── INIT ───────────────────────────────────────────────────────── */
