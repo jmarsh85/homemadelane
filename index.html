@@ -7253,9 +7253,20 @@
       return;
     }
 
+    const fmtMoney = n => '$'+parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const postedIds = new Set(activeRecords('transactions').filter(t=>t.serviceRequestId).map(t=>t.serviceRequestId));
+
     body.innerHTML = srs.map((sr,i) => {
       const swId = 'sr-'+sr.id;
       const propName = propMap[sr.propertyId] || 'Unknown property';
+      const costAmt  = sr.actualCost || sr.estimatedCost;
+      const isPosted = postedIds.has(sr.id);
+      const costLine = costAmt
+        ? '<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">'
+          +(sr.actualCost?'Actual: ':'Est: ')+fmtMoney(costAmt)
+          +(isPosted?' &middot; <span style="color:var(--green);font-weight:600;">✓ Posted</span>':'')
+          +'</div>'
+        : (isPosted?'<div style="font-size:0.75rem;color:var(--green);font-weight:600;margin-top:2px;">✓ Posted</div>':'');
       return '<div class="swipe-wrap" id="'+swId+'">'
         +'<div class="swipe-content" style="padding:14px 16px;" onclick="toggleSwipe(\''+swId+'\')">'
         +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
@@ -7264,6 +7275,7 @@
         +'<div style="font-size:0.75rem;color:var(--muted);">'+propName+' &middot; '+fmt(sr.createdAt?.slice(0,10))+'</div>'
         +(sr.description?'<div style="font-size:0.8125rem;margin-top:4px;color:var(--text);">'+sr.description+'</div>':'')
         +(sr.assignedTo?'<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">Assigned: '+sr.assignedTo+'</div>':'')
+        +costLine
         +'</div>'
         +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">'
         +statusBadge(sr.status)
@@ -7271,43 +7283,79 @@
         +'</div></div></div>'
         +'<div class="swipe-actions">'
         +(sr.status!=='closed'?'<button class="swipe-btn" style="background:var(--green);color:#fff;" onclick="resetSwipe(\''+swId+'\');closeSR(\''+sr.id+'\')"><span class="swipe-icon">&#9989;</span>Close</button>':'')
+        +(!isPosted&&sr.status==='closed'&&costAmt?'<button class="swipe-btn" style="background:var(--amber);color:var(--navy);" onclick="resetSwipe(\''+swId+'\');postSRToTransactions(\''+sr.id+'\')"><span class="swipe-icon">&#128178;</span>Post</button>':'')
         +'<button class="swipe-btn swipe-btn-edit" onclick="resetSwipe(\''+swId+'\');openServiceRequestForm(activeRecords(\'serviceRequests\').find(x=>x.id===\''+sr.id+'\'))"><span class="swipe-icon">&#9999;&#65039;</span>Edit</button>'
         +'<button class="swipe-btn swipe-btn-delete" onclick="resetSwipe(\''+swId+'\');confirmDelete(\'request\',\''+sr.title.replace(/\'/g,"\\'")+'\',function(){softDelete(\'serviceRequests\',\''+sr.id+'\');renderServiceRequests();})"><span class="swipe-icon">&#128465;</span>Delete</button>'
         +'</div></div>';
     }).join('');
   }
 
+  function postSRToTransactions(id) {
+    // Manual override — post a closed SR to transactions (or re-post if needed)
+    const sr = activeRecords('serviceRequests').find(x => x.id === id);
+    if (!sr) return;
+    const costAmt = sr.actualCost || sr.estimatedCost;
+    if (!costAmt) { showToast('⚠️ No cost on this request — edit it first'); return; }
+    const prop = sr.propertyId ? activeRecords('properties').find(p => p.id === sr.propertyId) : null;
+    const record = {
+      id:               genId(),
+      type:             'expense',
+      propertyId:       sr.propertyId || '',
+      property:         prop?.name || '',
+      amount:           costAmt,
+      date:             sr.closedAt?.slice(0,10) || new Date().toISOString().split('T')[0],
+      category:         'Cleaning & maintenance',
+      description:      sr.title + (sr.description ? ' — ' + sr.description : ''),
+      vendor:           sr.assignedTo || '',
+      taxYear:          new Date(sr.closedAt || Date.now()).getFullYear().toString(),
+      serviceRequestId: sr.id,
+      isRecurring:      false,
+      createdAt:        now(),
+    };
+    upsert('transactions', record);
+    renderTransactionLists();
+    renderFinancesOverview();
+    renderDashboard();
+    renderServiceRequests();
+    showToast('✅ Posted to transactions');
+  }
+
   function closeSR(id) {
     const sr = activeRecords('serviceRequests').find(x => x.id === id);
     if (!sr) return;
-    upsert('serviceRequests', {...sr, status:'closed', closedAt:now()});
-    renderServiceRequests();
+    const closedSR = {...sr, status:'closed', closedAt:now()};
+    upsert('serviceRequests', closedSR);
 
-    // If the SR has a cost, offer to log it as an expense
-    if (sr.estimatedCost && sr.estimatedCost > 0) {
-      const shouldLog = confirm(
-        `Log $${sr.estimatedCost.toLocaleString('en-US')} as an expense?\n\n` +
-        `"${sr.title}"${sr.propertyId ? ' — '+( activeRecords('properties').find(p=>p.id===sr.propertyId)?.name || '') : ''}\n\n` +
-        `This will open the expense form pre-filled for your records.`
-      );
-      if (shouldLog) {
-        const prop = sr.propertyId ? activeRecords('properties').find(p => p.id === sr.propertyId) : null;
-        const expRecord = {
-          propertyId:  sr.propertyId || '',
-          property:    prop?.name || '',
-          amount:      sr.estimatedCost,
-          date:        new Date().toISOString().split('T')[0],
-          category:    'Cleaning & maintenance',
-          description: sr.title + (sr.description ? ' — ' + sr.description : ''),
-          vendor:      sr.assignedTo || '',
-          // Link back to the service request
-          serviceRequestId: sr.id,
-        };
-        openTransactionForm('modal-expense', expRecord);
-        return; // skip the showToast — they'll see it after saving the expense
-      }
+    // Auto-post to transactions if a cost exists and not already posted
+    const postedIds = new Set(activeRecords('transactions').filter(t=>t.serviceRequestId).map(t=>t.serviceRequestId));
+    const costAmt = sr.actualCost || sr.estimatedCost;
+    if (costAmt && !postedIds.has(sr.id)) {
+      const prop = sr.propertyId ? activeRecords('properties').find(p => p.id === sr.propertyId) : null;
+      const record = {
+        id:               genId(),
+        type:             'expense',
+        propertyId:       sr.propertyId || '',
+        property:         prop?.name || '',
+        amount:           costAmt,
+        date:             new Date().toISOString().split('T')[0],
+        category:         'Cleaning & maintenance',
+        description:      sr.title + (sr.description ? ' — ' + sr.description : ''),
+        vendor:           sr.assignedTo || '',
+        taxYear:          new Date().getFullYear().toString(),
+        serviceRequestId: sr.id,
+        isRecurring:      false,
+        createdAt:        now(),
+      };
+      upsert('transactions', record);
+      renderTransactionLists();
+      renderFinancesOverview();
+      renderDashboard();
+      renderServiceRequests();
+      showToast('✅ Closed & posted $'+parseFloat(costAmt).toLocaleString('en-US',{minimumFractionDigits:2})+ ' to transactions');
+    } else {
+      renderServiceRequests();
+      showToast('✅ Request closed');
     }
-    showToast('✅ Request closed');
   }
 
   function openServiceRequestForm(record) {
@@ -7351,7 +7399,10 @@
             </div>
           </div>
           <div class="field"><label>Assigned To (optional)</label><input id="sr-assigned" type="text" placeholder="Contractor, handyman name…" value="${r.assignedTo||''}" /></div>
-          <div class="field"><label>Estimated Cost ($, optional)</label><input id="sr-cost" type="number" placeholder="0.00" value="${r.estimatedCost||''}" inputmode="decimal" /></div>
+          <div class="field-row">
+            <div class="field"><label>Estimated Cost ($)</label><input id="sr-cost" type="number" placeholder="0.00" value="${r.estimatedCost||''}" inputmode="decimal" /></div>
+            <div class="field"><label>Actual Cost ($)</label><input id="sr-actual-cost" type="number" placeholder="0.00" value="${r.actualCost||''}" inputmode="decimal" /></div>
+          </div>
           <div class="field"><label>Notes</label><textarea id="sr-notes" placeholder="Additional notes…" style="min-height:50px;">${r.notes||''}</textarea></div>
           <div style="display:flex;gap:10px;margin-top:4px;">
             <button class="btn btn-outline" style="flex:1;" onclick="closeDynModal('hml-sr-modal')">Cancel</button>
@@ -7367,20 +7418,51 @@
     const title = document.getElementById('sr-title')?.value?.trim();
     const propId = document.getElementById('sr-property')?.value;
     if (!title) { showToast('⚠️ Title is required'); return; }
+    const existingRec = existingId ? activeRecords('serviceRequests').find(x=>x.id===existingId) : null;
+    const newStatus    = document.getElementById('sr-status')?.value || 'open';
+    const wasOpen      = existingRec ? existingRec.status !== 'closed' : true;
+    const justClosed   = wasOpen && newStatus === 'closed';
     const record = {
       id:            existingId || genId(),
       propertyId:    propId || '',
       title,
       description:   document.getElementById('sr-desc')?.value || '',
       priority:      document.getElementById('sr-priority')?.value || 'medium',
-      status:        document.getElementById('sr-status')?.value || 'open',
+      status:        newStatus,
       assignedTo:    document.getElementById('sr-assigned')?.value || '',
       estimatedCost: parseFloat(document.getElementById('sr-cost')?.value) || null,
+      actualCost:    parseFloat(document.getElementById('sr-actual-cost')?.value) || null,
       notes:         document.getElementById('sr-notes')?.value || '',
-      createdAt:     existingId ? (activeRecords('serviceRequests').find(x=>x.id===existingId)?.createdAt || now()) : now(),
+      createdAt:     existingRec?.createdAt || now(),
+      closedAt:      newStatus === 'closed' ? (existingRec?.closedAt || now()) : null,
     };
     upsert('serviceRequests', record);
     closeDynModal('hml-sr-modal');
+
+    // If status was just set to closed via the form dropdown, auto-post if cost & not already posted
+    if (justClosed) {
+      const postedIds = new Set(activeRecords('transactions').filter(t=>t.serviceRequestId).map(t=>t.serviceRequestId));
+      const costAmt   = record.actualCost || record.estimatedCost;
+      if (costAmt && !postedIds.has(record.id)) {
+        const prop = record.propertyId ? activeRecords('properties').find(p=>p.id===record.propertyId) : null;
+        upsert('transactions', {
+          id: genId(), type:'expense',
+          propertyId: record.propertyId||'', property: prop?.name||'',
+          amount: costAmt,
+          date: new Date().toISOString().split('T')[0],
+          category: 'Cleaning & maintenance',
+          description: record.title+(record.description?' — '+record.description:''),
+          vendor: record.assignedTo||'',
+          taxYear: new Date().getFullYear().toString(),
+          serviceRequestId: record.id,
+          isRecurring: false, createdAt: now(),
+        });
+        renderTransactionLists(); renderFinancesOverview(); renderDashboard();
+        renderServiceRequests();
+        showToast('✅ Saved & posted $'+parseFloat(costAmt).toLocaleString('en-US',{minimumFractionDigits:2})+' to transactions');
+        return;
+      }
+    }
     renderServiceRequests();
     showToast('✅ Service request saved');
   }
