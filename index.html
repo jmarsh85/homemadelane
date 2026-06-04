@@ -2,7 +2,7 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 1.0.0                                             ║
+  ║  Version: 4.0.0                                             ║
   ║  Date: 2026-04-20                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
@@ -1481,12 +1481,12 @@
     <section class="screen" id="screen-properties">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
         <p class="section-label" style="margin:0;">Your Properties</p>
-        <button class="btn btn-amber btn-sm" onclick="openPropertyForm()">+ Add Property</button>
+        <button class="btn btn-amber btn-sm" onclick="hmlOpenPropertyForm()">+ Add Property</button>
       </div>
       <!-- Dynamic property cards rendered here by renderPropertyList() -->
       <div id="prop-list-body"></div>
       <!-- Always-visible add button at bottom -->
-      <button class="btn btn-primary btn-full" style="margin-top:4px;" onclick="openPropertyForm()">+ Add New Property</button>
+      <button class="btn btn-primary btn-full" style="margin-top:4px;" onclick="hmlOpenPropertyForm()">+ Add New Property</button>
     </section>
 
     <!-- ── PROPERTY DETAIL ────────────────────────────────────── -->
@@ -1951,6 +1951,13 @@
           </div>
           <span style="color:var(--muted);">→</span>
         </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:16px; border-top:1px solid var(--border); cursor:pointer;" onclick="renderPaymentMethods();openModal('modal-payment-methods')">
+          <div>
+            <div style="font-weight:600; font-size:0.9375rem;">Payment Methods</div>
+            <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">Cash, Zelle, ACH, etc.</div>
+          </div>
+          <span style="color:var(--muted);">→</span>
+        </div>
       </div>
 
       <p class="section-label">Storage</p>
@@ -2140,7 +2147,7 @@
         <div class="field">
           <label>Property</label>
           <div style="display:flex; gap:8px;">
-            <select data-field="property" id="rent-property-select" style="flex:1;" onchange="if(this.value==='__new'){closeModal('modal-rent');openPropertyForm();}">
+            <select data-field="property" id="rent-property-select" style="flex:1;" onchange="if(this.value==='__new'){closeModal('modal-rent');hmlOpenPropertyForm();}">
               <option value="">— Select property —</option>
               <option value="__new">+ Add new property…</option>
             </select>
@@ -2186,7 +2193,7 @@
       <div class="modal-body">
         <div class="field">
           <label>Property</label>
-          <select data-field="property" id="expense-property-select" onchange="if(this.value==='__new'){closeModal('modal-expense');openPropertyForm();}">
+          <select data-field="property" id="expense-property-select" onchange="if(this.value==='__new'){closeModal('modal-expense');hmlOpenPropertyForm();}">
             <option value="">— Select property —</option>
             <option value="__new">+ Add new property…</option>
           </select>
@@ -2208,13 +2215,38 @@
           <div class="field"><label>Date</label><input data-field="date" type="date" /></div>
         </div>
         <div class="field"><label>Vendor / Payee</label><input data-field="vendor" type="text" placeholder="e.g. Home Depot, Mike's Plumbing" /></div>
-        <div class="field"><label>Description</label><input data-field="description" type="text" placeholder="Brief description" /></div>
-        <div class="field">
+        <div class="field"><label>Description</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input data-field="description" type="text" placeholder="Brief description" style="flex:1;" />
+            <button type="button" id="expense-ai-btn" onclick="txnAiClassify()" title="AI classification assist" style="flex-shrink:0;padding:7px 11px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);font-size:0.8125rem;cursor:pointer;white-space:nowrap;">✨ AI</button>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Payment Method</label>
+            <select id="expense-payment-method">
+              <option value="">— Select —</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" id="expense-receipt-area">
           <label>Receipt (optional)</label>
-          <div class="receipt-area">
-            <div class="receipt-icon">📷</div>
-            <div class="receipt-label">Take or Upload Photo</div>
-            <div class="receipt-sub">Tap to attach receipt image</div>
+          <!-- Camera capture -->
+          <input type="file" id="expense-receipt-camera" accept="image/*" capture="environment" style="display:none;" onchange="expenseReceiptSelected(this)" />
+          <!-- Photo library / file picker (no capture attr = lets OS show full chooser) -->
+          <input type="file" id="expense-receipt-input" accept="image/*,application/pdf" style="display:none;" onchange="expenseReceiptSelected(this)" />
+          <div style="display:flex;gap:8px;">
+            <div class="receipt-area" onclick="document.getElementById('expense-receipt-camera').click()" style="cursor:pointer;flex:1;padding:12px 8px;">
+              <div class="receipt-icon">📷</div>
+              <div class="receipt-label" style="font-size:0.8rem;">Take Photo</div>
+            </div>
+            <div class="receipt-area" onclick="document.getElementById('expense-receipt-input').click()" style="cursor:pointer;flex:1;padding:12px 8px;">
+              <div class="receipt-icon">📁</div>
+              <div class="receipt-label" style="font-size:0.8rem;">Upload File</div>
+            </div>
+          </div>
+          <div id="expense-receipt-preview" style="display:none;margin-top:8px;position:relative;">
+            <img id="expense-receipt-img" src="" style="width:100%;max-height:180px;object-fit:contain;border-radius:var(--radius-sm);border:1.5px solid var(--border);" />
+            <button onclick="expenseClearReceipt()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:0.875rem;cursor:pointer;line-height:1;">✕</button>
           </div>
         </div>
         <!-- Recurring bill toggle -->
@@ -2257,7 +2289,7 @@
       <div class="modal-body">
         <div class="field">
           <label>Property</label>
-          <select data-field="propertyId" id="doc-property-select" onchange="if(this.value==='__new'){closeModal('modal-document');openPropertyForm();}">
+          <select data-field="propertyId" id="doc-property-select" onchange="if(this.value==='__new'){closeModal('modal-document');hmlOpenPropertyForm();}">
             <option value="">— Select property —</option>
             <option value="__new">+ Add new property…</option>
           </select>
@@ -2569,81 +2601,8 @@
     </div>
   </div>
 
-  <!-- Add / Edit Property Modal -->
-  <div class="modal-overlay" id="modal-add-property" onclick="overlayClose(event,'modal-add-property')">
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <div class="modal-title" id="prop-modal-title">Add Property</div>
-        <button class="modal-close" onclick="closeModal('modal-add-property')">✕</button>
-      </div>
-      <div class="modal-body">
-        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:12px;">Basic Info</div>
-        <div class="field"><label>Property Nickname</label><input data-field="nickname" type="text" placeholder="e.g. Mesa AZ, Beach House" /></div>
-        <div class="field"><label>Street Address</label><input data-field="address" type="text" placeholder="123 Main St" /></div>
-        <div class="field-row">
-          <div class="field"><label>City</label><input data-field="city" type="text" placeholder="City" /></div>
-          <div class="field"><label>State</label><input data-field="state" type="text" placeholder="AZ" maxlength="2" /></div>
-        </div>
-        <div class="field"><label>ZIP Code</label><input data-field="zip" type="text" placeholder="85201" inputmode="numeric" /></div>
-        <div class="field-row">
-          <div class="field"><label>Bedrooms</label><input data-field="bedrooms" type="number" placeholder="3" inputmode="numeric" min="0" /></div>
-          <div class="field"><label>Bathrooms</label><input data-field="bathrooms" type="number" placeholder="2" inputmode="decimal" min="0" step="0.5" /></div>
-        </div>
 
-        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin:16px 0 12px;">Rates & Deposits</div>
-        <div class="field-row">
-          <div class="field"><label>Monthly Rate ($)</label><input data-field="monthlyRate" type="number" placeholder="950" inputmode="decimal" /></div>
-          <div class="field"><label>Security Deposit ($)</label><input data-field="securityDeposit" type="number" placeholder="500" inputmode="decimal" /></div>
-        </div>
-        <div class="field-row">
-          <div class="field"><label>Pet Deposit ($)</label><input data-field="petDeposit" type="number" placeholder="300" inputmode="decimal" /></div>
-          <div class="field"><label>Pets Allowed</label>
-            <select data-field="petsAllowed"><option>Yes</option><option>No</option></select>
-          </div>
-        </div>
 
-        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin:16px 0 12px;">Property Type</div>
-        <div class="field"><label>Furnished</label>
-          <select data-field="furnished"><option>Yes — fully furnished</option><option>Yes — partially</option><option>No</option></select>
-        </div>
-        <div class="field"><label>Rental Type</label>
-          <select data-field="rentalType"><option>Short-term (3–6 months)</option><option>Long-term (12+ months)</option><option>Vacation / nightly</option></select>
-        </div>
-
-        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin:16px 0 12px;">Listing Platforms</div>
-        <div id="prop-platforms-list" style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
-          <div class="inline-list-item">
-            <span>Furnished Finder</span>
-            <button class="inline-list-remove" onclick="removePlatform(this)">✕</button>
-          </div>
-          <div class="inline-list-item">
-            <span>Direct</span>
-            <button class="inline-list-remove" onclick="removePlatform(this)">✕</button>
-          </div>
-        </div>
-        <div style="display:flex; gap:8px; margin-bottom:4px;">
-          <select id="new-platform-select" style="flex:1; font-family:var(--font-body); font-size:0.875rem; padding:10px 12px; border:1.5px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text);">
-            <option value="">— Add platform —</option>
-            <option>Airbnb</option>
-            <option>VRBO</option>
-            <option>Furnished Finder</option>
-            <option>Direct</option>
-            <option>Other</option>
-          </select>
-          <button class="btn btn-amber btn-sm" onclick="addPlatform()">Add</button>
-        </div>
-
-        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin:16px 0 12px;">Notes</div>
-        <div class="field"><textarea data-field="notes" placeholder="Any notes about this property" rows="3"></textarea></div>
-
-        <div style="display:flex; gap:10px; margin-top:4px;">
-          <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-add-property')">Cancel</button>
-          <button class="btn btn-primary" style="flex:2;" onclick="saveProperty()">Save Property</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Amenities Manager Modal -->
   <div class="modal-overlay" id="modal-amenities" onclick="overlayClose(event,'modal-amenities')">
@@ -2748,6 +2707,30 @@
     </div>
   </div>
 
+  <!-- Payment Methods Modal -->
+  <div class="modal-overlay" id="modal-payment-methods" onclick="overlayClose(event,'modal-payment-methods')">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title">Payment Methods</div>
+        <button class="modal-close" onclick="closeModal('modal-payment-methods')">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">
+          <div id="payment-methods-list"></div>
+        </div>
+        <div class="field">
+          <label>Add Method</label>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="new-payment-method-input" placeholder="e.g. Venmo, Wire Transfer" style="flex:1;" />
+            <button class="btn btn-amber btn-sm" onclick="addPaymentMethod()">Add</button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="closeModal('modal-payment-methods')">Done</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Standard Confirm Delete Dialog -->
   <div class="confirm-overlay" id="confirm-dialog">
     <div class="confirm-box">
@@ -2827,6 +2810,7 @@
     vehicles:         [],   // personal vehicles
     maintenance:      [],   // air filter / personal maintenance logs
     serviceRequests:  [],   // property service requests
+    paymentMethods:   [],   // user-customizable payment method labels
   };
 
   /* ── PERSISTENCE ────────────────────────────────────────── */
@@ -3957,6 +3941,183 @@
     body.innerHTML = html;
   }
 
+  /* ── PAYMENT METHODS ───────────────────────────────────────────── */
+  const DEFAULT_PAYMENT_METHODS = ['Cash','Check','Zelle','ACH / Wire','Credit Card','Debit Card','Venmo','Other'];
+
+  function getPaymentMethods() {
+    const stored = (DB.paymentMethods || []).filter(m => !m.deletedAt);
+    if (!stored.length) return DEFAULT_PAYMENT_METHODS.map((name,i) => ({id:'pm_default_'+i, name, isDefault:true}));
+    return stored;
+  }
+
+  function renderPaymentMethods() {
+    const list = document.getElementById('payment-methods-list');
+    if (!list) return;
+    const methods = getPaymentMethods();
+    if (!methods.length) { list.innerHTML = '<div style="padding:14px;color:var(--muted);font-size:0.875rem;">No methods yet.</div>'; return; }
+    list.innerHTML = methods.map((m,i) => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;${i<methods.length-1?'border-bottom:1px solid var(--border);':''}">
+        <span style="font-size:0.9rem;">${m.name}</span>
+        ${m.isDefault ? '<span style="font-size:0.7rem;color:var(--muted);">default</span>'
+          : `<button onclick="deletePaymentMethod('${m.id}')" style="background:none;border:none;color:var(--red);font-size:1rem;cursor:pointer;padding:2px 6px;">×</button>`}
+      </div>`).join('');
+  }
+
+  function populatePaymentMethodSelect(currentValue) {
+    const sel = document.getElementById('expense-payment-method');
+    if (!sel) return;
+    const methods = getPaymentMethods();
+    sel.innerHTML = '<option value="">— Select —</option>' +
+      methods.map(m => `<option value="${m.name}" ${m.name===currentValue?'selected':''}>${m.name}</option>`).join('');
+  }
+
+  function addPaymentMethod() {
+    const inp = document.getElementById('new-payment-method-input');
+    const name = inp?.value?.trim();
+    if (!name) { showToast('⚠️ Enter a method name'); return; }
+    if (!DB.paymentMethods) DB.paymentMethods = [];
+    DB.paymentMethods.push({id: genId(), name, createdAt: now()});
+    saveDB();
+    inp.value = '';
+    renderPaymentMethods();
+    showToast('✅ Payment method added');
+  }
+
+  function deletePaymentMethod(id) {
+    if (!DB.paymentMethods) return;
+    const m = DB.paymentMethods.find(x => x.id === id);
+    if (m) { m.deletedAt = now(); saveDB(); renderPaymentMethods(); showToast('Removed'); }
+  }
+
+  /* ── RECEIPT UPLOAD ────────────────────────────────────────────── */
+  var _expenseReceiptData = null; // base64 data URL for current form session
+
+  function expenseReceiptSelected(input) {
+    const file = input?.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      _expenseReceiptData = e.target.result;
+      const preview  = document.getElementById('expense-receipt-preview');
+      const img      = document.getElementById('expense-receipt-img');
+      // Hide both picker buttons, show preview
+      document.querySelectorAll('#expense-receipt-area .receipt-area').forEach(el => el.style.display = 'none');
+      if (img)     img.src = _expenseReceiptData;
+      if (preview) preview.style.display = 'block';
+      showToast('📷 Receipt attached');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function expenseClearReceipt() {
+    _expenseReceiptData = null;
+    const preview = document.getElementById('expense-receipt-preview');
+    const img     = document.getElementById('expense-receipt-img');
+    if (preview) preview.style.display = 'none';
+    if (img)     img.src = '';
+    // Restore both picker buttons
+    document.querySelectorAll('#expense-receipt-area .receipt-area').forEach(el => el.style.display = '');
+    // Clear file input values
+    ['expense-receipt-camera','expense-receipt-input'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+  }
+
+  function expenseRestoreReceipt(dataUrl) {
+    if (!dataUrl) return;
+    _expenseReceiptData = dataUrl;
+    const preview = document.getElementById('expense-receipt-preview');
+    const img     = document.getElementById('expense-receipt-img');
+    if (img)     img.src = dataUrl;
+    if (preview) preview.style.display = 'block';
+    document.querySelectorAll('#expense-receipt-area .receipt-area').forEach(el => el.style.display = 'none');
+  }
+
+  /* ── AI TRANSACTION CLASSIFIER ─────────────────────────────────── */
+  function txnAiClassify() {
+    const apiKey = localStorage.getItem('hml_lb_apikey') || '';
+    if (!apiKey) {
+      showToast('⚠️ Set your API key in Lease Builder → Settings first');
+      return;
+    }
+    const propId   = document.getElementById('expense-property-select')?.value;
+    const prop     = propId ? activeRecords('properties').find(p => p.id === propId) : null;
+    const amount   = document.getElementById('modal-expense')?.querySelector('[data-field="amount"]')?.value || '';
+    const vendor   = document.getElementById('modal-expense')?.querySelector('[data-field="vendor"]')?.value || '';
+    const desc     = document.getElementById('modal-expense')?.querySelector('[data-field="description"]')?.value || '';
+    const date     = document.getElementById('modal-expense')?.querySelector('[data-field="date"]')?.value || '';
+    const state    = prop?.state || prop?.address?.match(/,\s*([A-Z]{2})\s*\d/)?.[1] || 'unknown state';
+
+    if (!vendor && !desc) { showToast('⚠️ Enter a vendor or description first'); return; }
+
+    const btn = document.getElementById('expense-ai-btn');
+    if (btn) { btn.textContent = '…'; btn.disabled = true; }
+
+    const prompt = `You are a US tax classification assistant for a small property management and resale business.
+
+Given this expense:
+- Property: ${prop ? prop.name + ' (' + state + ')' : 'Not linked to a property'}
+- Amount: $${amount || '?'}
+- Vendor / Payee: ${vendor || '(not provided)'}
+- Description: ${desc || '(not provided)'}
+- Date: ${date || 'today'}
+
+Tasks:
+1. Suggest the best IRS expense category from this list: Repairs, Supplies, Insurance, Utilities, Management fees, Cleaning & maintenance, Legal & professional fees, Advertising, Mortgage interest, Property taxes, Auto & travel, Depreciation, Other
+2. Confirm if this belongs on Schedule E (rental property) or Schedule C (resale/business), or both.
+3. Note any deductibility considerations specific to the state or expense type (1-2 sentences max).
+
+Respond ONLY in this JSON format, no markdown, no preamble:
+{"category":"<category name>","schedule":"<E or C or E+C>","note":"<brief deductibility note>"}`;
+
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (btn) { btn.textContent = '✨ AI'; btn.disabled = false; }
+      const text = data.content?.[0]?.text?.trim() || '';
+      let parsed;
+      try { parsed = JSON.parse(text.replace(/```json|```/g,'')); } catch(e) {
+        showToast('⚠️ AI response unreadable — try again'); return;
+      }
+      // Apply category
+      const catSel = document.getElementById('modal-expense')?.querySelector('[data-field="category"]');
+      if (catSel && parsed.category) {
+        const opt = Array.from(catSel.options).find(o => o.value.toLowerCase() === parsed.category.toLowerCase());
+        if (opt) catSel.value = opt.value;
+      }
+      // Show inline result chip
+      const descField = document.getElementById('modal-expense')?.querySelector('[data-field="description"]');
+      if (descField) {
+        let chip = document.getElementById('ai-classify-result');
+        if (!chip) {
+          chip = document.createElement('div');
+          chip.id = 'ai-classify-result';
+          chip.style.cssText = 'margin-top:6px;padding:8px 10px;background:rgba(26,53,87,0.07);border-radius:var(--radius-sm);font-size:0.75rem;color:var(--navy);line-height:1.5;';
+          descField.closest('.field').appendChild(chip);
+        }
+        chip.innerHTML = '<strong>' + (parsed.category||'?') + '</strong> · Schedule ' + (parsed.schedule||'?')
+          + (parsed.note ? '<br><span style="color:var(--muted);">' + parsed.note + '</span>' : '');
+      }
+      showToast('✨ Category: ' + (parsed.category || '?'));
+    })
+    .catch(function() {
+      if (btn) { btn.textContent = '✨ AI'; btn.disabled = false; }
+      showToast('⚠️ AI request failed — check network or API key');
+    });
+  }
+
   function toggleRecurringFields() {
     const chk    = document.getElementById('expense-is-recurring');
     const fields = document.getElementById('expense-recurring-fields');
@@ -4475,7 +4636,7 @@
     if (screen === 'tenants')         { renderTenantsScreen(); }
     if (screen === 'resale')          { renderResaleScreen(); }
     if (screen === 'finances')        { renderFinancesOverview(); setTimeout(renderTransactionTable, 30); }
-    if (screen === 'settings')        { updateStorageStats(); renderCategories(); }
+    if (screen === 'settings')        { updateStorageStats(); renderCategories(); renderPaymentMethods(); }
     if (screen === 'personal')        { renderPersonalScreen(); }
     if (screen === 'service')         { renderServiceRequests(); }
     if (screen === 'property-detail') { /* rendered by openProperty */ }
@@ -4611,82 +4772,169 @@
     return false;
   }
 
-  function openPropertyForm(record) {
-    // Always attempt rehydration first regardless of record state
-    _rehydrateCurrentProperty();
-    record = record || currentProperty || null;
-    if (!record) { showToast('⚠ No property loaded', 2500); return; }
+  /* ── PROPERTY FORM — dynamic modal (body-appended, same pattern as SR/maintenance) ── */
+  function hmlOpenPropertyForm(record) {
+    record = record || null;
     EDIT.property = record;
-    const m = 'modal-add-property';
     const r = record || {};
-    const titleEl = document.getElementById('prop-modal-title');
-    if (!titleEl) { showToast('⚠ Modal title missing', 2500); return; }
-    titleEl.textContent = record ? 'Edit Property' : 'Add Property';
-    fSet(m, 'nickname',         r.name || '');
-    fSet(m, 'address',          r.address || '');
-    fSet(m, 'city',             r.city || '');
-    fSet(m, 'state',            r.state || '');
-    fSet(m, 'zip',              r.zip || '');
-    fSet(m, 'bedrooms',         r.bedrooms || '');
-    fSet(m, 'bathrooms',        r.bathrooms || '');
-    fSet(m, 'monthlyRate',      r.monthlyRate || '');
-    fSet(m, 'securityDeposit',  r.securityDeposit || '');
-    fSet(m, 'petDeposit',       r.petDeposit || '');
-    fSet(m, 'petsAllowed',      r.petsAllowed || 'Yes');
-    fSet(m, 'furnished',        r.furnished || 'Yes — fully furnished');
-    fSet(m, 'rentalType',       r.rentalType || 'Short-term (3–6 months)');
-    fSet(m, 'notes',            r.notes || '');
-    // Render platforms list from saved data (not hardcoded defaults)
-    const list = document.getElementById('prop-platforms-list');
-    if (list) {
-      const platforms = r.platforms || ['Furnished Finder', 'Direct'];
-      list.innerHTML = platforms.map(p => `
-        <div class="inline-list-item">
-          <span>${p}</span>
-          <button class="inline-list-remove" onclick="removePlatform(this)">✕</button>
-        </div>`).join('');
-    }
-    openModal(m);
+    const props_pf = r.platforms || (record ? [] : ['Furnished Finder', 'Direct']);
+
+    const existing = document.getElementById('hml-prop-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'hml-prop-modal';
+    modal.className = 'modal-overlay';
+    modal.onclick = function(e) { if (e.target === modal) hmlClosePropertyForm(); };
+    modal.innerHTML = `
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <div class="modal-title">${record ? 'Edit Property' : 'Add Property'}</div>
+          <button class="modal-close" onclick="hmlClosePropertyForm()">&#10005;</button>
+        </div>
+        <div class="modal-body">
+          <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:12px;">Basic Info</div>
+          <div class="field"><label>Property Nickname</label><input id="pf-nickname" type="text" placeholder="e.g. Mesa AZ, Beach House" value="${r.name||''}" /></div>
+          <div class="field"><label>Street Address</label><input id="pf-address" type="text" placeholder="123 Main St" value="${r.address||''}" /></div>
+          <div class="field-row">
+            <div class="field"><label>City</label><input id="pf-city" type="text" placeholder="City" value="${r.city||''}" /></div>
+            <div class="field"><label>State</label><input id="pf-state" type="text" placeholder="AZ" maxlength="2" value="${r.state||''}" /></div>
+          </div>
+          <div class="field"><label>ZIP Code</label><input id="pf-zip" type="text" placeholder="85201" inputmode="numeric" value="${r.zip||''}" /></div>
+          <div class="field-row">
+            <div class="field"><label>Bedrooms</label><input id="pf-bedrooms" type="number" placeholder="3" inputmode="numeric" min="0" value="${r.bedrooms||''}" /></div>
+            <div class="field"><label>Bathrooms</label><input id="pf-bathrooms" type="number" placeholder="2" inputmode="decimal" min="0" step="0.5" value="${r.bathrooms||''}" /></div>
+          </div>
+
+          <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:16px 0 12px;">Rates &amp; Deposits</div>
+          <div class="field-row">
+            <div class="field"><label>Monthly Rate ($)</label><input id="pf-monthlyRate" type="number" placeholder="950" inputmode="decimal" value="${r.monthlyRate||''}" /></div>
+            <div class="field"><label>Security Deposit ($)</label><input id="pf-securityDeposit" type="number" placeholder="500" inputmode="decimal" value="${r.securityDeposit||''}" /></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Pet Deposit ($)</label><input id="pf-petDeposit" type="number" placeholder="300" inputmode="decimal" value="${r.petDeposit||''}" /></div>
+            <div class="field"><label>Pets Allowed</label>
+              <select id="pf-petsAllowed">
+                <option ${(r.petsAllowed||'Yes')==='Yes'?'selected':''}>Yes</option>
+                <option ${r.petsAllowed==='No'?'selected':''}>No</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:16px 0 12px;">Property Type</div>
+          <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px;">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:0;">
+              <input type="checkbox" id="pf-isPrimary" ${r.isPrimaryResidence?'checked':''} style="accent-color:var(--navy);width:17px;height:17px;flex-shrink:0;" />
+              <div>
+                <div style="font-size:0.875rem;font-weight:600;color:var(--navy);">Primary Residence</div>
+                <div style="font-size:0.75rem;color:var(--muted);margin-top:1px;">Your personal home &#8212; not a rental</div>
+              </div>
+            </label>
+          </div>
+          <div class="field"><label>Furnished</label>
+            <select id="pf-furnished">
+              <option ${(r.furnished||'Yes — fully furnished')==='Yes — fully furnished'?'selected':''}>Yes &#8212; fully furnished</option>
+              <option ${r.furnished==='Yes — partially'?'selected':''}>Yes &#8212; partially</option>
+              <option ${r.furnished==='No'?'selected':''}>No</option>
+            </select>
+          </div>
+          <div class="field"><label>Rental Type</label>
+            <select id="pf-rentalType">
+              <option ${(r.rentalType||'Short-term (3–6 months)')==='Short-term (3–6 months)'?'selected':''}>Short-term (3&#8211;6 months)</option>
+              <option ${r.rentalType==='Long-term (12+ months)'?'selected':''}>Long-term (12+ months)</option>
+              <option ${r.rentalType==='Vacation / nightly'?'selected':''}>Vacation / nightly</option>
+            </select>
+          </div>
+
+          <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:16px 0 12px;">Listing Platforms</div>
+          <div id="pf-platforms-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+            ${props_pf.map(p => `<div class="inline-list-item"><span>${p}</span><button class="inline-list-remove" onclick="this.closest('.inline-list-item').remove()">&#10005;</button></div>`).join('')}
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:4px;">
+            <select id="pf-platform-select" style="flex:1;font-family:var(--font-body);font-size:0.875rem;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);">
+              <option value="">&#8212; Add platform &#8212;</option>
+              <option>Airbnb</option><option>VRBO</option><option>Furnished Finder</option><option>Direct</option><option>Other</option>
+            </select>
+            <button class="btn btn-amber btn-sm" onclick="pfAddPlatform()">Add</button>
+          </div>
+
+          <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:16px 0 12px;">Notes</div>
+          <div class="field"><textarea id="pf-notes" placeholder="Any notes about this property" rows="3">${r.notes||''}</textarea></div>
+
+          <div style="display:flex;gap:10px;margin-top:4px;">
+            <button class="btn btn-outline" style="flex:1;" onclick="hmlClosePropertyForm()">Cancel</button>
+            <button class="btn btn-primary" style="flex:2;" onclick="hmlSaveProperty()">Save Property</button>
+          </div>
+        </div>
+      </div>`;
+
+    document.body.appendChild(modal);
+    requestAnimationFrame(function() { modal.classList.add('open'); });
   }
 
-  /* ── AMENITIES MODAL OPEN ───────────────────────────────────── */
-  function saveProperty() {
-    const m = 'modal-add-property';
-    // Read platform list
-    const platforms = [...document.querySelectorAll('#prop-platforms-list .inline-list-item span')]
-      .map(s => s.textContent);
+  function hmlClosePropertyForm() {
+    const modal = document.getElementById('hml-prop-modal');
+    if (!modal) return;
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+    setTimeout(function() { if (modal.parentNode) modal.parentNode.removeChild(modal); }, 240);
+  }
+
+  function pfAddPlatform() {
+    const sel = document.getElementById('pf-platform-select');
+    const val = sel && sel.value;
+    if (!val) return;
+    const list = document.getElementById('pf-platforms-list');
+    if (!list) return;
+    const item = document.createElement('div');
+    item.className = 'inline-list-item';
+    item.innerHTML = '<span>' + val + '</span><button class="inline-list-remove" onclick="this.parentNode.remove()">&#10005;</button>';
+    list.appendChild(item);
+    sel.value = '';
+  }
+
+  function hmlSaveProperty() {
+    const nickname = (document.getElementById('pf-nickname') || {}).value || '';
+    if (!nickname.trim()) { showToast('⚠️ Property nickname is required'); return; }
+    const platforms = Array.from(document.querySelectorAll('#pf-platforms-list .inline-list-item span')).map(function(s){ return s.textContent; });
     const record = {
-      id:              EDIT.property?.id || genId(),
-      name:            fGet(m, 'nickname'),
-      address:         fGet(m, 'address'),
-      city:            fGet(m, 'city'),
-      state:           fGet(m, 'state'),
-      zip:             fGet(m, 'zip'),
-      bedrooms:        fGet(m, 'bedrooms'),
-      bathrooms:       fGet(m, 'bathrooms'),
-      monthlyRate:     fGet(m, 'monthlyRate'),
-      securityDeposit: fGet(m, 'securityDeposit'),
-      petDeposit:      fGet(m, 'petDeposit'),
-      petsAllowed:     fGet(m, 'petsAllowed'),
-      furnished:       fGet(m, 'furnished'),
-      rentalType:      fGet(m, 'rentalType'),
-      notes:           fGet(m, 'notes'),
-      platforms,
-      // Preserve amenities — they are saved separately via saveAmenities()
-      amenities:       EDIT.property?.amenities || currentProperty?.amenities || [],
-      createdAt:       EDIT.property?.createdAt || now(),
+      id:              EDIT.property ? EDIT.property.id : genId(),
+      name:            nickname.trim(),
+      address:         (document.getElementById('pf-address')||{}).value || '',
+      city:            (document.getElementById('pf-city')||{}).value || '',
+      state:           (document.getElementById('pf-state')||{}).value || '',
+      zip:             (document.getElementById('pf-zip')||{}).value || '',
+      bedrooms:        (document.getElementById('pf-bedrooms')||{}).value || '',
+      bathrooms:       (document.getElementById('pf-bathrooms')||{}).value || '',
+      monthlyRate:     (document.getElementById('pf-monthlyRate')||{}).value || '',
+      securityDeposit: (document.getElementById('pf-securityDeposit')||{}).value || '',
+      petDeposit:      (document.getElementById('pf-petDeposit')||{}).value || '',
+      petsAllowed:     (document.getElementById('pf-petsAllowed')||{}).value || 'Yes',
+      furnished:       (document.getElementById('pf-furnished')||{}).value || '',
+      rentalType:      (document.getElementById('pf-rentalType')||{}).value || '',
+      notes:           (document.getElementById('pf-notes')||{}).value || '',
+      isPrimaryResidence: !!(document.getElementById('pf-isPrimary')||{}).checked,
+      platforms:       platforms,
+      amenities:       EDIT.property ? (EDIT.property.amenities || []) : [],
+      createdAt:       EDIT.property ? (EDIT.property.createdAt || now()) : now(),
     };
-    if (!record.name) { alert('Property nickname is required.'); return; }
+    if (record.isPrimaryResidence) {
+      activeRecords('properties').forEach(function(p) {
+        if (p.id !== record.id && p.isPrimaryResidence) upsert('properties', Object.assign({}, p, {isPrimaryResidence: false}));
+      });
+    }
     upsert('properties', record);
-    // Update currentProperty so subsequent modal opens are pre-filled correctly
     currentProperty = record;
-    // Full render chain — update every view that references property data
+    hmlClosePropertyForm();
     renderPropertyList();
     renderPropertyDetail(record);
     renderDashboard();
-    closeModal('modal-add-property');
     EDIT.property = null;
+    showToast('✅ Property saved');
   }
+
+  /* ── AMENITIES MODAL OPEN ───────────────────────────────────── */
 
   function renderPropertyList() {
     const body = document.getElementById('prop-list-body');
@@ -4699,7 +4947,7 @@
         <div style="font-size:2rem;margin-bottom:12px;">🏠</div>
         <div style="font-weight:600;font-size:1rem;color:var(--navy);margin-bottom:6px;">No properties yet</div>
         <div style="font-size:0.875rem;margin-bottom:16px;">Add your first rental property to get started.</div>
-        <button class="btn btn-primary" onclick="openPropertyForm()">+ Add Property</button>
+        <button class="btn btn-primary" onclick="hmlOpenPropertyForm()">+ Add Property</button>
       </div>`;
       return;
     }
@@ -4750,14 +4998,17 @@
         <div style="padding:16px; border-bottom:1px solid var(--border);">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
             <div>
-              <div style="font-weight:700; font-size:1rem; color:var(--navy);">${p.name}</div>
+              <div style="font-weight:700; font-size:1rem; color:var(--navy); display:flex; align-items:center; gap:6px;">
+                ${p.name}
+                ${p.isPrimaryResidence ? '<span style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;background:var(--navy);color:#fff;padding:2px 7px;border-radius:99px;">Primary</span>' : ''}
+              </div>
               <div style="font-size:0.8125rem; color:var(--muted); margin-top:2px;">${p.address}, ${p.city} ${p.state} ${p.zip}</div>
             </div>
-            ${statusBadge(p)}
+            ${p.isPrimaryResidence ? '<span class="badge" style="background:#E8EEF7;color:var(--navy);">🏠 Home</span>' : statusBadge(p)}
           </div>
           <div style="font-size:0.8125rem; color:var(--muted);">${icons(p)}</div>
         </div>
-        ${statsRow(p)}
+        ${p.isPrimaryResidence ? '' : statsRow(p)}
       </div>`).join('');
 
     // Register DB properties in the PROPERTIES lookup
@@ -5091,6 +5342,15 @@
     }
     openModal(modalId);
 
+    // Payment method + receipt + AI chip state for expense modal
+    if (modalId === 'modal-expense') {
+      populatePaymentMethodSelect(record?.paymentMethod || '');
+      expenseClearReceipt();
+      if (record?.receiptData) expenseRestoreReceipt(record.receiptData);
+      const chip = document.getElementById('ai-classify-result');
+      if (chip) chip.remove();
+    }
+
     // Restore recurring bill state if editing an existing recurring transaction
     const rec = EDIT.transaction;
     if (rec?.isRecurring && modalId === 'modal-expense') {
@@ -5122,6 +5382,8 @@
       vendor:      fGet(modalId, 'vendor'),
       taxYear:     new Date(fGet(modalId, 'date') || Date.now()).getFullYear().toString(),
       serviceRequestId: EDIT.transaction?.serviceRequestId || null,
+      paymentMethod: modalId === 'modal-expense' ? (document.getElementById('expense-payment-method')?.value || '') : '',
+      receiptData:   modalId === 'modal-expense' ? (_expenseReceiptData || EDIT.transaction?.receiptData || null) : null,
       isRecurring: modalId === 'modal-expense' && !!document.getElementById('expense-is-recurring')?.checked,
       frequency:   modalId === 'modal-expense' && document.getElementById('expense-is-recurring')?.checked
                      ? (document.querySelector('input[name="expense-frequency"]:checked')?.value || 'monthly')
@@ -12116,7 +12378,7 @@ function _dkmFallbackCopy(t) {
 }
 
 // ── Bubble confirm / dismiss ──────────────────────────────────────────────────
-function dkmTagConfirm() {
+window.dkmTagConfirm = function() {
   var savedRowId  = DK._tagRowId;
   var savedScreen = DK._tagScreen || 'HOME';
   var savedDesc   = DK._tagElDesc || '';
@@ -12141,7 +12403,7 @@ function dkmTagConfirm() {
   }
 }
 
-function dkmTagDismiss(silent) {
+window.dkmTagDismiss = function(silent) {
   var bubble = document.getElementById('dk-tag-bubble');
   if (bubble) bubble.style.display = 'none';
   if (!silent && DK.pendingRef) {
@@ -12155,7 +12417,7 @@ function dkmTagDismiss(silent) {
   DK._tagScreen     = null;
   DK._tagElDesc     = null;
   DK._tagElContext  = null;
-}
+};
 
 /* ── INIT ───────────────────────────────────────────────────────── */
 // Auto-refresh screen badge whenever the user navigates (passive observer)
