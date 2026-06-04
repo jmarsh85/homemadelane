@@ -1,12 +1,12 @@
 {
   "name": "Homemade Lane",
-  "short_name": "Homemade Lane",
-  "description": "Property & Resale Tracker",
+  "short_name": "HML",
   "start_url": "/homemadelane/",
+  "scope": "/homemadelane/",
   "display": "standalone",
   "background_color": "#1B2B4B",
   "theme_color": "#1B2B4B",
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "icon-192.png",
@@ -16,7 +16,8 @@
     {
       "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
