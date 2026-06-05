@@ -2,7 +2,7 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.0.4                                             ║
+  ║  Version: 4.0.5                                             ║
   ║  Date: 2026-04-20                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
@@ -1681,7 +1681,7 @@
       <div class="fin-tab-panel" id="ftab-transactions">
 
         <!-- Toolbar: filters + add button -->
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
           <div style="display:flex; gap:6px; overflow-x:auto; flex:1; padding-bottom:2px;">
             <button class="filter-chip active" onclick="setFilter(this,'all')">All</button>
             <button class="filter-chip" onclick="setFilter(this,'income')">Income</button>
@@ -1692,6 +1692,9 @@
           </div>
           <button class="btn btn-amber btn-sm" style="flex-shrink:0;" onclick="openTxnForm()">+ Add</button>
         </div>
+
+        <!-- Property multi-select filter row -->
+        <div id="txn-prop-filter-row" style="margin-bottom:10px;"></div>
 
         <!-- Search bar -->
         <div style="position:relative; margin-bottom:12px;">
@@ -2615,7 +2618,7 @@
           <div class="field"><label>Security Deposit ($)</label><input data-field="securityDeposit" type="number" placeholder="500" inputmode="decimal" /></div>
           <div class="field"><label>Pet Deposit ($)</label><input data-field="petDeposit" type="number" placeholder="300" inputmode="decimal" /></div>
         </div>
-        <div class="field"><label>Cleaning Deposit ($) <span style="font-size:0.7rem;color:var(--muted);font-weight:400;">refundable</span></label><input data-field="cleaningDeposit" type="number" placeholder="0" inputmode="decimal" /></div>
+        <div class="field"><label>Cleaning Deposit ($) <span id="lease-cleaning-refund-label" style="font-size:0.7rem;font-weight:600;padding:1px 6px;border-radius:4px;background:var(--surface);color:var(--muted);">refundable</span></label><input data-field="cleaningDeposit" type="number" placeholder="0" inputmode="decimal" /></div>
         <div class="field">
           <label>Source Platform</label>
           <select data-field="platform" onchange="if(this.value==='__new'){promptNewPlatform();}">
@@ -2961,6 +2964,8 @@
       if (s.cats_e    && !localStorage.getItem('hml_cats_e'))           localStorage.setItem('hml_cats_e', s.cats_e);
       if (s.cats_c    && !localStorage.getItem('hml_cats_c'))           localStorage.setItem('hml_cats_c', s.cats_c);
       if (s.amenities && !localStorage.getItem('hml_amenities_demo'))   localStorage.setItem('hml_amenities_demo', s.amenities);
+      if (s.aiEnabled && !localStorage.getItem('hml_ai_enabled'))       localStorage.setItem('hml_ai_enabled', s.aiEnabled);
+      if (s.lbApiKey  && !localStorage.getItem('hml_lb_apikey'))        localStorage.setItem('hml_lb_apikey', s.lbApiKey);
       if (s.ownerProfile) {
         const op = s.ownerProfile;
         ['name','phone','email','address'].forEach(k => {
@@ -3102,6 +3107,8 @@
       cats_e:     localStorage.getItem('hml_cats_e')     || '',
       cats_c:     localStorage.getItem('hml_cats_c')     || '',
       amenities:  localStorage.getItem('hml_amenities_demo') || '',
+      aiEnabled:  localStorage.getItem('hml_ai_enabled') || '',
+      lbApiKey:   localStorage.getItem('hml_lb_apikey')  || '',
       ownerProfile: getOwnerProfile(),
     };
 
@@ -3227,6 +3234,14 @@
               if (s.cats_e)    localStorage.setItem('hml_cats_e',           s.cats_e);
               if (s.cats_c)    localStorage.setItem('hml_cats_c',           s.cats_c);
               if (s.amenities) localStorage.setItem('hml_amenities_demo',   s.amenities);
+              if (s.aiEnabled) localStorage.setItem('hml_ai_enabled',       s.aiEnabled);
+              if (s.lbApiKey)  localStorage.setItem('hml_lb_apikey',        s.lbApiKey);
+              if (s.ownerProfile) {
+                const op = s.ownerProfile;
+                ['name','phone','email','address'].forEach(k => {
+                  if (op[k]) localStorage.setItem('hml_owner_'+k, op[k]);
+                });
+              }
               applyAppName(getAppName());
             }
             // Load all records from backup directly
@@ -3373,13 +3388,15 @@
 
   function executeClearAll() {
     ['nestAndNest_db','nestAndNest_savedAt','nestAndNest_lastExport',
-     'hml_appName','hml_taxYear','hml_cats_e','hml_cats_c','hml_amenities_demo','hml_seeded'
+     'hml_appName','hml_taxYear','hml_cats_e','hml_cats_c','hml_amenities_demo','hml_seeded',
+     'hml_owner_name','hml_owner_phone','hml_owner_email','hml_owner_address',
+     'hml_ai_enabled'
     ].forEach(k => localStorage.removeItem(k));
     DB = {
       version: SCHEMA_VERSION,
-      properties:[], tenants:[], leases:[], documents:[],
+      properties:[], tenants:[], leases:[], leaseAgreements:[], documents:[],
       transactions:[], items:[], listings:[], sales:[],
-      vehicles:[], maintenance:[], serviceRequests:[],
+      vehicles:[], maintenance:[], serviceRequests:[], paymentMethods:[],
     };
     closeClearAll();
     updateStorageStats();
@@ -3558,8 +3575,53 @@
 
   function clearPropertyFilter() {
     TXN_STATE.propertyId = null;
+    TXN_STATE.propertyIds.clear();
     const chip = document.getElementById('prop-filter-chip');
     if (chip) chip.remove();
+    renderPropFilterRow();
+    renderTransactionTable();
+    renderFinancesOverview();
+  }
+
+  function renderPropFilterRow() {
+    const row = document.getElementById('txn-prop-filter-row');
+    if (!row) return;
+    const props = activeRecords('properties');
+    if (!props.length) { row.innerHTML = ''; return; }
+    const ids = TXN_STATE.propertyIds;
+    const chips = props.map(p => {
+      const sel = ids.has(p.id);
+      return `<button onclick="togglePropFilter('${p.id}')" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;border:1.5px solid ${sel?'var(--navy)':'var(--border)'};background:${sel?'var(--navy)':'var(--card)'};color:${sel?'#fff':'var(--muted)'};font-size:0.75rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:all 0.12s;">🏠 ${p.name||p.address||'Property'}</button>`;
+    }).join('');
+    const hasFilter = ids.size > 0;
+    row.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">${chips}${hasFilter?`<button onclick="clearPropFilterAll()" style="padding:4px 10px;border-radius:99px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted);font-size:0.72rem;font-weight:600;cursor:pointer;">✕ Clear</button>`:''}` +
+      `</div>`;
+    // Count label
+    if (hasFilter) {
+      const countEl = row.querySelector ? row : null; // update txn count label handled by renderTransactionTable
+    }
+  }
+
+  function togglePropFilter(propId) {
+    // Clear single-prop drill-down if active
+    TXN_STATE.propertyId = null;
+    const chip = document.getElementById('prop-filter-chip');
+    if (chip) chip.remove();
+    if (TXN_STATE.propertyIds.has(propId)) {
+      TXN_STATE.propertyIds.delete(propId);
+    } else {
+      TXN_STATE.propertyIds.add(propId);
+    }
+    TXN_STATE.visible = 8;
+    TXN_STATE.showAll = false;
+    renderPropFilterRow();
+    renderTransactionTable();
+    renderFinancesOverview();
+  }
+
+  function clearPropFilterAll() {
+    TXN_STATE.propertyIds.clear();
+    renderPropFilterRow();
     renderTransactionTable();
     renderFinancesOverview();
   }
@@ -3585,15 +3647,16 @@
   ════════════════════════════════════════════════════════════ */
 
   const TXN_STATE = {
-    filter:     'all',
-    search:     '',
-    sortField:  'date',
-    sortDir:    'desc',
-    visible:    8,
-    showAll:    false,
-    selected:   new Set(),
-    openRow:    null,
-    propertyId: null,   // per-property drill-down filter
+    filter:      'all',
+    search:      '',
+    sortField:   'date',
+    sortDir:     'desc',
+    visible:     8,
+    showAll:     false,
+    selected:    new Set(),
+    openRow:     null,
+    propertyId:  null,   // single-property drill-down (from property detail)
+    propertyIds: new Set(), // multi-property filter (from transactions tab picker)
   };
 
   const TXN_BATCH = 8;   // rows per "load more" tap
@@ -3607,7 +3670,13 @@
     let data = getTxnData();
     const f  = TXN_STATE.filter;
     const q  = TXN_STATE.search.toLowerCase().trim();
-    if (TXN_STATE.propertyId) data = data.filter(t => t.propertyId === TXN_STATE.propertyId);
+    // Single-property drill-down takes precedence (from property detail)
+    if (TXN_STATE.propertyId) {
+      data = data.filter(t => t.propertyId === TXN_STATE.propertyId);
+    } else if (TXN_STATE.propertyIds.size > 0) {
+      // Multi-property filter (from transactions tab picker)
+      data = data.filter(t => TXN_STATE.propertyIds.has(t.propertyId));
+    }
     if (f === 'income')  data = data.filter(t => t.type === 'income');
     if (f === 'expense') data = data.filter(t => t.type === 'expense');
     if (f === 'rental')  data = data.filter(t => t.property && t.property !== 'Resale');
@@ -3631,6 +3700,7 @@
   function renderTransactionTable() {
     const body = document.getElementById('txn-table-body');
     if (!body) return;
+    renderPropFilterRow();
 
     // ── BILLS VIEW ──────────────────────────────────────────────
     if (TXN_STATE.filter === 'bills') {
@@ -5584,6 +5654,15 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     fSet(m, 'relationship',   r.relationship || '');
     fSet(m, 'pets',           r.pets || 'No pets');
     fSet(m, 'petDesc',        r.petDesc || '');
+    // Set cleaning refundable label from linked property
+    const cleanLabelEl = document.getElementById('lease-cleaning-refund-label');
+    if (cleanLabelEl) {
+      const propRec = r.propertyId ? DB.properties.find(p => p.id === r.propertyId) : currentProperty;
+      const isRefundable = propRec ? !!propRec.cleaningFeeRefundable : true;
+      cleanLabelEl.textContent = isRefundable ? 'refundable' : 'non-refundable';
+      cleanLabelEl.style.background = isRefundable ? 'rgba(74,124,89,0.12)' : 'rgba(192,57,43,0.1)';
+      cleanLabelEl.style.color = isRefundable ? 'var(--green)' : 'var(--red)';
+    }
     fSet(m, 'startDate',      r.startDate || '');
     fSet(m, 'endDate',        r.endDate || '');
     fSet(m, 'monthlyRent',    r.monthlyRent || '');
@@ -9056,48 +9135,93 @@ window.lbUpdatePayInFull = function() {
   var chk    = document.getElementById('lb-payinfull-check');
   if (!bkEl || !totEl) return;
 
-  var cur = function(v){ return v ? '$'+parseFloat(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '$0.00'; };
+  if (!lease) {
+    bkEl.innerHTML = '<div style="color:var(--muted);">Link a lease in Step 1 to calculate.</div>';
+    totEl.textContent = '—';
+    return;
+  }
 
-  var rent    = lease ? parseFloat(lease.monthlyRent||0)       : 0;
-  var secDep  = lease ? parseFloat(lease.securityDeposit||0)   : 0;
-  var cleanDp = lease ? parseFloat(lease.cleaningDeposit||0)   : 0;
-  var hasPets = lease && lease.pets && lease.pets !== 'No pets';
-  var petFee  = (hasPets && lease) ? parseFloat(lease.petDeposit||0) : 0;
+  var cur = function(v){ return '$'+parseFloat(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+  var row = function(label, amount, muted) {
+    var col = muted ? 'color:var(--muted)' : 'color:var(--navy);font-weight:600';
+    return '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="'+col+'">'+label+'</span><span style="'+col+'">'+cur(amount)+'</span></div>';
+  };
 
-  // Pro-rate calculation: if start date is not the 1st, add prorated first month
-  var prorated = 0;
-  var proratedNote = '';
-  if (lease && lease.startDate) {
-    var startDay = new Date(lease.startDate + 'T12:00:00').getDate();
+  var rent    = parseFloat(lease.monthlyRent||0);
+  var secDep  = parseFloat(lease.securityDeposit||0);
+  var cleanDp = parseFloat(lease.cleaningDeposit||0);
+  var hasPets = lease.pets && lease.pets !== 'No pets';
+  var petFee  = hasPets ? parseFloat(lease.petDeposit||0) : 0;
+  var prop2   = LB.linkedPropertyId ? getCol('properties').find(function(p){ return p.id === LB.linkedPropertyId; }) : null;
+  var cleanLbl = prop2 ? (prop2.cleaningFeeRefundable ? 'Cleaning deposit (refundable)' : 'Cleaning fee (non-refundable)') : 'Cleaning fee';
+  var petLbl   = prop2 ? (prop2.petDepositRefundable  ? 'Pet deposit (refundable)'      : 'Pet fee (non-refundable)')      : 'Pet fee';
+
+  // Prorated first month
+  var prorated = 0, proratedNote = '', startDay = 1;
+  if (lease.startDate) {
+    startDay = new Date(lease.startDate + 'T12:00:00').getDate();
     if (startDay !== 1) {
       var daysInMonth = new Date(new Date(lease.startDate + 'T12:00:00').getFullYear(),
                                  new Date(lease.startDate + 'T12:00:00').getMonth() + 1, 0).getDate();
       var remainingDays = daysInMonth - startDay + 1;
       prorated = Math.round((rent / daysInMonth) * remainingDays * 100) / 100;
-      proratedNote = ' ('+remainingDays+'/'+daysInMonth+' days of first month)';
+      proratedNote = ' ('+remainingDays+' of '+daysInMonth+' days)';
     }
   }
 
-  var firstMonthRent = prorated > 0 ? prorated : rent;
-  var total = firstMonthRent + rent + secDep + cleanDp + petFee; // prorated + 2nd month + deposits
-
-  var rows = [];
-  if (prorated > 0) {
-    rows.push('<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Prorated first month'+proratedNote+'</span><span>'+cur(prorated)+'</span></div>');
-    rows.push('<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Second month rent</span><span>'+cur(rent)+'</span></div>');
-  } else {
-    rows.push('<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">First month rent</span><span>'+cur(rent)+'</span></div>');
+  // Prorated end month
+  var proratedEnd = 0, proratedEndNote = '';
+  if (lease.endDate) {
+    var endDay = new Date(lease.endDate + 'T12:00:00').getDate();
+    var endMonthDays = new Date(new Date(lease.endDate + 'T12:00:00').getFullYear(),
+                                new Date(lease.endDate + 'T12:00:00').getMonth() + 1, 0).getDate();
+    if (endDay !== endMonthDays) {
+      proratedEnd = Math.round((rent / endMonthDays) * endDay * 100) / 100;
+      proratedEndNote = ' ('+endDay+' of '+endMonthDays+' days)';
+    }
   }
-  var prop2 = LB.linkedPropertyId ? getCol('properties').find(function(p){ return p.id === LB.linkedPropertyId; }) : null;
-  var cleanLbl = prop2 ? (prop2.cleaningFeeRefundable ? 'Cleaning deposit (refundable)' : 'Cleaning fee (non-refundable)') : 'Cleaning fee';
-  var petLbl   = prop2 ? (prop2.petDepositRefundable  ? 'Pet deposit (refundable)'      : 'Pet fee (non-refundable)')      : 'Pet fee';
-  if (secDep)  rows.push('<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Security deposit</span><span>'+cur(secDep)+'</span></div>');
-  if (cleanDp) rows.push('<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">'+cleanLbl+'</span><span>'+cur(cleanDp)+'</span></div>');
-  if (petFee)  rows.push('<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">'+petLbl+'</span><span>'+cur(petFee)+'</span></div>');
 
-  bkEl.innerHTML = rows.join('') || '<div style="color:var(--muted);">Link a lease in Step 1 to calculate.</div>';
-  totEl.textContent = rows.length ? cur(total) : '—';
-  LB.payInFull = chk && chk.checked ? { total: total, breakdown: { firstMonth: firstMonthRent, prorated: prorated, secDep, cleanDp, petFee } } : null;
+  // Section 1: Due to Secure Lease (upfront deposits/fees)
+  var secureRows = [];
+  if (secDep)  secureRows.push(row('Security deposit', secDep, true));
+  if (cleanDp) secureRows.push(row(cleanLbl, cleanDp, true));
+  if (petFee)  secureRows.push(row(petLbl, petFee, true));
+  var secureTotal = secDep + cleanDp + petFee;
+
+  // Section 2: Monthly Breakdown
+  var monthRows = [];
+  if (prorated > 0) {
+    monthRows.push(row('Prorated first month'+proratedNote, prorated, true));
+    monthRows.push(row('Monthly rent (recurring)', rent, true));
+  } else {
+    monthRows.push(row('First month rent', rent, true));
+  }
+  if (proratedEnd > 0) {
+    monthRows.push(row('Prorated last month'+proratedEndNote, proratedEnd, true));
+  }
+
+  var firstPayment = prorated > 0 ? prorated : rent;
+  var grandTotal   = secureTotal + firstPayment + (prorated > 0 ? rent : 0) + proratedEnd;
+
+  var sHead = function(t){ return '<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--navy);margin:10px 0 5px;opacity:0.6;">'+t+'</div>'; };
+
+  var html = '';
+  if (secureRows.length) {
+    html += sHead('Due to Secure Lease');
+    html += secureRows.join('');
+    html += '<div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid var(--border);margin-top:4px;font-size:0.8125rem;font-weight:700;color:var(--navy)"><span>Upfront Total</span><span>'+cur(secureTotal)+'</span></div>';
+  }
+  if (monthRows.length) {
+    html += sHead('Monthly Breakdown');
+    html += monthRows.join('');
+  }
+
+  bkEl.innerHTML = html || '<div style="color:var(--muted);">No financial data on lease record.</div>';
+  totEl.textContent = cur(grandTotal);
+  LB.payInFull = chk && chk.checked ? {
+    total: grandTotal,
+    breakdown: { firstPayment: firstPayment, prorated: prorated, proratedEnd: proratedEnd, secDep: secDep, cleanDp: cleanDp, petFee: petFee }
+  } : null;
   if (noteEl) noteEl.style.display = (chk && chk.checked) ? '' : 'none';
 };
 function lbUpdateStep4Buttons() {
@@ -11503,7 +11627,7 @@ window.renderLeaseBuilder = function() {
         </div>
       </div>
       <div style="display:flex;gap:6px;margin-top:8px" id="dkm-detail-nav"></div>
-      <button onclick="dkmSaveDetail()" style="width:100%;margin-top:8px;padding:11px;border-radius:10px;background:var(--navy,#1a3557);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer">Save Changes</button>
+      <button onclick="dkmSaveDetail()" ontouchstart="" style="width:100%;margin-top:8px;padding:11px;border-radius:10px;background:var(--navy,#1a3557);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer">Save Changes</button>
     </div>
     <!-- New entry form (pre-filled from unrecognized tap) -->
     <div id="dkm-step-new" style="display:none;padding:8px 10px 12px">
@@ -11534,7 +11658,7 @@ window.renderLeaseBuilder = function() {
         </div>
         <div style="padding:8px 12px;display:flex;gap:5px" id="dkm-new-status-row"></div>
       </div>
-      <button onclick="dkmSaveNew()" style="width:100%;margin-top:8px;padding:11px;border-radius:10px;background:var(--navy,#1a3557);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer">Add to Map</button>
+      <button onclick="dkmSaveNew()" ontouchstart="" style="width:100%;margin-top:8px;padding:11px;border-radius:10px;background:var(--navy,#1a3557);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer">Add to Map</button>
     </div>
   </div>
 
