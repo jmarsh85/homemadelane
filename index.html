@@ -2,7 +2,7 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.0.5                                             ║
+  ║  Version: 4.0.6                                             ║
   ║  Date: 2026-04-20                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
@@ -611,6 +611,78 @@
       padding: 16px;
     }
     .qa-card.full .qa-text { flex: 1; }
+
+    /* ── HOME ACTION PILLS ────────────────────────────────────── */
+    .home-action-pill {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 10px 8px;
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-md);
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--navy);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s, transform 0.12s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .home-action-pill:active { background: var(--surface); transform: scale(0.96); }
+    .home-action-pill-lg { font-size: 0.8125rem; padding: 11px 10px; }
+
+    /* ── HOME STATUS BAR ──────────────────────────────────────── */
+    .home-status-bar {
+      background: var(--navy);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      color: #fff;
+    }
+    .home-status-kpi {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .home-status-kpi-cell {
+      background: rgba(255,255,255,0.06);
+      padding: 10px 8px;
+      text-align: center;
+    }
+    .home-status-kpi-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: rgba(255,255,255,0.55);
+      margin-bottom: 3px;
+    }
+    .home-status-kpi-val {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+    }
+    .home-status-prop-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .home-status-prop-row:last-child { border-bottom: none; }
+    .home-status-prop-name { font-size: 0.875rem; font-weight: 600; color: #fff; }
+    .home-status-prop-sub  { font-size: 0.72rem; color: rgba(255,255,255,0.6); margin-top:1px; }
 
     /* ── SLIDE-UP MODAL ───────────────────────────────────────── */
     .modal-overlay {
@@ -1313,22 +1385,29 @@
     <!-- ── HOME ──────────────────────────────────────────────── -->
     <section class="screen active" id="screen-home">
 
-      <div style="margin-bottom:20px;">
-        <div style="font-family:var(--font-display); font-size:1.5rem; color:var(--navy); margin-bottom:4px;" class="greeting">Good morning 👋</div>
-        <div style="font-size:0.875rem; color:var(--muted);">What would you like to do?</div>
+      <!-- Greeting -->
+      <div style="margin-bottom:16px;">
+        <div style="font-family:var(--font-display); font-size:1.375rem; color:var(--navy); margin-bottom:2px;" class="greeting">Good morning 👋</div>
+        <div style="font-size:0.8125rem; color:var(--muted);" id="home-date-line">—</div>
       </div>
 
-      <p class="section-label">Rental</p>
-      <div class="qa-grid">
+      <!-- ── Live Status Bar ─────────────────────────────────── -->
+      <div id="home-status-bar" style="margin-bottom:20px;">
+        <!-- Populated by renderHomeStatus() -->
+      </div>
 
+      <!-- ── Quick Actions ──────────────────────────────────── -->
+      <p class="section-label" style="margin-bottom:10px;">Quick Actions</p>
+
+      <!-- Row 1: primary financial actions -->
+      <div class="qa-grid" style="margin-bottom:10px;">
         <div class="qa-card green" onclick="openTransactionForm('modal-rent')">
           <div class="qa-icon green">💵</div>
           <div>
-            <div class="qa-label">Log Rent Payment</div>
-            <div class="qa-sub">Record income received</div>
+            <div class="qa-label">Log Rent</div>
+            <div class="qa-sub">Record income</div>
           </div>
         </div>
-
         <div class="qa-card red" onclick="openTransactionForm('modal-expense')">
           <div class="qa-icon red">🧾</div>
           <div>
@@ -1336,36 +1415,13 @@
             <div class="qa-sub">Log cost or receipt</div>
           </div>
         </div>
-
-        <div class="qa-card navy" onclick="openDocumentForm()">
-          <div class="qa-icon navy">📄</div>
-          <div>
-            <div class="qa-label">Add Document</div>
-            <div class="qa-sub">Attach lease or file</div>
-          </div>
-        </div>
-
-        <div class="qa-card amber" onclick="openTenantInfoPanel()">
-          <div class="qa-icon amber">🗓</div>
-          <div>
-            <div class="qa-label">Lease Dates</div>
-            <div class="qa-sub">View tenant info</div>
-          </div>
-        </div>
-
-      </div>
-
-      <p class="section-label">Resale</p>
-      <div class="qa-grid">
-
         <div class="qa-card purple" onclick="openModal('modal-acquire')">
           <div class="qa-icon purple">🛒</div>
           <div>
             <div class="qa-label">Log Purchase</div>
-            <div class="qa-sub">New item acquired</div>
+            <div class="qa-sub">New resale item</div>
           </div>
         </div>
-
         <div class="qa-card green" onclick="openSaleForm()">
           <div class="qa-icon green">🏷</div>
           <div>
@@ -1373,37 +1429,19 @@
             <div class="qa-sub">Record sold item</div>
           </div>
         </div>
-
       </div>
 
-      <p class="section-label">Personal</p>
-      <div class="qa-grid">
-        <div class="qa-card navy" onclick="navigate('personal')">
-          <div class="qa-icon navy">🔧</div>
-          <div>
-            <div class="qa-label">Maintenance</div>
-            <div class="qa-sub">Filters, oil changes</div>
-          </div>
-        </div>
-        <div class="qa-card red" onclick="navigate('service')">
-          <div class="qa-icon red">🛠</div>
-          <div>
-            <div class="qa-label">Service Requests</div>
-            <div class="qa-sub">Property work orders</div>
-          </div>
-        </div>
-        <div class="qa-card amber" onclick="openLeaseBuilder()" style="grid-column:1/-1;">
-          <div class="qa-icon amber">📋</div>
-          <div>
-            <div class="qa-label">Lease Builder</div>
-            <div class="qa-sub">Draft, customize &amp; export a lease agreement</div>
-          </div>
-        </div>
+      <!-- Row 2: secondary actions as compact horizontal strip -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+        <button class="home-action-pill" onclick="openDocumentForm()">📄 Document</button>
+        <button class="home-action-pill" onclick="openTenantInfoPanel()">🗓 Lease Info</button>
+        <button class="home-action-pill" onclick="openLeaseBuilder()">📋 Lease Builder</button>
       </div>
 
-      <p class="section-label">Quick Look</p>
-      <div class="card" id="home-quick-look" style="padding:0; overflow:hidden;">
-        <div style="padding:20px;text-align:center;color:var(--muted);font-size:0.875rem;">Loading…</div>
+      <!-- Row 3: Personal + Service consolidated -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;">
+        <button class="home-action-pill home-action-pill-lg" onclick="navigate('personal')">🔧 Maintenance</button>
+        <button class="home-action-pill home-action-pill-lg" onclick="navigate('service')">🛠 Service Requests</button>
       </div>
 
     </section>
@@ -1422,69 +1460,23 @@
       <div class="snapshot-row" style="margin-bottom:20px;">
         <div class="snapshot-cell">
           <div class="snapshot-label">Income</div>
-          <div class="snapshot-value income">$984</div>
+          <div class="snapshot-value income">$0</div>
         </div>
         <div class="snapshot-cell">
           <div class="snapshot-label">Expenses</div>
-          <div class="snapshot-value expense">$280</div>
+          <div class="snapshot-value expense">$0</div>
         </div>
         <div class="snapshot-cell">
           <div class="snapshot-label">Net</div>
-          <div class="snapshot-value net">$704</div>
+          <div class="snapshot-value net">$0</div>
         </div>
       </div>
 
       <p class="section-label">Resale This Month</p>
-      <div class="card" style="padding:0; overflow:hidden; margin-bottom:20px;">
-        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1px; background:var(--border);">
-          <div style="background:var(--card); padding:12px; text-align:center;">
-            <div style="font-size:0.625rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:3px;">Listed</div>
-            <div style="font-weight:700; color:var(--amber);">2</div>
-          </div>
-          <div style="background:var(--card); padding:12px; text-align:center;">
-            <div style="font-size:0.625rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:3px;">Sold</div>
-            <div style="font-weight:700; color:var(--green);">2</div>
-          </div>
-          <div style="background:var(--card); padding:12px; text-align:center;">
-            <div style="font-size:0.625rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:3px;">Profit</div>
-            <div style="font-weight:700; color:var(--green);">$57</div>
-          </div>
-        </div>
-        <div class="view-all-link" onclick="navigate('resale')">
-          View resale activity <span>→</span>
-        </div>
-      </div>
+      <div id="dash-resale-section" style="margin-bottom:20px;"></div>
 
       <p class="section-label">Recent Transactions</p>
-      <div class="card" style="padding:0; overflow:hidden;">
-        <div class="txn-item">
-          <div class="txn-dot txn-dot-green"></div>
-          <div class="txn-info">
-            <div class="txn-desc">Rent received</div>
-            <div class="txn-meta">Apr 17 · Mesa, AZ</div>
-          </div>
-          <div class="txn-amount income">+$950</div>
-        </div>
-        <div class="txn-item">
-          <div class="txn-dot txn-dot-green"></div>
-          <div class="txn-info">
-            <div class="txn-desc">Poshmark — Levi's jacket</div>
-            <div class="txn-meta">Apr 12 · Resale</div>
-          </div>
-          <div class="txn-amount income">+$34</div>
-        </div>
-        <div class="txn-item">
-          <div class="txn-dot txn-dot-red"></div>
-          <div class="txn-info">
-            <div class="txn-desc">Plumbing repair</div>
-            <div class="txn-meta">Apr 14 · Mesa, AZ</div>
-          </div>
-          <div class="txn-amount expense">-$280</div>
-        </div>
-        <div class="view-all-link" onclick="navigate('finances'); switchFinTab('transactions')">
-          View all transactions <span>→</span>
-        </div>
-      </div>
+      <div id="dash-recent-txns" class="card" style="padding:0; overflow:hidden;"></div>
 
     </section>
 
@@ -2089,7 +2081,24 @@
 
       <button class="btn btn-full" style="background:var(--red-light); color:var(--red); font-weight:700; border:1.5px solid var(--red);" onclick="openClearAll()">🗑 Clear All Data</button>
 
-    </section>
+      <!-- ── EXPORT DATA ─────────────────────────────────────── -->
+      <p class="section-label" style="margin-top:24px;">Export Data as CSV</p>
+      <div class="card" style="padding:14px 16px; margin-bottom:12px;">
+        <div style="font-size:0.8125rem;color:var(--muted);margin-bottom:14px;line-height:1.5;">
+          Download any table as a spreadsheet-ready CSV file for review, audit, or reconciliation.
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="btn btn-outline btn-full" style="justify-content:flex-start;gap:8px;font-size:0.8125rem;" onclick="exportTableCSV('transactions')">📊 Transactions (all)</button>
+          <button class="btn btn-outline btn-full" style="justify-content:flex-start;gap:8px;font-size:0.8125rem;" onclick="exportTableCSV('properties')">🏠 Properties</button>
+          <button class="btn btn-outline btn-full" style="justify-content:flex-start;gap:8px;font-size:0.8125rem;" onclick="exportTableCSV('leases')">📋 Leases / Tenants</button>
+          <button class="btn btn-outline btn-full" style="justify-content:flex-start;gap:8px;font-size:0.8125rem;" onclick="exportTableCSV('sales')">💰 Resale Sales</button>
+          <button class="btn btn-outline btn-full" style="justify-content:flex-start;gap:8px;font-size:0.8125rem;" onclick="exportTableCSV('items')">📦 Inventory</button>
+          <button class="btn btn-outline btn-full" style="justify-content:flex-start;gap:8px;font-size:0.8125rem;" onclick="exportTableCSV('vehicles')">🚗 Vehicles</button>
+          <button class="btn btn-outline btn-full" style="justify-content:flex-start;gap:8px;font-size:0.8125rem;" onclick="exportTableCSV('maintenance')">🔧 Maintenance Logs</button>
+          <button class="btn btn-outline btn-full" style="justify-content:flex-start;gap:8px;font-size:0.8125rem;" onclick="exportTableCSV('serviceRequests')">🛠 Service Requests</button>
+          <button class="btn btn-outline btn-full" style="justify-content:flex-start;gap:8px;font-size:0.8125rem;" onclick="exportTableCSV('documents')">📄 Documents (metadata)</button>
+        </div>
+      </div>
 
   </main>
 
@@ -2228,7 +2237,7 @@
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div class="modal-header">
-        <div class="modal-title">Add Expense</div>
+        <div class="modal-title" id="expense-modal-title">Add Expense</div>
         <button class="modal-close" onclick="closeModal('modal-expense')">✕</button>
       </div>
       <div class="modal-body">
@@ -2320,6 +2329,11 @@
               </label>
             </div>
           </div>
+        </div>
+        <div class="field">
+          <label>Notes <span style="font-size:0.7rem;font-weight:400;color:var(--muted);">optional</span></label>
+          <textarea data-field="notes" rows="2" placeholder="Any additional context, reference numbers, etc."
+            style="width:100%;font-family:var(--font-body);font-size:0.875rem;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);resize:none;outline:none;"></textarea>
         </div>
         <div style="display:flex; gap:10px;">
           <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-expense')">Cancel</button>
@@ -3260,7 +3274,7 @@
 
           closeDynModal('hml-import-modal');
           renderDashboard();
-          renderHomeQuickLook();
+          renderHomeStatus();
           renderAlerts();
           updateStorageStats();
 
@@ -4381,6 +4395,102 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     downloadCSV(`${getAppName().toLowerCase().replace(/\s+/g,"-")}-schedule-c-${year}.csv`, toCSV(sales, headers));
   }
 
+  /* ── TABLE CSV EXPORT (Settings) ────────────────────────────── */
+  function exportTableCSV(collection) {
+    const appSlug = getAppName().toLowerCase().replace(/\s+/g, '-');
+    const date    = new Date().toISOString().slice(0, 10);
+    const records = activeRecords(collection);
+
+    // Per-collection field maps: [csvHeader, recordKey]
+    const FIELD_MAPS = {
+      transactions: [
+        ['Date','date'],['Type','type'],['Category','category'],
+        ['Amount','amount'],['Description','description'],['Vendor','vendor'],
+        ['Property','property'],['Tax Year','taxYear'],['Payment Method','paymentMethod'],
+        ['Receipt','receiptNote'],['Recurring','isRecurring'],['Created','createdAt'],
+      ],
+      properties: [
+        ['Name','name'],['Address','address'],['City','city'],['State','state'],['ZIP','zip'],
+        ['Type','type'],['Bedrooms','bedrooms'],['Bathrooms','bathrooms'],
+        ['Monthly Rate','monthlyRate'],['Status','_status'],['Current Tenant','currentTenant'],
+        ['Pets Allowed','petsAllowed'],['Pet Deposit','petDeposit'],
+        ['Cleaning Fee','cleaningFee'],['Cleaning Refundable','cleaningFeeRefundable'],
+        ['Storage','storage'],['Parking','parking'],['Furnished','furnished'],
+        ['Primary Residence','primaryResidence'],['Notes','notes'],['Created','createdAt'],
+      ],
+      leases: [
+        ['First Name','firstName'],['Last Name','lastName'],
+        ['Co-Tenant First','coTenantFirst'],['Co-Tenant Last','coTenantLast'],
+        ['Email','email'],['Phone','phone'],
+        ['Start Date','startDate'],['End Date','endDate'],
+        ['Monthly Rent','monthlyRent'],['Security Deposit','securityDeposit'],
+        ['Cleaning Deposit','cleaningDeposit'],['Pet Deposit','petDeposit'],
+        ['Pets','pets'],['Pet Description','petDesc'],
+        ['Status','status'],['Platform','platform'],
+        ['Payment Method','paymentMethod'],['Lease Status','status'],
+        ['Emergency Contact','emergencyName'],['Emergency Phone','emergencyPhone'],
+        ['Property ID','propertyId'],['Created','createdAt'],
+      ],
+      sales: [
+        ['Sale Date','saleDate'],['Item Name','itemName'],['Platform','platform'],
+        ['Sale Price','salePrice'],['Platform Fees','platformFees'],
+        ['Shipping','shippingCost'],['Acquisition Cost','acquisitionCost'],
+        ['Net Proceeds','netProceeds'],['Tax Year','taxYear'],['Notes','notes'],['Created','createdAt'],
+      ],
+      items: [
+        ['Name','name'],['Category','category'],['Condition','condition'],
+        ['Acquisition Cost','acquisitionCost'],['Target Price','targetPrice'],
+        ['Source','source'],['Notes','notes'],['Created','createdAt'],
+      ],
+      vehicles: [
+        ['Year','year'],['Make','make'],['Model','model'],['VIN','vin'],
+        ['License Plate','licensePlate'],['Color','color'],['Mileage','mileage'],
+        ['Insurance Provider','insuranceProvider'],['Policy Number','policyNumber'],
+        ['Registration Expires','regExpires'],['Notes','notes'],['Created','createdAt'],
+      ],
+      maintenance: [
+        ['Date','date'],['Vehicle','vehicleLabel'],['Type','type'],
+        ['Description','description'],['Mileage','mileage'],
+        ['Cost','cost'],['Vendor','vendor'],['Notes','notes'],['Created','createdAt'],
+      ],
+      serviceRequests: [
+        ['Title','title'],['Property','propertyLabel'],['Status','status'],
+        ['Priority','priority'],['Category','category'],['Description','description'],
+        ['Requested Date','requestedDate'],['Completed Date','completedDate'],
+        ['Vendor','vendor'],['Cost','cost'],['Notes','notes'],['Created','createdAt'],
+      ],
+      documents: [
+        ['Name','docName'],['Type','docType'],['Property','propertyLabel'],
+        ['Lease','leaseLabel'],['Notes','notes'],['Created','createdAt'],
+      ],
+    };
+
+    const fieldMap = FIELD_MAPS[collection];
+    if (!fieldMap) { showToast('⚠️ No export map for ' + collection); return; }
+    if (!records.length) { showToast('No records to export'); return; }
+
+    // Enrich records with display labels where needed
+    if (collection === 'serviceRequests') {
+      records.forEach(r => {
+        const p = DB.properties.find(x => x.id === r.propertyId);
+        r.propertyLabel = p ? (p.name || p.address) : (r.propertyId || '');
+      });
+    }
+    if (collection === 'documents') {
+      records.forEach(r => {
+        const p = DB.properties.find(x => x.id === r.propertyId);
+        r.propertyLabel = p ? (p.name || p.address) : '';
+        const l = DB.leases.find(x => x.id === r.leaseId);
+        r.leaseLabel = l ? `${l.firstName||''} ${l.lastName||''}`.trim() : '';
+      });
+    }
+
+    const headers  = fieldMap.map(([h]) => h);
+    const keyMap   = Object.fromEntries(fieldMap.map(([h, k]) => [h, k]));
+    const csvRows  = records.map(r => Object.fromEntries(headers.map(h => [h, r[keyMap[h]] ?? ''])));
+    downloadCSV(`${appSlug}-${collection}-${date}.csv`, toCSV(csvRows, headers));
+  }
+
   /* ── AMENITIES MANAGER ──────────────────────────────────────── */
   /* ── AMENITIES — MULTI-SELECT CHIP SYSTEM ───────────────────── */
 
@@ -4819,7 +4929,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     if (backBtn) backBtn.style.display = canGoBack ? 'flex' : 'none';
 
     // Render from DB on every screen entry
-    if (screen === 'home')            { renderHomeQuickLook(); renderDashboard(); }
+    if (screen === 'home')            { renderHomeStatus(); renderDashboard(); }
     if (screen === 'dashboard')       { renderDashboard(); renderAlerts(); }
     if (screen === 'properties')      { renderPropertyList(); }
     if (screen === 'tenants')         { renderTenantsScreen(); }
@@ -5523,11 +5633,29 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       fSet(modalId, 'vendor',      record.vendor || '');
       fSet(modalId, 'category',    record.category || '');
       fSet(modalId, 'property',    record.propertyId || record.property || '');
+      fSet(modalId, 'notes',       record.notes || '');
     } else {
+      // Full reset — clear all fields so previous entry data never bleeds through
+      fSet(modalId, 'amount',      '');
+      fSet(modalId, 'description', '');
+      fSet(modalId, 'vendor',      '');
+      fSet(modalId, 'notes',       '');
+      // Reset category to first option
+      const catEl = document.querySelector(`#${modalId} [data-field="category"]`);
+      if (catEl) catEl.selectedIndex = 0;
       // Default date to today
       fSet(modalId, 'date', new Date().toISOString().split('T')[0]);
       // Pre-select current property if we're inside a property view
       if (currentProperty) fSet(modalId, 'property', currentProperty.id);
+      else fSet(modalId, 'property', '');
+    }
+    // Update title and save button label based on edit vs new
+    if (modalId === 'modal-expense') {
+      const titleEl = document.getElementById('expense-modal-title');
+      const saveBtn = document.querySelector('#modal-expense .btn-primary');
+      const isEdit  = !!(record?.id);
+      if (titleEl) titleEl.textContent = isEdit ? 'Edit Expense' : 'Add Expense';
+      if (saveBtn) saveBtn.textContent  = isEdit ? 'Save Changes' : 'Save Expense';
     }
     openModal(modalId);
 
@@ -5572,6 +5700,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       category:    fGet(modalId, 'category') || (type === 'income' ? 'Rent received' : 'Other'),
       description: fGet(modalId, 'description'),
       vendor:      fGet(modalId, 'vendor'),
+      notes:       fGet(modalId, 'notes') || '',
       taxYear:     new Date(fGet(modalId, 'date') || Date.now()).getFullYear().toString(),
       serviceRequestId: EDIT.transaction?.serviceRequestId || null,
       paymentMethod: modalId === 'modal-expense' ? (document.getElementById('expense-payment-method')?.value || '') : '',
@@ -6716,10 +6845,73 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       }).join('');
     }
 
-    // Update Home quick-look
-    renderHomeQuickLook();
-  }
+    // Update Home status bar
+    renderHomeStatus();
 
+    // ── Resale This Month ──────────────────────────────────────────
+    const resaleEl = document.getElementById('dash-resale-section');
+    if (resaleEl) {
+      const listed = activeRecords('listings').filter(l =>
+        (l.listedDate || l.createdAt || '').startsWith(thisMonth)
+      ).length;
+      const soldThisMonth = activeRecords('sales').filter(s =>
+        (s.saleDate || s.createdAt || '').startsWith(thisMonth)
+      );
+      const profit = soldThisMonth.reduce((sum, s) =>
+        sum + ((s.salePrice||0) - (s.acquisitionCost||0) - (s.platformFees||0) - (s.shippingCost||s.shipping||0)), 0
+      );
+      const fmt = n => (n >= 0 ? '' : '-') + '$' + Math.abs(n).toLocaleString();
+      resaleEl.innerHTML = `<div class="card" style="padding:0;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);">
+          <div style="background:var(--card);padding:12px;text-align:center;">
+            <div style="font-size:0.625rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:3px;">Listed</div>
+            <div style="font-weight:700;color:var(--amber);">${listed || '—'}</div>
+          </div>
+          <div style="background:var(--card);padding:12px;text-align:center;">
+            <div style="font-size:0.625rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:3px;">Sold</div>
+            <div style="font-weight:700;color:var(--green);">${soldThisMonth.length || '—'}</div>
+          </div>
+          <div style="background:var(--card);padding:12px;text-align:center;">
+            <div style="font-size:0.625rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:3px;">Profit</div>
+            <div style="font-weight:700;color:${profit >= 0 ? 'var(--green)' : 'var(--red)'};">${soldThisMonth.length ? fmt(profit) : '—'}</div>
+          </div>
+        </div>
+        <div class="view-all-link" onclick="navigate('resale')">View resale activity <span>→</span></div>
+      </div>`;
+    }
+
+    // ── Recent Transactions ────────────────────────────────────────
+    const recentEl = document.getElementById('dash-recent-txns');
+    if (recentEl) {
+      const recent = activeRecords('transactions')
+        .sort((a,b) => (b.date||b.createdAt||'') > (a.date||a.createdAt||'') ? 1 : -1)
+        .slice(0, 5);
+      if (!recent.length) {
+        recentEl.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:0.875rem;">No transactions yet</div>
+          <div class="view-all-link" onclick="navigate('finances');switchFinTab('transactions')">View all transactions <span>→</span></div>`;
+      } else {
+        const fmtDate = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+        recentEl.innerHTML = recent.map(t => {
+          const isInc = t.type === 'income';
+          const amt   = Math.abs(t.amount||0).toLocaleString();
+          const dot   = isInc ? 'txn-dot-green' : 'txn-dot-red';
+          const cls   = isInc ? 'income' : 'expense';
+          const sign  = isInc ? '+' : '-';
+          const src   = t.property || t.vendor || '';
+          return `<div class="txn-item">
+            <div class="txn-dot ${dot}"></div>
+            <div class="txn-info">
+              <div class="txn-desc">${t.description||t.category||'Transaction'}</div>
+              <div class="txn-meta">${fmtDate(t.date)}${src ? ' · '+src : ''}</div>
+            </div>
+            <div class="txn-amount ${cls}">${sign}$${amt}</div>
+          </div>`;
+        }).join('') +
+        `<div class="view-all-link" onclick="navigate('finances');switchFinTab('transactions')">View all transactions <span>→</span></div>`;
+      }
+    }
+
+  }  // end renderDashboard
 
   /* ── FINANCES OVERVIEW + REPORTS RENDER ────────────────────── */
   function renderFinancesOverview() {
@@ -6876,6 +7068,79 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     const nets=body.querySelectorAll('[style*="color:var(--green)"][style*="font-weight:800"]');
     if(nets[0])nets[0].textContent='$'+rentalNet.toLocaleString();
     if(nets[1])nets[1].textContent='$'+scNet.toLocaleString();
+  }
+
+  function renderHomeStatus() {
+    const bar = document.getElementById('home-status-bar');
+    if (!bar) return;
+
+    const props      = activeRecords('properties');
+    const thisMonth  = new Date().toISOString().slice(0, 7);
+    const txns       = activeRecords('transactions');
+    const monthTxns  = txns.filter(t => (t.date || t.createdAt || '').startsWith(thisMonth));
+    const income     = monthTxns.filter(t => t.type === 'income').reduce((s,t)  => s + (t.amount||0), 0);
+    const expenses   = monthTxns.filter(t => t.type === 'expense').reduce((s,t) => s + Math.abs(t.amount||0), 0);
+    const net        = income - expenses;
+    const fmt        = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString();
+    const netColor   = net >= 0 ? '#6fcf97' : '#ff7675';
+
+    // Date line
+    const dateLine = document.getElementById('home-date-line');
+    if (dateLine) {
+      dateLine.textContent = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+    }
+
+    if (!props.length) {
+      bar.innerHTML = `<div style="background:var(--navy);border-radius:var(--radius-md);padding:16px;text-align:center;">
+        <div style="font-size:0.875rem;color:rgba(255,255,255,0.7);margin-bottom:10px;">No properties yet</div>
+        <button onclick="hmlOpenPropertyForm()" style="padding:8px 16px;background:var(--amber);color:var(--navy);border:none;border-radius:8px;font-weight:700;font-size:0.8125rem;cursor:pointer;">+ Add Property</button>
+      </div>`;
+      return;
+    }
+
+    // Build property rows
+    const propRows = props.map(p => {
+      const { occupied, tenant, leaseEnd } = getPropertyDisplay(p);
+      const badge = occupied
+        ? `<span style="font-size:0.65rem;font-weight:700;padding:2px 7px;border-radius:20px;background:rgba(111,207,151,0.2);color:#6fcf97;">● Occupied</span>`
+        : `<span style="font-size:0.65rem;font-weight:700;padding:2px 7px;border-radius:20px;background:rgba(255,118,117,0.2);color:#ff7675;">● Vacant</span>`;
+      const sub = occupied
+        ? `${tenant}${leaseEnd ? ' · ends ' + new Date(leaseEnd+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : ''}`
+        : 'No active lease';
+      return `<div class="home-status-prop-row" onclick="openProperty('${p.id}')">
+        <div>
+          <div class="home-status-prop-name">${p.name||p.address||'Property'}</div>
+          <div class="home-status-prop-sub">${sub}</div>
+        </div>
+        ${badge}
+      </div>`;
+    }).join('');
+
+    bar.innerHTML = `<div class="home-status-bar">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.5);">This Month</div>
+        <div style="font-size:0.65rem;color:rgba(255,255,255,0.4);">${new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'})}</div>
+      </div>
+      <div class="home-status-kpi">
+        <div class="home-status-kpi-cell">
+          <div class="home-status-kpi-label">Income</div>
+          <div class="home-status-kpi-val" style="color:#6fcf97;">${fmt(income)}</div>
+        </div>
+        <div class="home-status-kpi-cell">
+          <div class="home-status-kpi-label">Expenses</div>
+          <div class="home-status-kpi-val" style="color:#ff9f7f;">${fmt(expenses)}</div>
+        </div>
+        <div class="home-status-kpi-cell">
+          <div class="home-status-kpi-label">Net</div>
+          <div class="home-status-kpi-val" style="color:${netColor};">${fmt(net)}</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;">${propRows}</div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:8px;">
+        <button onclick="navigate('dashboard')" style="flex:1;padding:7px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:8px;font-size:0.75rem;font-weight:600;cursor:pointer;">📊 Dashboard</button>
+        <button onclick="navigate('finances');switchFinTab('transactions')" style="flex:1;padding:7px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:8px;font-size:0.75rem;font-weight:600;cursor:pointer;">💳 Finances</button>
+      </div>
+    </div>`;
   }
 
   function renderHomeQuickLook() {
@@ -8012,7 +8277,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     NAV_HISTORY.push('home');
     // Render live data immediately — before any navigation
     renderDashboard();
-    renderHomeQuickLook();
+    renderHomeStatus();
     renderAlerts();
     syncDrawerActive('home');
 
