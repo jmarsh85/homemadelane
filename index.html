@@ -2,7 +2,7 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.0.6                                             ║
+  ║  Version: 4.0.7                                             ║
   ║  Date: 2026-04-20                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
@@ -1682,7 +1682,10 @@
             <button class="filter-chip" onclick="setFilter(this,'resale')">Resale</button>
             <button class="filter-chip" onclick="setFilter(this,'bills')">🔁 Bills</button>
           </div>
-          <button class="btn btn-amber btn-sm" style="flex-shrink:0;" onclick="openTxnForm()">+ Add</button>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button class="btn btn-sm" style="background:var(--green);color:#fff;font-weight:700;border:none;" onclick="openTransactionForm('modal-rent')">+ Income</button>
+            <button class="btn btn-amber btn-sm" style="flex-shrink:0;" onclick="openTransactionForm('modal-expense')">+ Expense</button>
+          </div>
         </div>
 
         <!-- Property multi-select filter row -->
@@ -2190,26 +2193,55 @@
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div class="modal-header">
-        <div class="modal-title">Log Rent Payment</div>
+        <div class="modal-title" id="income-modal-title">Log Income</div>
         <button class="modal-close" onclick="closeModal('modal-rent')">✕</button>
       </div>
       <div class="modal-body">
+
+        <div class="field">
+          <label>Category</label>
+          <select data-field="category" id="income-category-select" onchange="toggleIncomeLeaseField()">
+            <optgroup label="Rental Income">
+              <option value="Rent received">Rent Received</option>
+              <option value="Late fee">Late Fee</option>
+              <option value="Pet fee income">Pet Fee</option>
+              <option value="Parking fee">Parking Fee</option>
+              <option value="Storage fee">Storage Fee</option>
+              <option value="Laundry income">Laundry Income</option>
+              <option value="Application fee">Application Fee</option>
+            </optgroup>
+            <optgroup label="Deposits">
+              <option value="Security deposit received">Security Deposit Received</option>
+              <option value="Security deposit returned">Security Deposit Returned</option>
+              <option value="Pet deposit received">Pet Deposit Received</option>
+            </optgroup>
+            <optgroup label="Other">
+              <option value="Insurance reimbursement">Insurance Reimbursement</option>
+              <option value="Utility reimbursement">Utility Reimbursement</option>
+              <option value="Damage reimbursement">Damage Reimbursement</option>
+              <option value="Resale income">Resale Income</option>
+              <option value="Other income">Other Income</option>
+            </optgroup>
+          </select>
+        </div>
+
         <div class="field">
           <label>Property</label>
-          <div style="display:flex; gap:8px;">
-            <select data-field="property" id="rent-property-select" style="flex:1;" onchange="if(this.value==='__new'){closeModal('modal-rent');hmlOpenPropertyForm();}">
-              <option value="">— Select property —</option>
-              <option value="__new">+ Add new property…</option>
-            </select>
-          </div>
+          <select data-field="property" id="rent-property-select" onchange="if(this.value==='__new'){closeModal('modal-rent');hmlOpenPropertyForm();}">
+            <option value="">— Select property —</option>
+            <option value="__new">+ Add new property…</option>
+          </select>
         </div>
-        <div class="field">
-          <label>Tenant / Lease</label>
+
+        <!-- Tenant/Lease row — shown only for rent-type categories -->
+        <div class="field" id="income-lease-field">
+          <label>Tenant / Lease <span id="income-lease-hint" style="font-size:0.7rem;font-weight:400;color:var(--muted);">(optional for non-rent)</span></label>
           <select data-field="category" id="rent-lease-select" onchange="if(this.value==='__new'){closeModal('modal-rent');openLeaseForm(null);}">
-            <option value="Rent received">— Select lease —</option>
+            <option value="">— Select tenant —</option>
             <option value="__new">+ Add new lease…</option>
           </select>
         </div>
+
         <div class="field-row">
           <div class="field">
             <label>Amount</label>
@@ -2220,13 +2252,15 @@
             <input data-field="date" type="date" />
           </div>
         </div>
+
         <div class="field">
-          <label>Notes (optional)</label>
+          <label>Notes <span style="font-size:0.7rem;font-weight:400;color:var(--muted);">optional</span></label>
           <input data-field="description" type="text" placeholder="e.g. April payment, late fee included" />
         </div>
+
         <div style="display:flex; gap:10px;">
           <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-rent')">Cancel</button>
-          <button class="btn btn-primary" style="flex:2;" onclick="saveTransaction('modal-rent','income')">Save Payment</button>
+          <button class="btn btn-primary" style="flex:2;" id="income-save-btn" onclick="saveIncomeTransaction()">Save Income</button>
         </div>
       </div>
     </div>
@@ -3875,7 +3909,86 @@
     const modal=(record?.type==='income')?'modal-rent':'modal-expense';
     openTransactionForm(modal, record||null);
   }
-  function editTxn(id) { const r=getTxnData().find(t=>t.id===id); if(r)openTxnForm(r); }
+
+  // Toggle lease/tenant field visibility based on income category
+  window.toggleIncomeLeaseField = function() {
+    const catSel   = document.getElementById('income-category-select');
+    const leaseDiv = document.getElementById('income-lease-field');
+    const hint     = document.getElementById('income-lease-hint');
+    if (!catSel || !leaseDiv) return;
+    const rentCats = ['rent received','late fee','pet fee income','parking fee','storage fee','laundry income','application fee','security deposit received','security deposit returned','pet deposit received'];
+    const isRentType = rentCats.includes((catSel.value||'').toLowerCase());
+    leaseDiv.style.display = ''; // always show — useful to optionally link any income to a tenant
+    if (hint) hint.style.display = isRentType ? 'none' : '';
+  };
+
+  function saveIncomeTransaction() {
+    const catSel   = document.getElementById('income-category-select');
+    const leaseSel = document.getElementById('rent-lease-select');
+    const propVal  = fGet('modal-rent', 'property');
+    const propRec  = DB.properties.find(p => p.id === propVal);
+
+    // Determine category: if a tenant is selected, use tenant name as category label; else use category dropdown
+    const tenantVal = leaseSel?.value || '';
+    const catVal    = catSel?.value || 'Other income';
+    // Store the category as the dropdown value; tenant context goes into description
+    const category  = catVal;
+    // If tenant selected and notes empty, auto-note with tenant name
+    const notesField = document.querySelector('#modal-rent [data-field="description"]');
+    let   notes = notesField?.value || '';
+    if (tenantVal && tenantVal !== '__new' && !notes) {
+      // Extract just the tenant name portion before ' – '
+      const tenantName = tenantVal.split(' – ')[0];
+      notes = tenantName;
+    }
+
+    const amount = parseFloat(fGet('modal-rent', 'amount')) || 0;
+    if (!amount) { alert('Amount is required.'); return; }
+
+    const record = {
+      id:          EDIT.transaction?.id || genId(),
+      type:        'income',
+      propertyId:  propRec?.id   || EDIT.transaction?.propertyId || '',
+      property:    propRec?.name || propVal || EDIT.transaction?.property || '',
+      amount,
+      date:        fGet('modal-rent', 'date') || new Date().toISOString().split('T')[0],
+      category,
+      description: notes,
+      vendor:      '',
+      taxYear:     new Date(fGet('modal-rent', 'date') || Date.now()).getFullYear().toString(),
+      leaseRef:    tenantVal && tenantVal !== '__new' ? tenantVal : (EDIT.transaction?.leaseRef || ''),
+      createdAt:   EDIT.transaction?.createdAt || now(),
+      updatedAt:   now(),
+    };
+
+    upsert('transactions', record);
+    renderTransactionTable();
+    renderPropertyFinancials();
+    renderFinancesOverview();
+    renderDashboard();
+    closeModal('modal-rent');
+    EDIT.transaction = null;
+    showToast('✅ Income saved');
+  }
+  function editTxn(id) {
+    const r = getTxnData().find(t => t.id === id);
+    if (!r) return;
+    if (r.type === 'income') {
+      openTransactionForm('modal-rent', r);
+      // Restore lease ref if stored
+      if (r.leaseRef) {
+        setTimeout(() => {
+          const leaseSel = document.getElementById('rent-lease-select');
+          if (leaseSel) {
+            const match = [...leaseSel.options].find(o => o.value === r.leaseRef);
+            if (match) leaseSel.value = r.leaseRef;
+          }
+        }, 60);
+      }
+    } else {
+      openTransactionForm('modal-expense', r);
+    }
+  }
   function deleteTxn(id, label) {
     confirmDelete('transaction', label||id, () => {
       softDelete('transactions', id);
@@ -5603,16 +5716,57 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     // Populate lease select for rent modal
     if (modalId === 'modal-rent') {
       const leaseSel = document.getElementById('rent-lease-select');
-      if (leaseSel) {
-        const leases = activeRecords('leases').filter(l => l.status === 'active');
-        const fmt = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}) : '?';
-        leaseSel.innerHTML = '<option value="Rent received">— Select lease —</option>' +
-          leases.map(l => {
-            const name = `${l.firstName||''} ${l.lastName||''}`.trim() || l.id;
-            return `<option value="${name} – ${fmt(l.startDate)}–${fmt(l.endDate)}" ${record?.category?.includes(name)?'selected':''}>${name} · ${fmt(l.endDate)}</option>`;
-          }).join('') +
-          '<option value="__new">+ Add new lease…</option>';
+      const catSel   = document.getElementById('income-category-select');
+      const titleEl  = document.getElementById('income-modal-title');
+      const saveBtn  = document.getElementById('income-save-btn');
+
+      // Restore category and title for edit
+      if (record?.category && catSel) {
+        // Try to match existing option value, else leave as-is
+        const opt = [...catSel.options].find(o => o.value === record.category);
+        if (opt) catSel.value = record.category;
       }
+      if (titleEl) titleEl.textContent = record?.id ? 'Edit Income' : 'Log Income';
+      if (saveBtn) saveBtn.textContent  = record?.id ? 'Save Changes' : 'Save Income';
+
+      if (leaseSel) {
+        const allLeases = activeRecords('leases');
+        const fmt = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}) : '?';
+        const fmtShort = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '?';
+
+        // Deduplicate by id (defensive), then split into active and prior
+        const seen = new Set();
+        const unique = allLeases.filter(l => { if (seen.has(l.id)) return false; seen.add(l.id); return true; });
+        const active = unique.filter(l => l.status === 'active' || l.status === 'extended');
+        const prior  = unique.filter(l => l.status !== 'active' && l.status !== 'extended');
+
+        const makeOption = (l, selected) => {
+          const name  = `${l.firstName||''} ${l.lastName||''}`.trim() || l.id;
+          const range = `${fmtShort(l.startDate)}–${fmtShort(l.endDate)}`;
+          const val   = `${name} – ${fmt(l.startDate)}–${fmt(l.endDate)}`;
+          const sel   = selected || (record?.category?.includes(name)) ? 'selected' : '';
+          return `<option value="${val}" ${sel}>${name} · ${range}</option>`;
+        };
+
+        let html = '<option value="">— Select tenant —</option>';
+        if (active.length) {
+          html += '<optgroup label="Active Tenants">' + active.map(l => makeOption(l, false)).join('') + '</optgroup>';
+        }
+        if (prior.length) {
+          html += '<optgroup label="Past Tenants">' + prior.map(l => makeOption(l, false)).join('') + '</optgroup>';
+        }
+        html += '<option value="__new">+ Add new lease…</option>';
+        leaseSel.innerHTML = html;
+
+        // If editing, try to restore selected tenant
+        if (record?.category) {
+          const match = [...leaseSel.options].find(o => o.value === record.category);
+          if (match) leaseSel.value = record.category;
+        }
+      }
+
+      // Show/hide lease field based on category
+      toggleIncomeLeaseField();
     }
 
     // Populate sale item select for modal-sale
@@ -5640,9 +5794,16 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       fSet(modalId, 'description', '');
       fSet(modalId, 'vendor',      '');
       fSet(modalId, 'notes',       '');
-      // Reset category to first option
-      const catEl = document.querySelector(`#${modalId} [data-field="category"]`);
-      if (catEl) catEl.selectedIndex = 0;
+      // Reset category dropdowns
+      if (modalId === 'modal-rent') {
+        const incCat = document.getElementById('income-category-select');
+        if (incCat) incCat.selectedIndex = 0;
+        const leaseSel = document.getElementById('rent-lease-select');
+        if (leaseSel) leaseSel.selectedIndex = 0;
+      } else {
+        const catEl = document.querySelector(`#${modalId} [data-field="category"]`);
+        if (catEl) catEl.selectedIndex = 0;
+      }
       // Default date to today
       fSet(modalId, 'date', new Date().toISOString().split('T')[0]);
       // Pre-select current property if we're inside a property view
