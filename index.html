@@ -2,8 +2,8 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.0.9                                             ║
-  ║  Date: 2026-06-05                                           ║
+  ║  Version: 1.0.0                                             ║
+  ║  Date: 2026-06-06                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
   ║                                                             ║
@@ -2800,64 +2800,7 @@
   </div>
 
   <!-- Expense Categories Modal -->
-  <div class="modal-overlay" id="modal-categories" onclick="overlayClose(event,'modal-categories')">
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <div class="modal-title">Expense Categories</div>
-        <button class="modal-close" onclick="closeModal('modal-categories')">✕</button>
-      </div>
-      <div class="modal-body">
-        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:10px;">Schedule E — Rental</div>
-        <div class="card" style="padding:0; overflow:hidden; margin-bottom:16px;">
-          <div id="schedule-e-categories"></div>
-        </div>
-        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:10px;">Schedule C — Resale</div>
-        <div class="card" style="padding:0; overflow:hidden; margin-bottom:16px;">
-          <div id="schedule-c-categories"></div>
-        </div>
-        <div class="field">
-          <label>Add Custom Category</label>
-          <div style="display:flex; gap:8px;">
-            <input type="text" id="new-category-input" placeholder="Category name" style="flex:1;" />
-            <select id="new-category-type" style="font-family:var(--font-body); font-size:0.875rem; border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:10px; background:var(--surface); color:var(--text);">
-              <option value="e">Sch. E</option>
-              <option value="c">Sch. C</option>
-            </select>
-            <button class="btn btn-amber btn-sm" onclick="addCustomCategory()">Add</button>
-          </div>
-        </div>
-        <button class="btn btn-primary btn-full" onclick="closeModal('modal-categories')">Done</button>
-        <button class="btn btn-outline btn-full" style="margin-top:8px;" onclick="closeModal('modal-categories')">Cancel</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Payment Methods Modal -->
-  <div class="modal-overlay" id="modal-payment-methods" onclick="overlayClose(event,'modal-payment-methods')">
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <div class="modal-title">Payment Methods</div>
-        <button class="modal-close" onclick="closeModal('modal-payment-methods')">&#10005;</button>
-      </div>
-      <div class="modal-body">
-        <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">
-          <div id="payment-methods-list"></div>
-        </div>
-        <div class="field">
-          <label>Add Method</label>
-          <div style="display:flex;gap:8px;">
-            <input type="text" id="new-payment-method-input" placeholder="e.g. Venmo, Wire Transfer" style="flex:1;" />
-            <button class="btn btn-amber btn-sm" onclick="addPaymentMethod()">Add</button>
-          </div>
-        </div>
-        <button class="btn btn-primary btn-full" onclick="closeModal('modal-payment-methods')">Done</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Toast notification -->
+  <!-- [modal-categories moved to body level] -->
   <div id="hml-toast" style="
     position:fixed; bottom:90px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--navy); color:#fff; border-radius:24px; padding:11px 20px;
@@ -13522,7 +13465,64 @@ window.dkmTagDismiss = function(silent) {
 })(); // end IIFE
 </script>
 
-<!-- Standard Confirm Delete Dialog — body-level for reliable iOS fixed positioning -->
+<!-- Expense Categories Modal — body-level for reliable iOS fixed positioning -->
+<div class="modal-overlay" id="modal-categories" onclick="overlayClose(event,'modal-categories')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">Expense Categories</div>
+      <button class="modal-close" onclick="closeModal('modal-categories')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:10px;">Schedule E — Rental</div>
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">
+        <div id="schedule-e-categories"></div>
+      </div>
+      <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:10px;">Schedule C — Resale</div>
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">
+        <div id="schedule-c-categories"></div>
+      </div>
+      <div class="field">
+        <label>Add Custom Category</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="new-category-input" placeholder="Category name" style="flex:1;" />
+          <select id="new-category-type" style="font-family:var(--font-body);font-size:0.875rem;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px;background:var(--surface);color:var(--text);">
+            <option value="e">Sch. E</option>
+            <option value="c">Sch. C</option>
+          </select>
+          <button class="btn btn-amber btn-sm" ontouchstart="" onclick="addCustomCategory()">Add</button>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" ontouchstart="" onclick="closeModal('modal-categories')">Done</button>
+      <button class="btn btn-outline btn-full" style="margin-top:8px;" ontouchstart="" onclick="closeModal('modal-categories')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Payment Methods Modal — body-level for reliable iOS fixed positioning -->
+<div class="modal-overlay" id="modal-payment-methods" onclick="overlayClose(event,'modal-payment-methods')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">Payment Methods</div>
+      <button class="modal-close" onclick="closeModal('modal-payment-methods')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">
+        <div id="payment-methods-list"></div>
+      </div>
+      <div class="field">
+        <label>Add Method</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="new-payment-method-input" placeholder="e.g. Venmo, Wire Transfer" style="flex:1;" />
+          <button class="btn btn-amber btn-sm" ontouchstart="" onclick="addPaymentMethod()">Add</button>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" ontouchstart="" onclick="closeModal('modal-payment-methods')">Done</button>
+    </div>
+  </div>
+</div>
+
 <div class="confirm-overlay" id="confirm-dialog">
   <div class="confirm-box">
     <div class="confirm-icon">🗑</div>
