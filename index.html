@@ -2,8 +2,8 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.0.7                                             ║
-  ║  Date: 2026-04-20                                           ║
+  ║  Version: 4.0.8                                             ║
+  ║  Date: 2026-06-05                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
   ║                                                             ║
@@ -2236,7 +2236,7 @@
         <!-- Tenant/Lease row — shown only for rent-type categories -->
         <div class="field" id="income-lease-field">
           <label>Tenant / Lease <span id="income-lease-hint" style="font-size:0.7rem;font-weight:400;color:var(--muted);">(optional for non-rent)</span></label>
-          <select data-field="category" id="rent-lease-select" onchange="if(this.value==='__new'){closeModal('modal-rent');openLeaseForm(null);}">
+          <select data-field="category" id="rent-lease-select" onchange="if(this.value==='__new'){closeModal('modal-rent');openLeaseForm(null);}else{onIncomeLeasePicked();}">
             <option value="">— Select tenant —</option>
             <option value="__new">+ Add new lease…</option>
           </select>
@@ -2245,11 +2245,12 @@
         <div class="field-row">
           <div class="field">
             <label>Amount</label>
-            <input data-field="amount" type="number" placeholder="$0.00" inputmode="decimal" />
+            <input data-field="amount" id="income-amount" type="number" placeholder="$0.00" inputmode="decimal" oninput="this._userEdited=true;" onfocus="this._userEdited=false;" />
+            <div id="income-prorate-hint" style="display:none;margin-top:5px;font-size:0.72rem;font-weight:600;color:var(--amber);background:rgba(212,167,44,0.1);border:1px solid rgba(212,167,44,0.3);border-radius:6px;padding:4px 8px;"></div>
           </div>
           <div class="field">
             <label>Date</label>
-            <input data-field="date" type="date" />
+            <input data-field="date" id="income-date" type="date" onchange="onIncomeDateChanged()" />
           </div>
         </div>
 
@@ -3814,6 +3815,7 @@
             </div>
             <div style="display:flex;gap:8px;">
               <button class="btn btn-outline btn-sm btn-full" onclick="editTxn('${t.id}')">✏️ Edit</button>
+              <button class="btn btn-outline btn-sm btn-full" onclick="duplicateTxn('${t.id}')">⧉ Duplicate</button>
               <button class="btn btn-sm btn-full" style="background:var(--red);color:#fff;" onclick="deleteTxn('${t.id}','${esc(t.description)}')">🗑 Delete</button>
             </div>
           </div>`;
@@ -3918,9 +3920,146 @@
     if (!catSel || !leaseDiv) return;
     const rentCats = ['rent received','late fee','pet fee income','parking fee','storage fee','laundry income','application fee','security deposit received','security deposit returned','pet deposit received'];
     const isRentType = rentCats.includes((catSel.value||'').toLowerCase());
-    leaseDiv.style.display = ''; // always show — useful to optionally link any income to a tenant
+    leaseDiv.style.display = ''; // always show
     if (hint) hint.style.display = isRentType ? 'none' : '';
+    // When switching to Rent Received, try to pre-populate from selected lease
+    if (catSel.value === 'Rent received') onIncomeLeasePicked();
+    else _clearProrateHint();
   };
+
+  /* ── INCOME LEASE PRE-POPULATION ────────────────────────────── */
+  // Called when tenant/lease select changes OR category changes to Rent Received
+  window.onIncomeLeasePicked = function() {
+    const catSel   = document.getElementById('income-category-select');
+    const leaseSel = document.getElementById('rent-lease-select');
+    const amtEl    = document.getElementById('income-amount');
+    const propSel  = document.getElementById('rent-property-select');
+    const dateEl   = document.getElementById('income-date');
+    if (!leaseSel || !catSel) return;
+
+    const val = leaseSel.value;
+    if (!val || val === '__new' || val === '') return;
+
+    // Match the selected option value back to a lease record
+    // Option values are stored as "Name – MonthYYYY–MonthYYYY"
+    const allLeases = activeRecords('leases');
+    const fmt = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}) : '?';
+    const lease = allLeases.find(l => {
+      const name = `${l.firstName||''} ${l.lastName||''}`.trim() || l.id;
+      return val === `${name} – ${fmt(l.startDate)}–${fmt(l.endDate)}`;
+    });
+    if (!lease) return;
+
+    // Pre-fill property
+    if (propSel && lease.propertyId) {
+      const opt = [...propSel.options].find(o => o.value === lease.propertyId);
+      if (opt) propSel.value = lease.propertyId;
+    }
+
+    // Only pre-fill amount and prorate for Rent Received
+    if (catSel.value !== 'Rent received') return;
+    if (!lease.monthlyRent) return;
+
+    const rent = parseFloat(lease.monthlyRent);
+    const dateVal = dateEl?.value || new Date().toISOString().split('T')[0];
+    const result  = _incomeProrateCalc(lease, dateVal, rent);
+
+    if (amtEl && !amtEl._userEdited) {
+      amtEl.value = result.amount.toFixed(2);
+    }
+    _showProrateHint(result);
+  };
+
+  // Called when date changes — recalculate proration if Rent Received + tenant selected
+  window.onIncomeDateChanged = function() {
+    const catSel   = document.getElementById('income-category-select');
+    const leaseSel = document.getElementById('rent-lease-select');
+    const amtEl    = document.getElementById('income-amount');
+    if (catSel?.value !== 'Rent received' || !leaseSel?.value) return;
+
+    const allLeases = activeRecords('leases');
+    const fmt = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}) : '?';
+    const lease = allLeases.find(l => {
+      const name = `${l.firstName||''} ${l.lastName||''}`.trim() || l.id;
+      return leaseSel.value === `${name} – ${fmt(l.startDate)}–${fmt(l.endDate)}`;
+    });
+    if (!lease || !lease.monthlyRent) return;
+
+    const dateEl  = document.getElementById('income-date');
+    const rent    = parseFloat(lease.monthlyRent);
+    const result  = _incomeProrateCalc(lease, dateEl?.value, rent);
+
+    if (amtEl && !amtEl._userEdited) {
+      amtEl.value = result.amount.toFixed(2);
+    }
+    _showProrateHint(result);
+  };
+
+  // Prorated rent calculation
+  function _incomeProrateCalc(lease, dateStr, rent) {
+    if (!dateStr) return { amount: rent, prorated: false };
+    const d         = new Date(dateStr + 'T12:00:00');
+    const month     = d.getMonth();
+    const year      = d.getFullYear();
+    const daysInMo  = new Date(year, month + 1, 0).getDate();
+
+    // Is this the lease start month?
+    const startD = lease.startDate ? new Date(lease.startDate + 'T12:00:00') : null;
+    if (startD && startD.getMonth() === month && startD.getFullYear() === year && startD.getDate() > 1) {
+      const remainDays = daysInMo - startD.getDate() + 1;
+      const prorated   = Math.round((rent / daysInMo) * remainDays * 100) / 100;
+      return { amount: prorated, prorated: true, remainDays, daysInMo, fullRent: rent };
+    }
+
+    // Is this the lease end month?
+    const endD = lease.endDate ? new Date(lease.endDate + 'T12:00:00') : null;
+    if (endD && endD.getMonth() === month && endD.getFullYear() === year && endD.getDate() < daysInMo) {
+      const usedDays = endD.getDate();
+      const prorated = Math.round((rent / daysInMo) * usedDays * 100) / 100;
+      return { amount: prorated, prorated: true, remainDays: usedDays, daysInMo, fullRent: rent, isEnd: true };
+    }
+
+    return { amount: rent, prorated: false };
+  }
+
+  function _showProrateHint(result) {
+    const hintEl = document.getElementById('income-prorate-hint');
+    if (!hintEl) return;
+    if (result.prorated) {
+      const label = result.isEnd ? 'final month' : 'first month';
+      hintEl.style.display = '';
+      hintEl.textContent = `⚡ Prorated ${label}: ${result.remainDays} of ${result.daysInMo} days · Full rent $${result.fullRent.toLocaleString()}`;
+    } else {
+      hintEl.style.display = 'none';
+      hintEl.textContent   = '';
+    }
+  }
+
+  function _clearProrateHint() {
+    const hintEl = document.getElementById('income-prorate-hint');
+    if (hintEl) { hintEl.style.display = 'none'; hintEl.textContent = ''; }
+  }
+
+  /* ── DUPLICATE TRANSACTION ───────────────────────────────────── */
+  function duplicateTxn(id) {
+    const original = getTxnData().find(t => t.id === id);
+    if (!original) return;
+    const copy = Object.assign({}, original, {
+      id:        genId(),
+      date:      new Date().toISOString().split('T')[0], // default to today — user edits in form
+      createdAt: now(),
+      updatedAt: now(),
+      description: original.description ? original.description + ' (copy)' : 'Copy',
+    });
+    delete copy.deletedAt;
+    upsert('transactions', copy);
+    // Close the current detail drawer
+    TXN_STATE.openRow = null;
+    renderTransactionTable();
+    showToast('✅ Duplicated — opening to edit…');
+    // Open in edit mode after a short delay so the table re-renders first
+    setTimeout(() => editTxn(copy.id), 180);
+  }
 
   function saveIncomeTransaction() {
     const catSel   = document.getElementById('income-category-select');
@@ -5800,6 +5939,9 @@ Respond ONLY in this JSON format, no markdown, no preamble:
         if (incCat) incCat.selectedIndex = 0;
         const leaseSel = document.getElementById('rent-lease-select');
         if (leaseSel) leaseSel.selectedIndex = 0;
+        const amtEl = document.getElementById('income-amount');
+        if (amtEl) amtEl._userEdited = false;
+        _clearProrateHint();
       } else {
         const catEl = document.querySelector(`#${modalId} [data-field="category"]`);
         if (catEl) catEl.selectedIndex = 0;
