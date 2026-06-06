@@ -2,7 +2,7 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.0.8                                             ║
+  ║  Version: 4.0.9                                             ║
   ║  Date: 2026-06-05                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
@@ -2244,13 +2244,27 @@
 
         <div class="field-row">
           <div class="field">
-            <label>Amount</label>
-            <input data-field="amount" id="income-amount" type="number" placeholder="$0.00" inputmode="decimal" oninput="this._userEdited=true;" onfocus="this._userEdited=false;" />
-            <div id="income-prorate-hint" style="display:none;margin-top:5px;font-size:0.72rem;font-weight:600;color:var(--amber);background:rgba(212,167,44,0.1);border:1px solid rgba(212,167,44,0.3);border-radius:6px;padding:4px 8px;"></div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
+              <label style="margin-bottom:0;">Amount</label>
+              <span id="income-recalc-link" onclick="onIncomeLeasePicked(true)" style="display:none;font-size:0.7rem;font-weight:600;color:var(--amber);cursor:pointer;text-decoration:underline;text-underline-offset:2px;">↻ Recalculate</span>
+            </div>
+            <input data-field="amount" id="income-amount" type="number" placeholder="$0.00" inputmode="decimal" oninput="this._userEdited=true;_updateRecalcLink();" />
           </div>
           <div class="field">
             <label>Date</label>
             <input data-field="date" id="income-date" type="date" onchange="onIncomeDateChanged()" />
+          </div>
+        </div>
+
+        <!-- Proration calculation card — shown when prorated month detected -->
+        <div id="income-prorate-hint" style="display:none;margin-top:-4px;margin-bottom:10px;border-radius:8px;overflow:hidden;border:1px solid rgba(212,167,44,0.35);background:rgba(212,167,44,0.07);">
+          <div style="padding:10px 12px;">
+            <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(180,130,0,0.8);margin-bottom:6px;" id="prorate-label">Prorated First Month</div>
+            <div style="font-size:0.8125rem;color:var(--navy);font-family:var(--font-body);line-height:1.6;" id="prorate-formula"></div>
+            <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">
+              <div style="font-size:1rem;font-weight:700;color:var(--navy);" id="prorate-result"></div>
+              <button onclick="_applyProratedAmount()" style="padding:5px 14px;background:var(--amber);color:var(--navy);border:none;border-radius:6px;font-size:0.75rem;font-weight:700;cursor:pointer;">Use this amount</button>
+            </div>
           </div>
         </div>
 
@@ -3929,7 +3943,8 @@
 
   /* ── INCOME LEASE PRE-POPULATION ────────────────────────────── */
   // Called when tenant/lease select changes OR category changes to Rent Received
-  window.onIncomeLeasePicked = function() {
+  // force=true means the user tapped ↻ Recalculate — always apply amount
+  window.onIncomeLeasePicked = function(force) {
     const catSel   = document.getElementById('income-category-select');
     const leaseSel = document.getElementById('rent-lease-select');
     const amtEl    = document.getElementById('income-amount');
@@ -3940,8 +3955,7 @@
     const val = leaseSel.value;
     if (!val || val === '__new' || val === '') return;
 
-    // Match the selected option value back to a lease record
-    // Option values are stored as "Name – MonthYYYY–MonthYYYY"
+    // Match option value back to a lease record
     const allLeases = activeRecords('leases');
     const fmt = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}) : '?';
     const lease = allLeases.find(l => {
@@ -3956,17 +3970,20 @@
       if (opt) propSel.value = lease.propertyId;
     }
 
-    // Only pre-fill amount and prorate for Rent Received
-    if (catSel.value !== 'Rent received') return;
-    if (!lease.monthlyRent) return;
+    if (catSel.value !== 'Rent received' || !lease.monthlyRent) return;
 
-    const rent = parseFloat(lease.monthlyRent);
+    const rent    = parseFloat(lease.monthlyRent);
     const dateVal = dateEl?.value || new Date().toISOString().split('T')[0];
     const result  = _incomeProrateCalc(lease, dateVal, rent);
 
-    if (amtEl && !amtEl._userEdited) {
-      amtEl.value = result.amount.toFixed(2);
+    // Auto-fill amount only when: new entry with no user-typed value, OR force=true (recalculate tapped)
+    const amtEmpty    = !amtEl?.value || parseFloat(amtEl.value) === 0;
+    const shouldApply = force || (!amtEl?._userEdited && amtEmpty);
+    if (amtEl && shouldApply) {
+      amtEl.value       = result.amount.toFixed(2);
+      amtEl._userEdited = false;
     }
+
     _showProrateHint(result);
   };
 
@@ -3985,14 +4002,16 @@
     });
     if (!lease || !lease.monthlyRent) return;
 
-    const dateEl  = document.getElementById('income-date');
-    const rent    = parseFloat(lease.monthlyRent);
-    const result  = _incomeProrateCalc(lease, dateEl?.value, rent);
+    const dateEl = document.getElementById('income-date');
+    const rent   = parseFloat(lease.monthlyRent);
+    const result = _incomeProrateCalc(lease, dateEl?.value, rent);
 
+    // Only auto-apply if amount hasn't been user-edited
     if (amtEl && !amtEl._userEdited) {
       amtEl.value = result.amount.toFixed(2);
     }
     _showProrateHint(result);
+    _updateRecalcLink();
   };
 
   // Prorated rent calculation
@@ -4023,21 +4042,65 @@
   }
 
   function _showProrateHint(result) {
-    const hintEl = document.getElementById('income-prorate-hint');
+    const hintEl    = document.getElementById('income-prorate-hint');
+    const labelEl   = document.getElementById('prorate-label');
+    const formulaEl = document.getElementById('prorate-formula');
+    const resultEl  = document.getElementById('prorate-result');
     if (!hintEl) return;
-    if (result.prorated) {
-      const label = result.isEnd ? 'final month' : 'first month';
-      hintEl.style.display = '';
-      hintEl.textContent = `⚡ Prorated ${label}: ${result.remainDays} of ${result.daysInMo} days · Full rent $${result.fullRent.toLocaleString()}`;
-    } else {
+
+    if (!result.prorated) {
       hintEl.style.display = 'none';
-      hintEl.textContent   = '';
+      return;
     }
+
+    const cur = n => '$' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const label    = result.isEnd ? 'Prorated Final Month' : 'Prorated First Month';
+    const dayLabel = result.isEnd ? `${result.remainDays} days used` : `${result.remainDays} days remaining`;
+    const formula  = `${cur(result.fullRent)} ÷ ${result.daysInMo} days × ${result.remainDays} days`;
+
+    if (labelEl)   labelEl.textContent   = label;
+    if (formulaEl) formulaEl.innerHTML   =
+      `<span style="color:var(--muted);">${dayLabel} of ${result.daysInMo}-day month</span><br>` +
+      `<span style="font-family:monospace;font-size:0.8125rem;color:var(--navy);letter-spacing:-0.01em;">${formula}</span>`;
+    if (resultEl)  resultEl.textContent  = `= ${cur(result.amount)}`;
+
+    hintEl.style.display = '';
+
+    // Store result on element for _applyProratedAmount to read
+    hintEl._proratedAmount = result.amount;
+
+    // Show recalc link if editing (amount already has a value that differs)
+    _updateRecalcLink();
   }
 
   function _clearProrateHint() {
     const hintEl = document.getElementById('income-prorate-hint');
-    if (hintEl) { hintEl.style.display = 'none'; hintEl.textContent = ''; }
+    if (hintEl) hintEl.style.display = 'none';
+    const recalcEl = document.getElementById('income-recalc-link');
+    if (recalcEl) recalcEl.style.display = 'none';
+  }
+
+  // Apply the suggested prorated amount to the amount field
+  window._applyProratedAmount = function() {
+    const hintEl = document.getElementById('income-prorate-hint');
+    const amtEl  = document.getElementById('income-amount');
+    if (!hintEl || !amtEl || !hintEl._proratedAmount) return;
+    amtEl.value        = hintEl._proratedAmount.toFixed(2);
+    amtEl._userEdited  = true;
+    _updateRecalcLink();
+  };
+
+  // Show/hide the ↻ Recalculate link based on whether amount differs from suggestion
+  function _updateRecalcLink() {
+    const hintEl   = document.getElementById('income-prorate-hint');
+    const amtEl    = document.getElementById('income-amount');
+    const recalcEl = document.getElementById('income-recalc-link');
+    if (!recalcEl) return;
+    // Show recalc link only when: prorate card is visible AND amount has been user-edited
+    const prorateVisible = hintEl && hintEl.style.display !== 'none' && hintEl._proratedAmount;
+    const hasAmount      = amtEl && parseFloat(amtEl.value) > 0;
+    const differs        = prorateVisible && hasAmount && Math.abs(parseFloat(amtEl.value) - hintEl._proratedAmount) > 0.01;
+    recalcEl.style.display = (prorateVisible && (amtEl?._userEdited || differs)) ? '' : 'none';
   }
 
   /* ── DUPLICATE TRANSACTION ───────────────────────────────────── */
@@ -5961,6 +6024,18 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       if (saveBtn) saveBtn.textContent  = isEdit ? 'Save Changes' : 'Save Expense';
     }
     openModal(modalId);
+
+    // For income modal: after open, show prorate card if editing an existing record
+    // This surfaces the recalculate option without auto-overwriting the stored amount
+    if (modalId === 'modal-rent') {
+      setTimeout(() => {
+        const catSel = document.getElementById('income-category-select');
+        if (catSel?.value === 'Rent received') {
+          // onIncomeLeasePicked with force=false — shows card, doesn't overwrite amount
+          onIncomeLeasePicked(false);
+        }
+      }, 60);
+    }
 
     // Payment method + receipt + AI chip state for expense modal
     if (modalId === 'modal-expense') {
