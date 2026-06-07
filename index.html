@@ -2,7 +2,7 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.0.11                                             ║
+  ║  Version: 4.0.12                                             ║
   ║  Date: 2026-06-06                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
@@ -4359,6 +4359,14 @@
     if (inp) inp.value = '';
     renderPaymentMethods(); // synchronous — safe: Add button is outside the list DOM
     showToast('✅ Added: ' + name);
+  }
+
+  function populatePaymentMethodSelect(currentValue) {
+    const sel = document.getElementById('expense-payment-method');
+    if (!sel) return;
+    const methods = getPaymentMethods();
+    sel.innerHTML = '<option value="">— Select —</option>' +
+      methods.map(m => `<option value="${m.name}" ${m.name === currentValue ? 'selected' : ''}>${m.name}</option>`).join('');
   }
 
 
