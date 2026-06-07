@@ -2,7 +2,7 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.1.0                                             ║
+  ║  Version: 4.1.1                                             ║
   ║  Date: 2026-06-06                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
@@ -110,7 +110,7 @@
       align-items: center;
       gap: 8px;
       text-decoration: none;
-      flex: 1;
+      flex-shrink: 0;
     }
 
     .header-title {
@@ -119,6 +119,7 @@
       color: #fff;
       letter-spacing: 0.01em;
       line-height: 1;
+      white-space: nowrap;
     }
 
     .logo-heart-o {
@@ -1373,7 +1374,7 @@
       </svg>
       <div class="header-title" id="header-app-name">H<span class="logo-heart-o">o</span>memade Lane</div>
     </div>
-    <span id="hml-build-ref" style="flex:1;text-align:center;font-size:0.6rem;color:rgba(255,255,255,0.28);letter-spacing:0.04em;pointer-events:none;user-select:none;">v1.0.0 · 2026-06-06</span>
+    <span id="hml-build-ref" style="flex:1;text-align:right;font-size:0.6rem;color:rgba(255,255,255,0.28);letter-spacing:0.04em;pointer-events:none;user-select:none;padding-right:8px;">v4.1.0</span>
     <div class="header-actions">
       <button class="icon-btn" title="Notifications" onclick="showAlerts()">🔔</button>
       <button class="icon-btn" title="Settings" onclick="drawerNavigate('settings')">⚙️</button>
@@ -12280,7 +12281,9 @@ window.renderLeaseBuilder = function() {
 
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 var DK_KEY        = 'hml_devlog';        // localStorage key — isolated from app data
-var DK_APP_VER    = 'Homemade Lane v1.0';
+var DK_APP_VER    = 'Homemade Lane v4.1.0';
+// Single source of truth — badge reads this at init; update only DK_APP_VER for future releases
+(function(){ var b=document.getElementById('hml-build-ref'); if(b) b.textContent='v'+DK_APP_VER.replace('Homemade Lane v',''); })();
 var DK_MAX_RECENT = 3;                   // entries shown in Log tab preview
 
 /* ── STATE ──────────────────────────────────────────────────────── */
