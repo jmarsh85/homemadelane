@@ -2,7 +2,7 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.0.10                                             ║
+  ║  Version: 4.0.11                                             ║
   ║  Date: 2026-06-06                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
@@ -4324,9 +4324,12 @@
   const DEFAULT_PAYMENT_METHODS = ['Cash','Check','Zelle','ACH / Wire','Credit Card','Debit Card','Venmo','Other'];
 
   function getPaymentMethods() {
-    const stored = (DB.paymentMethods || []).filter(m => !m.deletedAt);
-    if (!stored.length) return DEFAULT_PAYMENT_METHODS.map((name,i) => ({id:'pm_default_'+i, name, isDefault:true}));
-    return stored;
+    const custom   = (DB.paymentMethods || []).filter(m => !m.deletedAt);
+    const defaults = DEFAULT_PAYMENT_METHODS.map((name, i) => ({id: 'pm_default_'+i, name, isDefault: true}));
+    // Always show defaults + any custom entries that aren't duplicates of a default
+    const defaultNames = new Set(DEFAULT_PAYMENT_METHODS.map(n => n.toLowerCase()));
+    const uniqueCustom = custom.filter(m => !defaultNames.has(m.name.toLowerCase()));
+    return [...defaults, ...uniqueCustom];
   }
 
   function renderPaymentMethods() {
@@ -4334,33 +4337,30 @@
     if (!list) return;
     const methods = getPaymentMethods();
     if (!methods.length) { list.innerHTML = '<div style="padding:14px;color:var(--muted);font-size:0.875rem;">No methods yet.</div>'; return; }
-    list.innerHTML = methods.map((m,i) => `
+    list.innerHTML = methods.map((m, i) => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;${i<methods.length-1?'border-bottom:1px solid var(--border);':''}">
         <span style="font-size:0.9rem;">${m.name}</span>
-        ${m.isDefault ? '<span style="font-size:0.7rem;color:var(--muted);">default</span>'
+        ${m.isDefault
+          ? '<span style="font-size:0.7rem;color:var(--muted);">default</span>'
           : `<button onclick="deletePaymentMethod('${m.id}')" style="background:none;border:none;color:var(--red);font-size:1rem;cursor:pointer;padding:2px 6px;">×</button>`}
       </div>`).join('');
   }
 
-  function populatePaymentMethodSelect(currentValue) {
-    const sel = document.getElementById('expense-payment-method');
-    if (!sel) return;
-    const methods = getPaymentMethods();
-    sel.innerHTML = '<option value="">— Select —</option>' +
-      methods.map(m => `<option value="${m.name}" ${m.name===currentValue?'selected':''}>${m.name}</option>`).join('');
-  }
-
   function addPaymentMethod() {
-    const inp = document.getElementById('new-payment-method-input');
+    const inp  = document.getElementById('new-payment-method-input');
     const name = inp?.value?.trim();
     if (!name) { showToast('⚠️ Enter a method name'); return; }
+    const existing  = (DB.paymentMethods || []).filter(m => !m.deletedAt).map(m => m.name.toLowerCase());
+    const isDefault = DEFAULT_PAYMENT_METHODS.map(n => n.toLowerCase()).includes(name.toLowerCase());
+    if (isDefault || existing.includes(name.toLowerCase())) { showToast('⚠️ Already exists'); return; }
     if (!DB.paymentMethods) DB.paymentMethods = [];
     DB.paymentMethods.push({id: genId(), name, createdAt: now()});
     saveDB();
-    inp.value = '';
-    renderPaymentMethods();
-    showToast('✅ Payment method added');
+    if (inp) inp.value = '';
+    renderPaymentMethods(); // synchronous — safe: Add button is outside the list DOM
+    showToast('✅ Added: ' + name);
   }
+
 
   function deletePaymentMethod(id) {
     if (!DB.paymentMethods) return;
@@ -5130,12 +5130,14 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     const input = document.getElementById('new-category-input');
     const type  = document.getElementById('new-category-type')?.value || 'e';
     const name  = (input?.value || '').trim();
-    if (!name) return;
+    if (!name) { showToast('⚠️ Enter a category name'); return; }
     const cats = getCategories(type);
+    if (cats.includes(name)) { showToast('⚠️ Already exists'); return; }
     cats.push(name);
     saveCategories(type, cats);
-    renderCategories();
     if (input) input.value = '';
+    showToast('✅ Category added');
+    setTimeout(() => renderCategories(), 50);
   }
 
   function deleteCategory(type, idx) {
@@ -13467,13 +13469,14 @@ window.dkmTagDismiss = function(silent) {
 
 <!-- Expense Categories Modal — body-level for reliable iOS fixed positioning -->
 <div class="modal-overlay" id="modal-categories" onclick="overlayClose(event,'modal-categories')">
-  <div class="modal-sheet">
+  <div class="modal-sheet" style="display:flex;flex-direction:column;max-height:88vh;">
     <div class="modal-handle"></div>
-    <div class="modal-header">
+    <div class="modal-header" style="flex-shrink:0;">
       <div class="modal-title">Expense Categories</div>
       <button class="modal-close" onclick="closeModal('modal-categories')">✕</button>
     </div>
-    <div class="modal-body">
+    <!-- Scrollable content -->
+    <div class="modal-body" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:0;">
       <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:10px;">Schedule E — Rental</div>
       <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">
         <div id="schedule-e-categories"></div>
@@ -13484,40 +13487,48 @@ window.dkmTagDismiss = function(silent) {
       </div>
       <div class="field">
         <label>Add Custom Category</label>
-        <div style="display:flex;gap:8px;">
-          <input type="text" id="new-category-input" placeholder="Category name" style="flex:1;" />
-          <select id="new-category-type" style="font-family:var(--font-body);font-size:0.875rem;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px;background:var(--surface);color:var(--text);">
+        <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+          <input type="text" id="new-category-input" placeholder="Category name"
+            style="flex:1;min-width:0;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+          <select id="new-category-type"
+            style="width:72px;flex-shrink:0;font-family:var(--font-body);font-size:0.8rem;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 4px;background:var(--surface);color:var(--text);text-align:center;">
             <option value="e">Sch. E</option>
             <option value="c">Sch. C</option>
           </select>
-          <button class="btn btn-amber btn-sm" ontouchstart="" onclick="addCustomCategory()">Add</button>
         </div>
+        <button class="btn btn-amber btn-full" ontouchstart="event.stopPropagation()" onclick="addCustomCategory()">+ Add Category</button>
       </div>
+    </div>
+    <!-- Sticky footer — always visible regardless of list height -->
+    <div style="flex-shrink:0;padding:12px 20px 20px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;">
       <button class="btn btn-primary btn-full" ontouchstart="" onclick="closeModal('modal-categories')">Done</button>
-      <button class="btn btn-outline btn-full" style="margin-top:8px;" ontouchstart="" onclick="closeModal('modal-categories')">Cancel</button>
+      <button class="btn btn-outline btn-full" ontouchstart="" onclick="closeModal('modal-categories')">Cancel</button>
     </div>
   </div>
 </div>
 
 <!-- Payment Methods Modal — body-level for reliable iOS fixed positioning -->
 <div class="modal-overlay" id="modal-payment-methods" onclick="overlayClose(event,'modal-payment-methods')">
-  <div class="modal-sheet">
+  <div class="modal-sheet" style="display:flex;flex-direction:column;max-height:88vh;">
     <div class="modal-handle"></div>
-    <div class="modal-header">
+    <div class="modal-header" style="flex-shrink:0;">
       <div class="modal-title">Payment Methods</div>
       <button class="modal-close" onclick="closeModal('modal-payment-methods')">&#10005;</button>
     </div>
-    <div class="modal-body">
+    <!-- Scrollable content -->
+    <div class="modal-body" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:0;">
       <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">
         <div id="payment-methods-list"></div>
       </div>
       <div class="field">
         <label>Add Method</label>
-        <div style="display:flex;gap:8px;">
-          <input type="text" id="new-payment-method-input" placeholder="e.g. Venmo, Wire Transfer" style="flex:1;" />
-          <button class="btn btn-amber btn-sm" ontouchstart="" onclick="addPaymentMethod()">Add</button>
-        </div>
+        <input type="text" id="new-payment-method-input" placeholder="e.g. Venmo, Wire Transfer"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);margin-bottom:8px;box-sizing:border-box;" />
+        <button class="btn btn-amber btn-full" ontouchstart="event.stopPropagation()" onclick="addPaymentMethod()">+ Add Method</button>
       </div>
+    </div>
+    <!-- Sticky footer — always visible regardless of list height -->
+    <div style="flex-shrink:0;padding:12px 20px 20px;border-top:1px solid var(--border);">
       <button class="btn btn-primary btn-full" ontouchstart="" onclick="closeModal('modal-payment-methods')">Done</button>
     </div>
   </div>
