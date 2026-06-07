@@ -1631,7 +1631,7 @@
           <button class="inner-tab" onclick="switchFinTab('transactions')">Transactions</button>
           <button class="inner-tab" onclick="switchFinTab('reports')">Reports</button>
         </div>
-        <select id="fin-year" style="font-family:var(--font-body); font-size:0.875rem; font-weight:600; border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:6px 10px; background:var(--card); color:var(--text); flex-shrink:0;">
+        <select id="fin-year" onchange="renderFinancesOverview();renderTransactionTable();renderReports();" style="font-family:var(--font-body); font-size:0.875rem; font-weight:600; border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:6px 10px; background:var(--card); color:var(--text); flex-shrink:0;">
           <option>2026</option><option>2025</option>
         </select>
       </div>
@@ -1674,7 +1674,13 @@
       <!-- ── TRANSACTIONS TAB ───────────────────────────────── -->
       <div class="fin-tab-panel" id="ftab-transactions">
 
-        <!-- Toolbar: filters + add button -->
+        <!-- Add income/expense buttons — own row above filters -->
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <button class="btn btn-sm" style="flex:1;background:var(--green);color:#fff;font-weight:700;border:none;" onclick="openTransactionForm('modal-rent')">+ Income</button>
+          <button class="btn btn-amber btn-sm" style="flex:1;font-weight:700;" onclick="openTransactionForm('modal-expense')">+ Expense</button>
+        </div>
+
+        <!-- Toolbar: type filter chips -->
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
           <div style="display:flex; gap:6px; overflow-x:auto; flex:1; padding-bottom:2px;">
             <button class="filter-chip active" onclick="setFilter(this,'all')">All</button>
@@ -1683,10 +1689,6 @@
             <button class="filter-chip" onclick="setFilter(this,'rental')">Rental</button>
             <button class="filter-chip" onclick="setFilter(this,'resale')">Resale</button>
             <button class="filter-chip" onclick="setFilter(this,'bills')">🔁 Bills</button>
-          </div>
-          <div style="display:flex;gap:6px;flex-shrink:0;">
-            <button class="btn btn-sm" style="background:var(--green);color:#fff;font-weight:700;border:none;" onclick="openTransactionForm('modal-rent')">+ Income</button>
-            <button class="btn btn-amber btn-sm" style="flex-shrink:0;" onclick="openTransactionForm('modal-expense')">+ Expense</button>
           </div>
         </div>
 
@@ -2270,6 +2272,23 @@
           </div>
         </div>
 
+        <div class="field-row">
+          <div class="field">
+            <label>Payment Method</label>
+            <select id="income-payment-method">
+              <option value="">— Optional —</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Received By</label>
+            <select id="income-received-by">
+              <option value="">— Optional —</option>
+              <option value="James">James</option>
+              <option value="Karissa">Karissa</option>
+            </select>
+          </div>
+        </div>
+
         <div class="field">
           <label>Notes <span style="font-size:0.7rem;font-weight:400;color:var(--muted);">optional</span></label>
           <input data-field="description" type="text" placeholder="e.g. April payment, late fee included" />
@@ -2469,8 +2488,27 @@
           <div class="field"><label>Date</label><input data-field="date" type="date" /></div>
         </div>
         <div class="field">
-          <label>Photo (optional)</label>
-          <div class="receipt-area">
+          <label>Photo <span style="font-size:0.7rem;font-weight:400;color:var(--muted);">optional</span></label>
+          <input type="file" accept="image/*" id="acquire-photo-input" style="display:none;"
+            onchange="(function(inp){
+              if(!inp.files||!inp.files[0])return;
+              const r=new FileReader();
+              r.onload=function(e){
+                const prev=document.getElementById('acquire-photo-preview');
+                const area=document.getElementById('acquire-photo-area');
+                if(prev){prev.src=e.target.result;prev.style.display='block';}
+                if(area){area.style.borderStyle='solid';area.style.borderColor='var(--navy)';}
+                const icon=area&&area.querySelector('.receipt-icon');
+                const lbl=area&&area.querySelector('.receipt-label');
+                const sub=area&&area.querySelector('.receipt-sub');
+                if(icon)icon.style.display='none';
+                if(lbl)lbl.textContent='Photo added ✓';
+                if(sub)sub.textContent=inp.files[0].name;
+              };
+              r.readAsDataURL(inp.files[0]);
+            })(this)" />
+          <div class="receipt-area" id="acquire-photo-area" onclick="document.getElementById('acquire-photo-input').click()" style="cursor:pointer;position:relative;">
+            <img id="acquire-photo-preview" src="" alt="" style="display:none;max-height:120px;border-radius:6px;object-fit:contain;margin-bottom:6px;" />
             <div class="receipt-icon">📷</div>
             <div class="receipt-label">Add Item Photo</div>
             <div class="receipt-sub">Helps when listing later</div>
@@ -2578,10 +2616,18 @@
           </select>
         </div>
         <div class="field">
-          <label>Attach Extension Addendum (optional)</label>
-          <div class="receipt-area">
+          <label>Attach Extension Addendum <span style="font-size:0.7rem;font-weight:400;color:var(--muted);">optional</span></label>
+          <input type="file" id="extend-addendum-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display:none;"
+            onchange="(function(inp){
+              if(!inp.files||!inp.files[0])return;
+              const lbl=document.getElementById('extend-addendum-label');
+              if(lbl)lbl.textContent=inp.files[0].name;
+              const area=inp.nextElementSibling;
+              if(area){area.style.borderColor='var(--navy)';area.style.borderStyle='solid';}
+            })(this)" />
+          <div class="receipt-area" onclick="document.getElementById('extend-addendum-input').click()" style="cursor:pointer;">
             <div class="receipt-icon">📄</div>
-            <div class="receipt-label">Upload Addendum</div>
+            <div class="receipt-label" id="extend-addendum-label">Upload Addendum</div>
             <div class="receipt-sub">PDF recommended</div>
           </div>
         </div>
@@ -3671,7 +3717,10 @@
   const TXN_INIT  = 8;   // rows shown on first render
 
   function getTxnData() {
-    return activeRecords('transactions');
+    const year = document.getElementById('fin-year')?.value || '';
+    const all  = activeRecords('transactions');
+    if (!year) return all;
+    return all.filter(t => (t.taxYear === year) || (t.date || '').startsWith(year));
   }
 
   function getFilteredTxns() {
@@ -3732,14 +3781,14 @@
     const MSHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const fmtDate  = d => { if(!d)return'—'; const[y,m,day]=d.split('-'); return `${MSHORT[+m-1]} ${+day}`; };
     const fmtMonth = k => { if(k==='?')return'Unknown'; const[y,m]=k.split('-'); return `${MONTHS[+m-1]} ${y}`; };
-    const fmtAmt   = t => { const sign=t.type==='income'?'+':'-'; return `${sign}$${Math.abs(t.amount||0).toLocaleString()}`; };
+    const fmtAmt   = t => { const sign=t.type==='income'?'+':'-'; return `${sign}$${Math.abs(t.amount||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`; };
     const esc      = s => (s||'').replace(/'/g,"\\'").replace(/</g,'&lt;');
 
     let html = '';
     Object.entries(groups).forEach(([month, txns]) => {
       const net = txns.reduce((s,t)=>s+(t.type==='income'?(t.amount||0):-(Math.abs(t.amount||0))),0);
       const nc  = net>=0?'var(--green)':'var(--red)';
-      const ns  = `${net>=0?'+':''}$${Math.abs(net).toLocaleString()}`;
+      const ns  = `${net>=0?'+':''}$${Math.abs(net).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
       html += `<div style="display:grid;grid-template-columns:28px 68px 1fr 68px 78px 36px;background:var(--surface);border-bottom:1px solid var(--border);">
         <div style="grid-column:1/-1;padding:6px 10px;font-size:0.6875rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;">
           <span>${fmtMonth(month)}</span><span style="color:${nc};font-weight:700;">${ns} net</span>
@@ -3766,11 +3815,14 @@
           <div class="txn-detail-drawer${open?' open':''}" id="txn-detail-${t.id}">
             <div class="txn-detail-grid">
               <div class="txn-detail-cell"><div class="txn-detail-label">Date</div><div class="txn-detail-val">${t.date||'—'}</div></div>
-              <div class="txn-detail-cell"><div class="txn-detail-label">Type</div><div class="txn-detail-val" style="text-transform:capitalize;">${t.type||'—'}</div></div>
+              <div class="txn-detail-cell"><div class="txn-detail-label">Amount</div><div class="txn-detail-val" style="color:${t.type==='income'?'var(--green)':'var(--red)'};">${fmtAmt(t)}</div></div>
               <div class="txn-detail-cell"><div class="txn-detail-label">Category</div><div class="txn-detail-val">${t.category||'—'}</div></div>
               <div class="txn-detail-cell"><div class="txn-detail-label">Source</div><div class="txn-detail-val">${t.property||'—'}</div></div>
               <div class="txn-detail-cell" style="grid-column:1/-1;"><div class="txn-detail-label">Description</div><div class="txn-detail-val">${esc(t.description)||'—'}</div></div>
-              ${t.vendor?`<div class="txn-detail-cell" style="grid-column:1/-1;"><div class="txn-detail-label">Vendor</div><div class="txn-detail-val">${esc(t.vendor)}</div></div>`:''}
+              ${t.vendor?`<div class="txn-detail-cell" style="grid-column:1/-1;"><div class="txn-detail-label">Vendor / Payee</div><div class="txn-detail-val">${esc(t.vendor)}</div></div>`:''}
+              ${t.paymentMethod?`<div class="txn-detail-cell"><div class="txn-detail-label">Payment Method</div><div class="txn-detail-val">${esc(t.paymentMethod)}</div></div>`:''}
+              ${t.receivedBy?`<div class="txn-detail-cell"><div class="txn-detail-label">Received By</div><div class="txn-detail-val">${esc(t.receivedBy)}</div></div>`:''}
+              ${t.notes?`<div class="txn-detail-cell"${(!t.paymentMethod&&!t.receivedBy)?' style="grid-column:1/-1;"':''}><div class="txn-detail-label">Notes</div><div class="txn-detail-val">${esc(t.notes)}</div></div>`:''}
             </div>
             <div style="display:flex;gap:8px;">
               <button class="btn btn-outline btn-sm btn-full" onclick="editTxn('${t.id}')">✏️ Edit</button>
@@ -4093,19 +4145,21 @@
     if (!amount) { alert('Amount is required.'); return; }
 
     const record = {
-      id:          EDIT.transaction?.id || genId(),
-      type:        'income',
-      propertyId:  propRec?.id   || EDIT.transaction?.propertyId || '',
-      property:    propRec?.name || propVal || EDIT.transaction?.property || '',
+      id:            EDIT.transaction?.id || genId(),
+      type:          'income',
+      propertyId:    propRec?.id   || EDIT.transaction?.propertyId || '',
+      property:      propRec?.name || propVal || EDIT.transaction?.property || '',
       amount,
-      date:        fGet('modal-rent', 'date') || new Date().toISOString().split('T')[0],
+      date:          fGet('modal-rent', 'date') || new Date().toISOString().split('T')[0],
       category,
-      description: notes,
-      vendor:      '',
-      taxYear:     new Date(fGet('modal-rent', 'date') || Date.now()).getFullYear().toString(),
-      leaseRef:    tenantVal && tenantVal !== '__new' ? tenantVal : (EDIT.transaction?.leaseRef || ''),
-      createdAt:   EDIT.transaction?.createdAt || now(),
-      updatedAt:   now(),
+      description:   notes,
+      vendor:        '',
+      paymentMethod: document.getElementById('income-payment-method')?.value || '',
+      receivedBy:    document.getElementById('income-received-by')?.value || '',
+      taxYear:       new Date(fGet('modal-rent', 'date') || Date.now()).getFullYear().toString(),
+      leaseRef:      tenantVal && tenantVal !== '__new' ? tenantVal : (EDIT.transaction?.leaseRef || ''),
+      createdAt:     EDIT.transaction?.createdAt || now(),
+      updatedAt:     now(),
     };
 
     upsert('transactions', record);
@@ -4368,6 +4422,14 @@
     if (!sel) return;
     const methods = getPaymentMethods();
     sel.innerHTML = '<option value="">— Select —</option>' +
+      methods.map(m => `<option value="${m.name}" ${m.name === currentValue ? 'selected' : ''}>${m.name}</option>`).join('');
+  }
+
+  function populatePaymentMethodSelect_income(currentValue) {
+    const sel = document.getElementById('income-payment-method');
+    if (!sel) return;
+    const methods = getPaymentMethods();
+    sel.innerHTML = '<option value="">— Optional —</option>' +
       methods.map(m => `<option value="${m.name}" ${m.name === currentValue ? 'selected' : ''}>${m.name}</option>`).join('');
   }
 
@@ -5891,11 +5953,22 @@ Respond ONLY in this JSON format, no markdown, no preamble:
         const fmt = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}) : '?';
         const fmtShort = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '?';
 
-        // Deduplicate by id (defensive), then split into active and prior
-        const seen = new Set();
-        const unique = allLeases.filter(l => { if (seen.has(l.id)) return false; seen.add(l.id); return true; });
-        const active = unique.filter(l => l.status === 'active' || l.status === 'extended');
-        const prior  = unique.filter(l => l.status !== 'active' && l.status !== 'extended');
+        // Deduplicate by id, then by full name within each status group
+        // (prevents duplicate when a prospect record and active record coexist for same tenant)
+        const seenId = new Set();
+        const unique = allLeases.filter(l => { if (seenId.has(l.id)) return false; seenId.add(l.id); return true; });
+        const activeRaw = unique.filter(l => l.status === 'active' || l.status === 'extended');
+        const prior     = unique.filter(l => l.status !== 'active' && l.status !== 'extended');
+        // Within active group, keep only one record per full name (prefer most recently updated)
+        const seenName = new Set();
+        const active = activeRaw
+          .sort((a,b) => (b.updatedAt||'').localeCompare(a.updatedAt||''))
+          .filter(l => {
+            const name = `${l.firstName||''} ${l.lastName||''}`.trim().toLowerCase();
+            if (seenName.has(name)) return false;
+            seenName.add(name);
+            return true;
+          });
 
         const makeOption = (l, selected) => {
           const name  = `${l.firstName||''} ${l.lastName||''}`.trim() || l.id;
@@ -5924,6 +5997,16 @@ Respond ONLY in this JSON format, no markdown, no preamble:
 
       // Show/hide lease field based on category
       toggleIncomeLeaseField();
+
+      // Populate payment method select
+      const incPaySel = document.getElementById('income-payment-method');
+      if (incPaySel) {
+        populatePaymentMethodSelect_income(record?.paymentMethod || '');
+      }
+      // Restore received-by
+      const recvSel = document.getElementById('income-received-by');
+      if (recvSel && record?.receivedBy) recvSel.value = record.receivedBy;
+      else if (recvSel) recvSel.value = '';
     }
 
     // Populate sale item select for modal-sale
@@ -6906,11 +6989,39 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     fSet(m, 'cost',      r.acquisitionCost || '');
     fSet(m, 'date',      r.acquisitionDate || '');
     fSet(m, 'notes',     r.notes || '');
+    // Reset photo UI
+    const photoInp  = document.getElementById('acquire-photo-input');
+    const photoPrev = document.getElementById('acquire-photo-preview');
+    const photoArea = document.getElementById('acquire-photo-area');
+    if (photoInp)  photoInp.value = '';
+    if (photoPrev) { photoPrev.src = ''; photoPrev.style.display = 'none'; }
+    if (photoArea) {
+      const icon = photoArea.querySelector('.receipt-icon');
+      const lbl  = photoArea.querySelector('.receipt-label');
+      const sub  = photoArea.querySelector('.receipt-sub');
+      photoArea.style.borderStyle = 'dashed';
+      photoArea.style.borderColor = '';
+      if (icon) icon.style.display = '';
+      if (r.photoData) {
+        photoPrev.src = r.photoData;
+        photoPrev.style.display = 'block';
+        if (icon) icon.style.display = 'none';
+        if (lbl)  lbl.textContent = 'Photo added ✓';
+        if (sub)  sub.textContent = 'Tap to replace';
+      } else {
+        if (lbl) lbl.textContent = 'Add Item Photo';
+        if (sub) sub.textContent = 'Helps when listing later';
+      }
+    }
     openModal(m);
   }
 
   function saveItem() {
     const m = 'modal-acquire';
+    // Capture photo data URL if a new photo was selected
+    const photoInp  = document.getElementById('acquire-photo-input');
+    const photoPrev = document.getElementById('acquire-photo-preview');
+    const newPhoto  = photoPrev?.src && photoPrev.src !== window.location.href ? photoPrev.src : null;
     const record = {
       id:              EDIT.item?.id || genId(),
       name:            fGet(m, 'itemName'),
@@ -6919,6 +7030,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       acquisitionCost: parseFloat(fGet(m, 'cost')) || 0,
       acquisitionDate: fGet(m, 'date'),
       notes:           fGet(m, 'notes'),
+      photoData:       newPhoto || EDIT.item?.photoData || null,
       status:          EDIT.item?.status || 'acquired',
       createdAt:       EDIT.item?.createdAt || now(),
     };
@@ -7249,10 +7361,13 @@ Respond ONLY in this JSON format, no markdown, no preamble:
   /* ── FINANCES OVERVIEW + REPORTS RENDER ────────────────────── */
   function renderFinancesOverview() {
     const year  = document.getElementById('fin-year')?.value || new Date().getFullYear().toString();
-    const txns  = activeRecords('transactions').filter(t => (t.taxYear===year)||(t.date||'').startsWith(year));
+    const primaryIds = new Set(activeRecords('properties').filter(p=>p.isPrimaryResidence).map(p=>p.id));
+    const txns  = activeRecords('transactions').filter(t =>
+      !primaryIds.has(t.propertyId) &&
+      ((t.taxYear===year)||(t.date||'').startsWith(year))
+    );
     const sales = activeRecords('sales').filter(s => (s.taxYear===year)||(s.saleDate||'').startsWith(year));
-    const props = activeRecords('properties');
-
+    const props = activeRecords('properties').filter(p => !p.isPrimaryResidence);
     const rentalInc = txns.filter(t=>t.type==='income').reduce((s,t)=>s+(t.amount||0),0);
     const rentalExp = txns.filter(t=>t.type==='expense').reduce((s,t)=>s+Math.abs(t.amount||0),0);
     const resaleRev = sales.reduce((s,r)=>s+(r.salePrice||0),0);
@@ -7373,7 +7488,12 @@ Respond ONLY in this JSON format, no markdown, no preamble:
 
   function renderReports() {
     const year = document.getElementById('fin-year')?.value || new Date().getFullYear().toString();
-    const txns = activeRecords('transactions').filter(t=>(t.taxYear===year)||(t.date||'').startsWith(year));
+    // Exclude transactions belonging to primary residence properties
+    const primaryIds = new Set(activeRecords('properties').filter(p=>p.isPrimaryResidence).map(p=>p.id));
+    const txns = activeRecords('transactions').filter(t=>
+      !primaryIds.has(t.propertyId) &&
+      ((t.taxYear===year)||(t.date||'').startsWith(year))
+    );
     const sales = activeRecords('sales').filter(s=>(s.taxYear===year)||(s.saleDate||'').startsWith(year));
     const rentalInc = txns.filter(t=>t.type==='income').reduce((s,t)=>s+(t.amount||0),0);
     const rentalExp = txns.filter(t=>t.type==='expense').reduce((s,t)=>s+Math.abs(t.amount||0),0);
