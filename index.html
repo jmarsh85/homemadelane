@@ -2,7 +2,7 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.1.3                                             ║
+  ║  Version: 4.1.1                                             ║
   ║  Date: 2026-06-11                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
@@ -11343,6 +11343,7 @@ window.lbExportPdf = function() {
   var cleanLabel  = tokens['{{CLEANING_FEE_LABEL}}'] || 'Cleaning Fee';
   var petLabel    = tokens['{{PET_FEE_LABEL}}']      || 'Pet Fee';
   var fname       = 'lease-' + tenantFull.replace(/\s+/g,'-').toLowerCase() + '-' + effDate + '.pdf';
+  var sigDataUrl  = localStorage.getItem('hml_signature') || '';  // read early — used in sig line below
 
   /* ── 2. Build logical lines array (same as lbExportTxt) ── */
   var lines = [
@@ -11448,9 +11449,7 @@ window.lbExportPdf = function() {
   }
 
   // ── SIGNATURE EMBED (JPEG → DCT) ────────────────────────────────────
-  // canvas.toDataURL('image/jpeg') gives base64 JPEG — raw bytes ARE the DCT stream.
-  // No decompression or re-encoding needed. /Filter /DCTDecode reads JPEG directly.
-  var sigDataUrl = localStorage.getItem('hml_signature') || '';
+  // sigDataUrl, sigPdfW, sigPdfH declared at top of function (used in lines[] above)
   var sigPdfW    = 160;  // target width in PDF points
   var sigPdfH    = 48;   // target height in PDF points
   var SIG_OBJ_ID = null; // will be set to PDF object number if embed succeeds
