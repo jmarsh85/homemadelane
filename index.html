@@ -2,7 +2,7 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.1.2                                             ║
+  ║  Version: 4.1.1                                             ║
   ║  Date: 2026-06-11                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
@@ -8773,10 +8773,12 @@ Respond ONLY in this JSON format, no markdown, no preamble:
 
 
   /* ── SIGNATURE CANVAS ─────────────────────────────────────── */
+  /* ── SIGNATURE CANVAS ───────────────────────────────────────────── */
   var _sigHasContent = false;
   var _sigDrawing    = false;
 
-  function openSignatureModal() {
+  // All sig functions on window.* so modal onclick attrs can reach them
+  window.openSignatureModal = function() {
     openModal('modal-signature');
     requestAnimationFrame(function() {
       var wrap   = document.getElementById('sig-canvas-wrap');
@@ -8787,27 +8789,35 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       canvas.width  = w;
       canvas.height = h;
       canvas.style.height = h + 'px';
-      sigClear();
+      window.sigClear();
+      // Wire events here — canvas exists only after modal opens
+      canvas.addEventListener('mousedown',  window._sigStart);
+      canvas.addEventListener('mousemove',  window._sigMove);
+      canvas.addEventListener('mouseup',    window._sigEnd);
+      canvas.addEventListener('mouseleave', window._sigEnd);
+      canvas.addEventListener('touchstart', window._sigStart, { passive: false });
+      canvas.addEventListener('touchmove',  window._sigMove,  { passive: false });
+      canvas.addEventListener('touchend',   window._sigEnd,   { passive: false });
     });
-  }
+  };
 
-  function sigGetCtx() {
+  function _sigCtx() {
     var c = document.getElementById('sig-canvas');
     return c ? c.getContext('2d') : null;
   }
 
-  function sigClear() {
+  window.sigClear = function() {
     var canvas = document.getElementById('sig-canvas');
-    var ctx    = sigGetCtx();
+    var ctx    = _sigCtx();
     if (!ctx || !canvas) return;
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     _sigHasContent = false;
     var hint = document.getElementById('sig-canvas-hint');
     if (hint) hint.style.opacity = '0.5';
-  }
+  };
 
-  function sigGetPos(e, canvas) {
+  function _sigPos(e, canvas) {
     var rect   = canvas.getBoundingClientRect();
     var scaleX = canvas.width  / rect.width;
     var scaleY = canvas.height / rect.height;
@@ -8818,13 +8828,13 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     };
   }
 
-  function sigStartDraw(e) {
+  window._sigStart = function(e) {
     e.preventDefault();
     var canvas = document.getElementById('sig-canvas');
-    var ctx    = sigGetCtx();
+    var ctx    = _sigCtx();
     if (!ctx || !canvas) return;
     _sigDrawing = true;
-    var pos = sigGetPos(e, canvas);
+    var pos = _sigPos(e, canvas);
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
     ctx.strokeStyle = '#1A1A2E';
@@ -8834,42 +8844,41 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     var hint = document.getElementById('sig-canvas-hint');
     if (hint) hint.style.opacity = '0';
     _sigHasContent = true;
-  }
+  };
 
-  function sigDraw(e) {
+  window._sigMove = function(e) {
     if (!_sigDrawing) return;
     e.preventDefault();
     var canvas = document.getElementById('sig-canvas');
-    var ctx    = sigGetCtx();
+    var ctx    = _sigCtx();
     if (!ctx || !canvas) return;
-    var pos = sigGetPos(e, canvas);
+    var pos = _sigPos(e, canvas);
     ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
-  }
+  };
 
-  function sigEndDraw() {
+  window._sigEnd = function() {
     _sigDrawing = false;
-    var ctx = sigGetCtx();
+    var ctx = _sigCtx();
     if (ctx) ctx.beginPath();
-  }
+  };
 
-  function sigSave() {
+  window.sigSave = function() {
     if (!_sigHasContent) { showToast('Draw your signature first'); return; }
     var canvas = document.getElementById('sig-canvas');
     if (!canvas) return;
-    // Save as JPEG (white background, 95% quality) — enables direct PDF embed
     var dataUrl = canvas.toDataURL('image/jpeg', 0.95);
     localStorage.setItem('hml_signature', dataUrl);
     syncSignatureSettingsUI();
     closeModal('modal-signature');
     showToast('✅ Signature saved');
-  }
+  };
 
-  function clearSavedSignature() {
+  window.clearSavedSignature = function() {
     localStorage.removeItem('hml_signature');
     syncSignatureSettingsUI();
     showToast('Signature cleared');
-  }
+  };
 
   function syncSignatureSettingsUI() {
     var saved    = localStorage.getItem('hml_signature');
@@ -8889,19 +8898,6 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       if (clearBtn) { clearBtn.style.display = 'none'; }
     }
   }
-
-  // Wire canvas events
-  document.addEventListener('DOMContentLoaded', function() {
-    var canvas = document.getElementById('sig-canvas');
-    if (!canvas) return;
-    canvas.addEventListener('mousedown',  sigStartDraw);
-    canvas.addEventListener('mousemove',  sigDraw);
-    canvas.addEventListener('mouseup',    sigEndDraw);
-    canvas.addEventListener('mouseleave', sigEndDraw);
-    canvas.addEventListener('touchstart', sigStartDraw, { passive: false });
-    canvas.addEventListener('touchmove',  sigDraw,      { passive: false });
-    canvas.addEventListener('touchend',   sigEndDraw,   { passive: false });
-  });
 
 
     // Keyboard: Escape closes drawer
