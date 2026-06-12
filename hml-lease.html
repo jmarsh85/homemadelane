@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Lease Agreement</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 11pt;
+      line-height: 1.65;
+      color: #111;
+      background: #f4f4f0;
+      padding: 0;
+    }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #1B2B4B;
+      color: #fff;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+    #toolbar-title { font-size: 0.875rem; font-weight: 700; opacity: 0.9; }
+    #toolbar-sub   { font-size: 0.7rem; opacity: 0.6; margin-top: 1px; }
+    #print-btn {
+      background: #F0A500;
+      color: #1B2B4B;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 18px;
+      font-size: 0.875rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    #print-btn:active { opacity: 0.8; }
+
+    /* ── Lease document card ── */
+    #lease-wrap {
+      max-width: 760px;
+      margin: 24px auto 48px;
+      padding: 0 12px;
+    }
+    #lease-doc {
+      background: #fff;
+      border-radius: 4px;
+      padding: 48pt 48pt 64pt;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.10);
+    }
+
+    /* ── Lease typography ── */
+    #lease-doc h1 {
+      font-family: Georgia, serif;
+      font-size: 14pt;
+      text-align: center;
+      color: #1B2B4B;
+      margin-bottom: 4pt;
+    }
+    #lease-doc h2 {
+      font-size: 9pt;
+      text-align: center;
+      color: #666;
+      margin-bottom: 20pt;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-weight: 400;
+    }
+    #lease-doc p  { margin-bottom: 9pt; }
+    #lease-doc .clause { margin-bottom: 12pt; }
+    #lease-doc .clause-title { font-weight: 700; }
+
+    /* ── Receipt table ── */
+    .receipt-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10pt 0 14pt;
+      font-size: 10pt;
+    }
+    .receipt-table td {
+      padding: 5pt 8pt;
+      border: 1px solid #ccc;
+    }
+    .receipt-table tr:last-child td { font-weight: 700; }
+
+    /* ── Signature block ── */
+    .sig-block {
+      margin-top: 28pt;
+      padding-top: 18pt;
+      border-top: 1px solid #333;
+    }
+    .sig-row {
+      display: flex;
+      gap: 32pt;
+      margin-top: 12pt;
+    }
+    .sig-col { flex: 1; }
+    .sig-label { font-weight: 700; margin-bottom: 14pt; }
+    .sig-line {
+      border-bottom: 1px solid #333;
+      margin-bottom: 5pt;
+      height: 28pt;
+    }
+    .sig-name { font-size: 10pt; }
+    .sig-date { font-size: 9pt; color: #555; margin-top: 4pt; }
+
+    /* ── States ── */
+    #state-loading, #state-error {
+      text-align: center;
+      padding: 64px 24px;
+      color: #666;
+    }
+    #state-error { color: #c0392b; }
+    #state-loading .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #ddd;
+      border-top-color: #1B2B4B;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Print styles ── */
+    @media print {
+      body { background: #fff; }
+      #toolbar { display: none !important; }
+      #lease-wrap { margin: 0; padding: 0; max-width: 100%; }
+      #lease-doc  { box-shadow: none; border-radius: 0; padding: 0.5in; }
+      #state-loading, #state-error { display: none !important; }
+      .clause { page-break-inside: avoid; }
+      .sig-block { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <div>
+    <div id="toolbar-title">Lease Agreement</div>
+    <div id="toolbar-sub">View only &mdash; use Print to save as PDF</div>
+  </div>
+  <button id="print-btn" onclick="window.print()">&#x1F5A8; Print / Save PDF</button>
+</div>
+
+<div id="lease-wrap">
+  <div id="state-loading">
+    <div class="spinner"></div>
+    <div>Loading lease&hellip;</div>
+  </div>
+  <div id="state-error" style="display:none;"></div>
+  <div id="lease-doc" style="display:none;"></div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  function showError(msg) {
+    document.getElementById('state-loading').style.display = 'none';
+    var el = document.getElementById('state-error');
+    el.innerHTML = '<h2 style="margin-bottom:12px;">Unable to load lease</h2><p>' + msg + '</p>';
+    el.style.display = '';
+  }
+
+  function getGistId() {
+    var m = window.location.search.match(/[?&]g=([a-f0-9]+)/i);
+    return m ? m[1] : null;
+  }
+
+  function fmt(n) {
+    return '$' + parseFloat(n || 0).toFixed(2);
+  }
+
+  function render(data) {
+    // Update toolbar
+    document.getElementById('toolbar-title').textContent =
+      (data.state || '') + ' Lease Agreement';
+    document.getElementById('toolbar-sub').textContent =
+      (data.tenant || '') + ' \u2014 ' + (data.effDate || 'Draft');
+    document.title = 'Lease \u2014 ' + (data.tenant || '') + ' \u2014 ' + (data.effDate || '');
+
+    // Build clause HTML
+    var clauseHtml = (data.clauses || []).map(function(c) {
+      var text = (c.text || '').replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
+      return '<div class="clause"><p><span class="clause-title">' + c.num + '. ' + c.title + '.</span> ' + text + '</p></div>';
+    }).join('');
+
+    // Receipt rows
+    var receiptRows = '';
+    if (data.proratedAmt && data.proratedAmt > 0) {
+      receiptRows +=
+        '<tr><td>Prorated First Month (' + data.proratedNote + '):</td><td>' + fmt(data.proratedAmt) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>' +
+        '<tr><td>Second Month Rent:</td><td>' + fmt(data.rent) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+    } else {
+      receiptRows += '<tr><td>First Month Rent:</td><td>' + fmt(data.rent) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+    }
+    if (data.secDep)   receiptRows += '<tr><td>Security Deposit:</td><td>' + fmt(data.secDep) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+    if (data.cleanDep) receiptRows += '<tr><td>' + (data.cleanLabel || 'Cleaning Fee') + ':</td><td>' + fmt(data.cleanDep) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+    if (data.petFee)   receiptRows += '<tr><td>' + (data.petLabel || 'Pet Fee') + ':</td><td>' + fmt(data.petFee) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+
+    var totalDep = (parseFloat(data.secDep||0) + parseFloat(data.cleanDep||0) + parseFloat(data.petFee||0)).toFixed(2);
+    if (data.payInFull) {
+      receiptRows += '<tr><td style="color:#2e7d32;font-weight:700;">Move-in Total (Paid in Full):</td><td style="color:#2e7d32;font-weight:700;">' + fmt(data.payInFull.total) + '</td><td></td><td></td></tr>';
+    } else {
+      receiptRows += '<tr><td>Total Received:</td><td>$' + totalDep + '</td><td></td><td></td></tr>';
+    }
+
+    var doc = document.getElementById('lease-doc');
+    doc.innerHTML =
+      '<h1>' + (data.state || '').toUpperCase() + ' RESIDENTIAL LEASE AGREEMENT</h1>' +
+      '<h2>Prepared via Homemade Lane &bull; ' + (data.sharedAt ? new Date(data.sharedAt).toLocaleDateString() : '') + '</h2>' +
+      '<p>This Lease Agreement (the &ldquo;Agreement&rdquo;) is made and entered on <strong>' + (data.effDate || '___________') + '</strong> by and between <strong>' + (data.landlord || '___________') + '</strong> (the &ldquo;Landlord&rdquo;) and the following tenant:</p>' +
+      '<p style="text-align:center;font-weight:600;font-size:12pt;">' + (data.tenant || '___________') + '</p>' +
+      '<p style="text-align:center;">(the &ldquo;Tenant&rdquo;)</p>' +
+      '<p>Subject to the terms and conditions stated below the parties agree as follows:</p>' +
+      clauseHtml +
+      '<div class="sig-block">' +
+        '<p style="font-weight:600;margin-bottom:0;">Receipt of Funds</p>' +
+        '<table class="receipt-table"><tbody>' + receiptRows + '</tbody></table>' +
+        '<p style="font-weight:600;margin-top:14pt;">IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement as of the Effective Date.</p>' +
+        '<div class="sig-row">' +
+          '<div class="sig-col">' +
+            '<div class="sig-label">Landlord:</div>' +
+            '<div class="sig-line"></div>' +
+            '<div class="sig-name">' + (data.landlord || '') + '</div>' +
+            '<div class="sig-date">Date: ___________</div>' +
+          '</div>' +
+          '<div class="sig-col">' +
+            '<div class="sig-label">Tenant:</div>' +
+            '<div class="sig-line"></div>' +
+            '<div class="sig-name">' + (data.tenant || '') + '</div>' +
+            '<div class="sig-date">Date: ___________</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    document.getElementById('state-loading').style.display = 'none';
+    doc.style.display = '';
+  }
+
+  // ── Main ─────────────────────────────────────────────────────────
+  var gistId = getGistId();
+  if (!gistId) {
+    showError('No lease ID found in this URL. Make sure you opened the full link sent by your landlord.');
+    return;
+  }
+
+  fetch('https://api.github.com/gists/' + gistId, {
+    headers: { 'Accept': 'application/vnd.github+json' }
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('Could not load lease (status ' + r.status + '). The link may have expired or been deleted.');
+    return r.json();
+  })
+  .then(function(gist) {
+    // Find the first .json file in the Gist
+    var files = gist.files || {};
+    var fname = Object.keys(files).find(function(k){ return k.endsWith('.json'); });
+    if (!fname) throw new Error('Lease data not found in this link.');
+    var raw = files[fname].content;
+    if (!raw) throw new Error('Lease file is empty.');
+    var data = JSON.parse(raw);
+    if (!data.v || !data.clauses) throw new Error('Unrecognised lease format (v' + (data.v||'?') + ').');
+    render(data);
+  })
+  .catch(function(err) {
+    showError(err.message || 'An unexpected error occurred. Please try again or contact your landlord.');
+  });
+
+})();
+</script>
+</body>
+</html>
