@@ -3,7 +3,7 @@
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
   ║  Version: 4.1.1                                             ║
-  ║  Date: 2026-06-06                                           ║
+  ║  Date: 2026-06-11                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
   ║                                                             ║
@@ -1374,7 +1374,7 @@
       </svg>
       <div class="header-title" id="header-app-name">H<span class="logo-heart-o">o</span>memade Lane</div>
     </div>
-    <span id="hml-build-ref" style="flex:1;text-align:right;font-size:0.6rem;color:rgba(255,255,255,0.28);letter-spacing:0.04em;pointer-events:none;user-select:none;padding-right:8px;">v4.1.0</span>
+    <span id="hml-build-ref" style="flex:1;text-align:right;font-size:0.6rem;color:rgba(255,255,255,0.28);letter-spacing:0.04em;pointer-events:none;user-select:none;padding-right:8px;">v4.1.1</span>
     <div class="header-actions">
       <button class="icon-btn" title="Notifications" onclick="showAlerts()">🔔</button>
       <button class="icon-btn" title="Settings" onclick="drawerNavigate('settings')">⚙️</button>
@@ -1922,6 +1922,22 @@
           <span id="settings-owner-saved" style="font-size:0.75rem;color:var(--green);margin-left:10px;opacity:0;transition:opacity 0.3s;">✓ Saved</span>
         </div>
         <div style="padding:0 16px 12px;font-size:0.75rem;color:var(--muted);">Used as landlord defaults in the Lease Builder — fill once, referenced everywhere.</div>
+      </div>
+
+      <p class="section-label">Signature</p>
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:4px;">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.875rem;font-weight:600;color:var(--navy);margin-bottom:4px;">Landlord Signature</div>
+          <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px;">Drawn signature is stamped onto lease PDFs exported from the Lease Builder.</div>
+          <div id="settings-sig-preview" style="display:none;margin-bottom:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;text-align:center;">
+            <img id="settings-sig-img" src="" alt="Saved signature" style="max-height:60px;max-width:100%;object-fit:contain;" />
+          </div>
+          <div id="settings-sig-none" style="margin-bottom:10px;font-size:0.8125rem;color:var(--muted);font-style:italic;">No signature saved yet.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="openSignatureModal()" ontouchstart="">✏️ Draw Signature</button>
+            <button class="btn btn-outline btn-sm" id="settings-sig-clear-btn" onclick="clearSavedSignature()" ontouchstart="" style="display:none;">🗑 Clear</button>
+          </div>
+        </div>
       </div>
 
       <p class="section-label">AI Features</p>
@@ -8737,6 +8753,9 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     // Apply saved app name
     applyAppName(getAppName());
 
+    // Init signature UI
+    if (typeof syncSignatureSettingsUI === 'function') syncSignatureSettingsUI();
+
     // Apply saved tax year
     const savedYear = localStorage.getItem('hml_taxYear');
     if (savedYear) {
@@ -8751,6 +8770,139 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     const greeting = hr < 12 ? 'Good morning 👋' : hr < 17 ? 'Good afternoon 👋' : 'Good evening 👋';
     const greetEl = document.querySelector('#screen-home .greeting');
     if (greetEl) greetEl.textContent = greeting;
+
+
+  /* ── SIGNATURE CANVAS ─────────────────────────────────────── */
+  var _sigHasContent = false;
+  var _sigDrawing    = false;
+
+  function openSignatureModal() {
+    openModal('modal-signature');
+    requestAnimationFrame(function() {
+      var wrap   = document.getElementById('sig-canvas-wrap');
+      var canvas = document.getElementById('sig-canvas');
+      if (!canvas || !wrap) return;
+      var w = wrap.clientWidth;
+      var h = Math.round(w * 0.38);
+      canvas.width  = w;
+      canvas.height = h;
+      canvas.style.height = h + 'px';
+      sigClear();
+    });
+  }
+
+  function sigGetCtx() {
+    var c = document.getElementById('sig-canvas');
+    return c ? c.getContext('2d') : null;
+  }
+
+  function sigClear() {
+    var canvas = document.getElementById('sig-canvas');
+    var ctx    = sigGetCtx();
+    if (!ctx || !canvas) return;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    _sigHasContent = false;
+    var hint = document.getElementById('sig-canvas-hint');
+    if (hint) hint.style.opacity = '0.5';
+  }
+
+  function sigGetPos(e, canvas) {
+    var rect   = canvas.getBoundingClientRect();
+    var scaleX = canvas.width  / rect.width;
+    var scaleY = canvas.height / rect.height;
+    var src    = e.touches ? e.touches[0] : e;
+    return {
+      x: (src.clientX - rect.left) * scaleX,
+      y: (src.clientY - rect.top)  * scaleY,
+    };
+  }
+
+  function sigStartDraw(e) {
+    e.preventDefault();
+    var canvas = document.getElementById('sig-canvas');
+    var ctx    = sigGetCtx();
+    if (!ctx || !canvas) return;
+    _sigDrawing = true;
+    var pos = sigGetPos(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    ctx.strokeStyle = '#1A1A2E';
+    ctx.lineWidth   = 2.2;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+    var hint = document.getElementById('sig-canvas-hint');
+    if (hint) hint.style.opacity = '0';
+    _sigHasContent = true;
+  }
+
+  function sigDraw(e) {
+    if (!_sigDrawing) return;
+    e.preventDefault();
+    var canvas = document.getElementById('sig-canvas');
+    var ctx    = sigGetCtx();
+    if (!ctx || !canvas) return;
+    var pos = sigGetPos(e, canvas);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+  }
+
+  function sigEndDraw() {
+    _sigDrawing = false;
+    var ctx = sigGetCtx();
+    if (ctx) ctx.beginPath();
+  }
+
+  function sigSave() {
+    if (!_sigHasContent) { showToast('Draw your signature first'); return; }
+    var canvas = document.getElementById('sig-canvas');
+    if (!canvas) return;
+    // Save as JPEG (white background, 95% quality) — enables direct PDF embed
+    var dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    localStorage.setItem('hml_signature', dataUrl);
+    syncSignatureSettingsUI();
+    closeModal('modal-signature');
+    showToast('✅ Signature saved');
+  }
+
+  function clearSavedSignature() {
+    localStorage.removeItem('hml_signature');
+    syncSignatureSettingsUI();
+    showToast('Signature cleared');
+  }
+
+  function syncSignatureSettingsUI() {
+    var saved    = localStorage.getItem('hml_signature');
+    var preview  = document.getElementById('settings-sig-preview');
+    var img      = document.getElementById('settings-sig-img');
+    var none     = document.getElementById('settings-sig-none');
+    var clearBtn = document.getElementById('settings-sig-clear-btn');
+    if (saved) {
+      if (preview)  { preview.style.display  = 'block'; }
+      if (img)      { img.src = saved; }
+      if (none)     { none.style.display     = 'none'; }
+      if (clearBtn) { clearBtn.style.display = 'inline-flex'; }
+    } else {
+      if (preview)  { preview.style.display  = 'none'; }
+      if (img)      { img.src = ''; }
+      if (none)     { none.style.display     = 'block'; }
+      if (clearBtn) { clearBtn.style.display = 'none'; }
+    }
+  }
+
+  // Wire canvas events
+  document.addEventListener('DOMContentLoaded', function() {
+    var canvas = document.getElementById('sig-canvas');
+    if (!canvas) return;
+    canvas.addEventListener('mousedown',  sigStartDraw);
+    canvas.addEventListener('mousemove',  sigDraw);
+    canvas.addEventListener('mouseup',    sigEndDraw);
+    canvas.addEventListener('mouseleave', sigEndDraw);
+    canvas.addEventListener('touchstart', sigStartDraw, { passive: false });
+    canvas.addEventListener('touchmove',  sigDraw,      { passive: false });
+    canvas.addEventListener('touchend',   sigEndDraw,   { passive: false });
+  });
+
 
     // Keyboard: Escape closes drawer
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
@@ -9195,7 +9347,7 @@ function lbPromptOverlay(message, placeholder, onSubmit) {
 
 /* Synchronous download helper — stays within the user gesture frame */
 function lbDownloadNow(filename, content, mimeType) {
-  // Path 1: Web Share API with files (iOS 15+, requires HTTPS + gesture)
+  // Path 1: Web Share API with files (iOS PWA + HTTPS — works for PDF, images)
   try {
     var shareBlob = new Blob([content], { type: mimeType });
     var shareFile = new File([shareBlob], filename, { type: mimeType });
@@ -9207,19 +9359,21 @@ function lbDownloadNow(filename, content, mimeType) {
     }
   } catch(e1) {}
 
-  // Path 2: blob URL download (works on desktop/Android)
+  // Path 2: Desktop/Android blob anchor download
   try {
-    var dlBlob = new Blob([content], { type: mimeType });
-    var dlUrl  = URL.createObjectURL(dlBlob);
-    var dlA    = document.createElement('a');
-    dlA.href = dlUrl; dlA.download = filename;
-    document.body.appendChild(dlA); dlA.click(); document.body.removeChild(dlA);
-    setTimeout(function(){ URL.revokeObjectURL(dlUrl); }, 1500);
-    if (window.lbToast) window.lbToast('✅ ' + filename);
-    return true;
+    if (!navigator.standalone && !window.matchMedia('(display-mode: standalone)').matches) {
+      var dlBlob = new Blob([content], { type: mimeType });
+      var dlUrl  = URL.createObjectURL(dlBlob);
+      var dlA    = document.createElement('a');
+      dlA.href = dlUrl; dlA.download = filename;
+      document.body.appendChild(dlA); dlA.click(); document.body.removeChild(dlA);
+      setTimeout(function(){ URL.revokeObjectURL(dlUrl); }, 1500);
+      if (window.lbToast) window.lbToast('✅ ' + filename);
+      return true;
+    }
   } catch(e2) {}
 
-  // Path 3 (iOS PWA fallback): show content in copy modal
+  // Path 3: In-app content overlay — tap Share ↗ or Copy to save
   lbShowContent(filename, content);
   return true;
 }
@@ -9837,8 +9991,10 @@ window.lbGoStep = function(step) {
   }
   if (step === 'preview') {
     lbRenderPreview();
-    lbUpdateStep4Buttons(); // update Execute/Amend based on agreement status
+    lbUpdateStep4Buttons();
   }
+  var _stickyBar = document.getElementById('lb-sticky-actions');
+  if (_stickyBar) _stickyBar.style.display = step === 'preview' ? '' : 'none';
   var body = document.getElementById('lb-body-scroll');
   if (body) body.scrollTo({ top: 0, behavior: 'smooth' });
 };
@@ -9954,12 +10110,18 @@ function lbUpdateStep4Buttons() {
 
   var status = agreement ? agreement.status : 'draft';
 
+  var _se = document.getElementById('lb-sticky-execute');
+  var _sa = document.getElementById('lb-sticky-amend');
   if (status === 'executed' || status === 'amended') {
-    executeBtn.style.display = 'none';
-    amendBtn.style.display   = '';
+    if (executeBtn) executeBtn.style.display = 'none';
+    if (amendBtn)   amendBtn.style.display   = '';
+    if (_se) _se.style.display = 'none';
+    if (_sa) _sa.style.display = '';
   } else {
-    executeBtn.style.display = '';
-    amendBtn.style.display   = 'none';
+    if (executeBtn) executeBtn.style.display = '';
+    if (amendBtn)   amendBtn.style.display   = 'none';
+    if (_se) _se.style.display = '';
+    if (_sa) _sa.style.display = 'none';
   }
 }
 // Each clause stores its default text separately so we can reset.
@@ -10506,7 +10668,13 @@ window.lbRenderPreview = function() {
       + (LB.payInFull ? '<p style="margin-top:8px;font-size:0.8125rem;color:var(--green);font-weight:600;">✓ Tenant is paying all move-in costs in full at signing.</p>' : '')
       + '<p style="margin-top:16px;font-weight:600;">IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement as of the Effective Date.</p>'
       + '<div class="lb-sig-row">'
-        + '<div class="lb-sig-col"><div style="font-weight:700;margin-bottom:16px;">Landlord:</div><div class="lb-sig-line"></div><div>'+landlordName+'</div><div style="color:var(--muted);font-size:0.75rem;margin-top:4px;">Date: ___________</div></div>'
+        + (function(){
+            var sig = localStorage.getItem('hml_signature');
+            var sigHtml = sig
+              ? '<img src="' + sig + '" alt="Signature" style="max-height:48px;max-width:160px;object-fit:contain;display:block;margin-bottom:4px;" />'
+              : '<div class="lb-sig-line"></div>';
+            return '<div class="lb-sig-col"><div style="font-weight:700;margin-bottom:10px;">Landlord:</div>' + sigHtml + '<div>' + landlordName + '</div><div style="color:var(--muted);font-size:0.75rem;margin-top:4px;">Date: ___________</div></div>';
+          }())
         + '<div class="lb-sig-col"><div style="font-weight:700;margin-bottom:16px;">Tenant:</div><div class="lb-sig-line"></div><div>'+tenantFull+'</div><div style="color:var(--muted);font-size:0.75rem;margin-top:4px;">Date: ___________</div></div>'
       + '</div>'
     + '</div>';
@@ -11231,7 +11399,8 @@ window.lbExportPdf = function() {
   lines.push({ text: 'IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement as of the Effective Date.', size: 11 });
   lines.push({ text: '', size: 11 });
   lines.push({ text: 'Landlord: ' + landlordName, size: 11 });
-  lines.push({ text: 'By: _________________________________   Date: ___________', size: 11 });
+  var pdfSigLine = sigDataUrl ? (landlordName + ' [signed]   Date: ___________') : 'By: _________________________________   Date: ___________';
+  lines.push({ text: pdfSigLine, size: 11, _landlordSig: true });
   lines.push({ text: '', size: 11 });
   lines.push({ text: 'Tenant: ' + tenantFull, size: 11 });
   lines.push({ text: 'By: _________________________________   Date: ___________', size: 11 });
@@ -11282,12 +11451,20 @@ window.lbExportPdf = function() {
     });
   }
 
-  // Expand logical lines into render lines [{text, bold, center}]
+  // ── SIGNATURE EMBED (JPEG → DCT) ────────────────────────────────────
+  // canvas.toDataURL('image/jpeg') gives base64 JPEG — raw bytes ARE the DCT stream.
+  // No decompression or re-encoding needed. /Filter /DCTDecode reads JPEG directly.
+  var sigDataUrl = localStorage.getItem('hml_signature') || '';
+  var sigPdfW    = 160;  // target width in PDF points
+  var sigPdfH    = 48;   // target height in PDF points
+  var SIG_OBJ_ID = null; // will be set to PDF object number if embed succeeds
+
+  // Expand logical lines into render lines [{text, bold, center, _landlordSig}]
   var renderLines = [];
   lines.forEach(function(ln) {
     var wrapped = wrapText(ln.text || '', CHARS_PER_LINE);
     wrapped.forEach(function(wl, wi) {
-      renderLines.push({ text: wl, bold: !!ln.bold, center: !!ln.center && wi === 0 });
+      renderLines.push({ text: wl, bold: !!ln.bold, center: !!ln.center && wi === 0, _landlordSig: !!ln._landlordSig && wi === 0 });
     });
   });
 
@@ -11331,10 +11508,56 @@ window.lbExportPdf = function() {
   w('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
   w('endobj');
 
-  // Page content objects start at obj 5
-  // Each page = 2 objects: content stream (5,7,9…) + page dict (6,8,10…)
-  var pageObjIds = [];
+  // Embed JPEG signature as PDF image XObject (synchronous — no Image() needed)
   var nextObj = 5;
+  if (sigDataUrl && sigDataUrl.indexOf('data:image/jpeg;base64,') === 0) {
+    try {
+      var jpegB64   = sigDataUrl.replace('data:image/jpeg;base64,', '');
+      var jpegBin   = atob(jpegB64);
+      var jpegBytes = new Uint8Array(jpegBin.length);
+      for (var si = 0; si < jpegBin.length; si++) jpegBytes[si] = jpegBin.charCodeAt(si);
+
+      // Read JPEG dimensions (SOF0/SOF2 marker scan)
+      var jpegW = 0, jpegH = 0;
+      for (var ji = 0; ji < jpegBytes.length - 8; ji++) {
+        if (jpegBytes[ji] === 0xFF && (jpegBytes[ji+1] === 0xC0 || jpegBytes[ji+1] === 0xC2)) {
+          jpegH = (jpegBytes[ji+5] << 8) | jpegBytes[ji+6];
+          jpegW = (jpegBytes[ji+7] << 8) | jpegBytes[ji+8];
+          break;
+        }
+      }
+      // Adjust PDF height to match canvas aspect ratio
+      if (jpegW > 0 && jpegH > 0) {
+        sigPdfH = Math.round(sigPdfW * (jpegH / jpegW));
+        if (sigPdfH > 60) { sigPdfH = 60; sigPdfW = Math.round(60 * (jpegW / jpegH)); }
+      }
+
+      // Convert bytes to binary string for PDF stream
+      var jpegStream = '';
+      for (var sk = 0; sk < jpegBytes.length; sk++) jpegStream += String.fromCharCode(jpegBytes[sk]);
+
+      var sigObjId = nextObj++;
+      offsets[sigObjId] = out.join('').length;
+      w(sigObjId + ' 0 obj');
+      w('<< /Type /XObject /Subtype /Image');
+      w('   /Width '  + (jpegW || 320));
+      w('   /Height ' + (jpegH || 88));
+      w('   /ColorSpace /DeviceRGB');
+      w('   /BitsPerComponent 8');
+      w('   /Filter /DCTDecode');
+      w('   /Length ' + jpegStream.length + ' >>');
+      w('stream');
+      out.push(jpegStream + '\n');
+      w('endstream');
+      w('endobj');
+      SIG_OBJ_ID = sigObjId;
+    } catch(sigErr) {
+      SIG_OBJ_ID = null;
+    }
+  }
+
+  // Page content objects — each page = 2 objects: content stream + page dict
+  var pageObjIds = [];
 
   pages.forEach(function(pageLines) {
     // Build content stream — use Tm (absolute text matrix) for every line
@@ -11342,8 +11565,29 @@ window.lbExportPdf = function() {
     // For upright unscaled text: 1 0 0 1 x y Tm
     var ops = [];
     var y = PH - MT - FONT_SIZE; // first baseline (PDF y=0 is bottom of page)
+    var pageSigDrawn = false; // track if sig was drawn on this page
 
     pageLines.forEach(function(rl) {
+      // Landlord signature line — replace underline with image if available
+      if (rl._landlordSig && SIG_OBJ_ID) {
+        // Draw "Date: ___________" text on same line
+        ops.push('BT');
+        ops.push('/F1 ' + FONT_SIZE + ' Tf');
+        var dateX = ML + sigPdfW + 16;
+        ops.push('1 0 0 1 ' + dateX.toFixed(2) + ' ' + y.toFixed(2) + ' Tm');
+        ops.push('(' + pdfStr('Date: ___________') + ') Tj');
+        ops.push('ET');
+        // Place signature image: bottom-left at (ML, y - sigPdfH + LINE_H*0.25)
+        var imgY = y - sigPdfH + LINE_H * 0.3;
+        ops.push('q'); // save graphics state
+        ops.push(sigPdfW.toFixed(2) + ' 0 0 ' + sigPdfH.toFixed(2) + ' ' + ML.toFixed(2) + ' ' + imgY.toFixed(2) + ' cm');
+        ops.push('/Sig Do');
+        ops.push('Q'); // restore graphics state
+        pageSigDrawn = true;
+        y -= LINE_H;
+        return;
+      }
+
       var font = rl.bold ? '/F2' : '/F1';
       ops.push('BT');
       ops.push(font + ' ' + FONT_SIZE + ' Tf');
@@ -11373,7 +11617,7 @@ window.lbExportPdf = function() {
     w('endstream');
     w('endobj');
 
-    // Page dictionary object
+    // Page dictionary object — include XObject resource if sig was drawn
     var pageObjId = nextObj++;
     pageObjIds.push(pageObjId);
     offsets[pageObjId] = out.join('').length;
@@ -11381,7 +11625,11 @@ window.lbExportPdf = function() {
     w('<< /Type /Page /Parent 2 0 R');
     w('   /MediaBox [0 0 ' + PW + ' ' + PH + ']');
     w('   /Contents ' + contentObjId + ' 0 R');
-    w('   /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >>');
+    if (pageSigDrawn && SIG_OBJ_ID) {
+      w('   /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /Sig ' + SIG_OBJ_ID + ' 0 R >> >>');
+    } else {
+      w('   /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >>');
+    }
     w('>>');
     w('endobj');
   });
@@ -11440,6 +11688,19 @@ window.openLeaseBuilder = function() {
           '<button class="lb-step-tab"        id="lb-tab-terms"    onclick="lbGoStep(\'terms\')">2 Terms</button>',
           '<button class="lb-step-tab"        id="lb-tab-clauses"  onclick="lbGoStep(\'clauses\')">3 Clauses</button>',
           '<button class="lb-step-tab"        id="lb-tab-preview"  onclick="lbGoStep(\'preview\')">4 Preview</button>',
+        '</div>',
+      '</div>',
+      '<div id="lb-sticky-actions" style="display:none;background:var(--card);border-bottom:1px solid var(--border);padding:8px 12px;flex-shrink:0;">',
+        '<div style="display:flex;gap:6px;margin-bottom:6px;">',
+          '<button class="btn btn-outline btn-sm" style="flex:1;" onclick="lbGoStep(\'clauses\')">\u2190 Edit</button>',
+          '<button class="btn btn-amber btn-sm" style="flex:1;" onclick="lbSaveDraft()">💾 Save Draft</button>',
+          '<button id="lb-sticky-execute" class="btn btn-sm" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:0.75rem;font-weight:700;cursor:pointer;" onclick="lbExecute()">✅ Execute</button>',
+          '<button id="lb-sticky-amend" class="btn btn-sm" style="flex:1;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:0.75rem;font-weight:700;cursor:pointer;display:none;" onclick="lbPromptAmend()">&#x1F4DD; Amend</button>',
+        '</div>',
+        '<div style="display:flex;gap:6px;">',
+          '<button class="btn btn-primary btn-sm" style="flex:1;" onclick="lbExportDocx()" ontouchstart="">⬇ .doc</button>',
+          '<button class="btn btn-primary btn-sm" style="flex:1;background:#4A7C59;border-color:#4A7C59;" onclick="lbExportTxt()" ontouchstart="">⬇ .txt</button>',
+          '<button class="btn btn-primary btn-sm" style="flex:1;background:var(--red);border-color:var(--red);" onclick="lbExportPdf()" ontouchstart="">⬇ .pdf</button>',
         '</div>',
       '</div>',
       '<div class="lb-body" id="lb-body-scroll">',
@@ -11630,20 +11891,10 @@ window.openLeaseBuilder = function() {
         '</div>',
         // STEP 4
         '<div class="lb-panel" id="lb-panel-preview">',
-          '<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">',
-            '<button class="btn btn-outline btn-sm" style="flex:1;" onclick="lbGoStep(\'clauses\')">← Edit</button>',
-            '<button class="btn btn-amber btn-sm" style="flex:1;" onclick="lbSaveDraft()">💾 Save Draft</button>',
-            '<button id="lb-btn-execute" class="btn btn-sm" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:0.75rem;font-weight:600;cursor:pointer;" onclick="lbExecute()">✅ Execute</button>',
-            '<button id="lb-btn-amend"   class="btn btn-sm" style="flex:1;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:0.75rem;font-weight:600;cursor:pointer;display:none;" onclick="lbPromptAmend()">📝 Amend</button>',
-          '</div>',
-          '<div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap;">',
-            '<button class="btn btn-primary btn-sm" style="flex:1;" onclick="lbExportDocx()" title="Word-compatible RTF">⬇ .doc</button>',
-            '<button class="btn btn-primary btn-sm" style="flex:1;background:#4A7C59;border-color:#4A7C59;" onclick="lbExportTxt()" title="Plain text">⬇ .txt</button>',
-            '<button class="btn btn-primary btn-sm" style="flex:1;background:var(--red);border-color:var(--red);" onclick="lbExportPdf()" title="Save as PDF">⬇ .pdf</button>',
-          '</div>',
-          '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">',
-            '<button class="btn btn-outline btn-sm" style="flex:1;font-size:0.7rem;" onclick="lbExportSnapshot()" title="Export frozen snapshot of executed agreement">📜 Export Snapshot</button>',
-            '<button class="btn btn-outline btn-sm" style="flex:1;font-size:0.7rem;" onclick="lbShowChangelog()" title="View all versions and changes">🕐 Change Log</button>',
+          '<div style="display:none;"><button id="lb-btn-execute"></button><button id="lb-btn-amend"></button></div>',
+          '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">',
+            '<button class="btn btn-outline btn-sm" style="flex:1;font-size:0.7rem;" onclick="lbExportSnapshot()" title="Export frozen snapshot">📜 Export Snapshot</button>',
+            '<button class="btn btn-outline btn-sm" style="flex:1;font-size:0.7rem;" onclick="lbShowChangelog()" title="View all versions">🕐 Change Log</button>',
           '</div>',
           '<div id="lb-changelog-panel" style="display:none;margin-bottom:14px;background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;"></div>',
           '<div id="lb-preview-doc" class="lb-preview"></div>',
@@ -12401,7 +12652,7 @@ window.renderLeaseBuilder = function() {
 
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 var DK_KEY        = 'hml_devlog';        // localStorage key — isolated from app data
-var DK_APP_VER    = 'Homemade Lane v4.1.0';
+var DK_APP_VER    = 'Homemade Lane v4.1.1';
 // Single source of truth — badge reads this at init; update only DK_APP_VER for future releases
 (function(){ var b=document.getElementById('hml-build-ref'); if(b) b.textContent='v'+DK_APP_VER.replace('Homemade Lane v',''); })();
 var DK_MAX_RECENT = 3;                   // entries shown in Log tab preview
@@ -13760,6 +14011,27 @@ window.dkmTagDismiss = function(silent) {
     <div id="backup-done-msg" style="display:none; font-size:0.75rem; color:var(--green); font-weight:600; margin-top:10px; text-align:center;">✓ Backup downloaded — safe to delete</div>
   </div>
 </div>
+<div class="modal-overlay" id="modal-signature" onclick="overlayClose(event,'modal-signature')">
+  <div class="modal-sheet" style="max-height:90vh;">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">Draw Signature</div>
+      <button class="modal-close" onclick="closeModal('modal-signature')" ontouchstart="">✕</button>
+    </div>
+    <div class="modal-body" style="padding-bottom:max(20px, env(safe-area-inset-bottom));">
+      <div style="font-size:0.8125rem;color:var(--muted);margin-bottom:12px;line-height:1.4;">Draw your signature below. It will be saved and stamped on lease PDFs.</div>
+      <div style="border:2px solid var(--border);border-radius:var(--radius-sm);background:#fff;touch-action:none;overflow:hidden;position:relative;" id="sig-canvas-wrap">
+        <canvas id="sig-canvas" style="display:block;width:100%;touch-action:none;cursor:crosshair;"></canvas>
+        <div id="sig-canvas-hint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;color:var(--muted);font-size:0.875rem;opacity:0.5;">Sign here</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-outline btn-sm" style="flex:1;" onclick="sigClear()" ontouchstart="">Clear</button>
+        <button class="btn btn-primary btn-sm" style="flex:2;" onclick="sigSave()" ontouchstart="">Save Signature</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 </body>
 </html>
