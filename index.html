@@ -2,8 +2,8 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.1.7                                             ║
-  ║  Date: 2026-06-11                                           ║
+  ║  Version: 4.2.0                                             ║
+  ║  Date: 2026-06-06                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
   ║                                                             ║
@@ -1374,7 +1374,7 @@
       </svg>
       <div class="header-title" id="header-app-name">H<span class="logo-heart-o">o</span>memade Lane</div>
     </div>
-    <span id="hml-build-ref" style="flex:1;text-align:right;font-size:0.6rem;color:rgba(255,255,255,0.28);letter-spacing:0.04em;pointer-events:none;user-select:none;padding-right:8px;">v4.1.1</span>
+    <span id="hml-build-ref" style="flex:1;text-align:right;font-size:0.6rem;color:rgba(255,255,255,0.28);letter-spacing:0.04em;pointer-events:none;user-select:none;padding-right:8px;">v4.1.0</span>
     <div class="header-actions">
       <button class="icon-btn" title="Notifications" onclick="showAlerts()">🔔</button>
       <button class="icon-btn" title="Settings" onclick="drawerNavigate('settings')">⚙️</button>
@@ -1940,14 +1940,13 @@
         </div>
       </div>
 
-
       <p class="section-label">Lease Sharing</p>
       <div class="card" style="padding:0;overflow:hidden;margin-bottom:4px;">
         <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
           <div style="font-size:0.875rem;font-weight:600;color:var(--navy);margin-bottom:4px;">GitHub Personal Access Token</div>
-          <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px;">Required to share leases via link. Create a token with <strong>gist</strong> scope only at github.com/settings/tokens</div>
+          <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px;">Required to share leases via link. Create a <strong>classic</strong> token with <strong>gist</strong> scope only at github.com/settings/tokens</div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <input type="password" id="settings-gh-pat" placeholder="github_pat_..." autocomplete="off"
+            <input type="password" id="settings-gh-pat" placeholder="ghp_..." autocomplete="off"
               style="flex:1;font-family:var(--font-body);font-size:0.875rem;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none;"
               onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'" />
             <button class="btn btn-amber btn-sm" onclick="saveGhPat()">Save</button>
@@ -1956,10 +1955,9 @@
             <button class="btn btn-outline btn-sm" onclick="testGhPat()" id="gh-pat-test-btn">Test Token</button>
             <span id="gh-pat-test-status" style="font-size:0.75rem;"></span>
           </div>
-          <div style="margin-top:8px;font-size:0.75rem;color:var(--muted);">Token stored locally on device only — used only to create secret Gists on your GitHub account.</div>
+          <div style="margin-top:8px;font-size:0.75rem;color:var(--muted);">Token stored locally on device only.</div>
         </div>
       </div>
-
 
       <p class="section-label">AI Features</p>
       <div class="card" style="padding:0;overflow:hidden;margin-bottom:4px;">
@@ -4562,53 +4560,6 @@
     syncAiButton();
     showToast('✅ API key saved');
   }
-
-  function saveGhPat() {
-    var inp = document.getElementById('settings-gh-pat');
-    var val = inp && inp.value ? inp.value.trim() : '';
-    if (!val || val.charAt(0) === '\u2022') { showToast('\u26a0\ufe0f Enter your GitHub token first'); return; }
-    localStorage.setItem('hml_gh_pat', val);
-    if (inp) inp.value = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
-    showToast('\u2705 GitHub token saved');
-  }
-
-  function testGhPat() {
-    var pat = localStorage.getItem('hml_gh_pat') || '';
-    var statusEl = document.getElementById('gh-pat-test-status');
-    var btn = document.getElementById('gh-pat-test-btn');
-    if (!pat) {
-      if (statusEl) { statusEl.textContent = '\u26a0\ufe0f No token saved'; statusEl.style.color = 'var(--amber)'; }
-      return;
-    }
-    if (window.location.protocol === 'file:') {
-      if (statusEl) { statusEl.textContent = '\u26a0\ufe0f Open via GitHub Pages to test'; statusEl.style.color = 'var(--amber)'; }
-      return;
-    }
-    if (btn) { btn.textContent = 'Testing...'; btn.disabled = true; }
-    fetch('https://api.github.com/user', {
-      headers: { 'Authorization': 'Bearer ' + pat, 'Accept': 'application/vnd.github+json' }
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(data){
-      if (btn) { btn.textContent = 'Test Token'; btn.disabled = false; }
-      if (data.login) {
-        if (statusEl) { statusEl.textContent = '\u2713 Connected as ' + data.login; statusEl.style.color = 'var(--green)'; }
-      } else {
-        if (statusEl) { statusEl.textContent = '\u2717 Invalid token'; statusEl.style.color = 'var(--red)'; }
-      }
-    })
-    .catch(function(){
-      if (btn) { btn.textContent = 'Test Token'; btn.disabled = false; }
-      if (statusEl) { statusEl.textContent = '\u2717 Network error'; statusEl.style.color = 'var(--red)'; }
-    });
-  }
-
-  function syncGhPatSettingsUI() {
-    var pat = localStorage.getItem('hml_gh_pat') || '';
-    var inp = document.getElementById('settings-gh-pat');
-    if (inp) inp.value = pat ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : '';
-  }
-
 
   function testAiApiKey() {
     const apiKey = localStorage.getItem('hml_lb_apikey') || '';
@@ -8742,6 +8693,284 @@ Respond ONLY in this JSON format, no markdown, no preamble:
 
   /* ── TOAST ───────────────────────────────────────────────── */
   let _toastTimer = null;
+  /* ═══════════════════════════════════════════════════════════
+     SIGNATURE PAD
+  ═══════════════════════════════════════════════════════════ */
+  var _sigDrawing = false;
+  var _sigHasContent = false;
+
+  function openSignatureModal() {
+    openModal('modal-signature');
+    // Size canvas to its container after modal is visible
+    requestAnimationFrame(function() {
+      const wrap   = document.getElementById('sig-canvas-wrap');
+      const canvas = document.getElementById('sig-canvas');
+      if (!canvas || !wrap) return;
+      const w = wrap.clientWidth;
+      const h = Math.round(w * 0.38); // ~2.6:1 aspect — signature proportions
+      canvas.width  = w;
+      canvas.height = h;
+      canvas.style.height = h + 'px';
+      sigClear();
+    });
+  }
+
+  function sigGetCtx() {
+    const c = document.getElementById('sig-canvas');
+    return c ? c.getContext('2d') : null;
+  }
+
+  function sigClear() {
+    const canvas = document.getElementById('sig-canvas');
+    const ctx    = sigGetCtx();
+    if (!ctx || !canvas) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    _sigHasContent = false;
+    const hint = document.getElementById('sig-canvas-hint');
+    if (hint) hint.style.opacity = '0.5';
+  }
+
+  function sigGetPos(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const src = e.touches ? e.touches[0] : e;
+    return {
+      x: (src.clientX - rect.left) * scaleX,
+      y: (src.clientY - rect.top)  * scaleY,
+    };
+  }
+
+  function sigStartDraw(e) {
+    e.preventDefault();
+    const canvas = document.getElementById('sig-canvas');
+    const ctx = sigGetCtx();
+    if (!ctx || !canvas) return;
+    _sigDrawing = true;
+    const pos = sigGetPos(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    ctx.strokeStyle = '#1A1A2E';
+    ctx.lineWidth   = 2.2;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+    const hint = document.getElementById('sig-canvas-hint');
+    if (hint) hint.style.opacity = '0';
+    _sigHasContent = true;
+  }
+
+  function sigDraw(e) {
+    if (!_sigDrawing) return;
+    e.preventDefault();
+    const canvas = document.getElementById('sig-canvas');
+    const ctx    = sigGetCtx();
+    if (!ctx || !canvas) return;
+    const pos = sigGetPos(e, canvas);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+  }
+
+  function sigEndDraw(e) {
+    _sigDrawing = false;
+    const ctx = sigGetCtx();
+    if (ctx) ctx.beginPath(); // reset path so next stroke is fresh
+  }
+
+  function sigSave() {
+    if (!_sigHasContent) { showToast('Draw your signature first'); return; }
+    const canvas = document.getElementById('sig-canvas');
+    if (!canvas) return;
+    const dataUrl = canvas.toDataURL('image/png');
+    localStorage.setItem('hml_signature', dataUrl);
+    syncSignatureSettingsUI();
+    closeModal('modal-signature');
+    showToast('✅ Signature saved');
+  }
+
+  function clearSavedSignature() {
+    localStorage.removeItem('hml_signature');
+    syncSignatureSettingsUI();
+    showToast('Signature cleared');
+  }
+
+  function syncSignatureSettingsUI() {
+    const saved   = localStorage.getItem('hml_signature');
+    const preview = document.getElementById('settings-sig-preview');
+    const img     = document.getElementById('settings-sig-img');
+    const none    = document.getElementById('settings-sig-none');
+    const clearBtn= document.getElementById('settings-sig-clear-btn');
+    if (saved) {
+      if (preview)  { preview.style.display  = 'block'; }
+      if (img)      { img.src = saved; }
+      if (none)     { none.style.display     = 'none'; }
+      if (clearBtn) { clearBtn.style.display = 'inline-flex'; }
+    } else {
+      if (preview)  { preview.style.display  = 'none'; }
+      if (img)      { img.src = ''; }
+      if (none)     { none.style.display     = 'block'; }
+      if (clearBtn) { clearBtn.style.display = 'none'; }
+    }
+  }
+
+  // Wire canvas events after modal opens
+  document.addEventListener('DOMContentLoaded', function() {
+    const canvas = document.getElementById('sig-canvas');
+    if (!canvas) return;
+    // Mouse
+    canvas.addEventListener('mousedown',  sigStartDraw);
+    canvas.addEventListener('mousemove',  sigDraw);
+    canvas.addEventListener('mouseup',    sigEndDraw);
+    canvas.addEventListener('mouseleave', sigEndDraw);
+    // Touch
+    canvas.addEventListener('touchstart', sigStartDraw, { passive: false });
+    canvas.addEventListener('touchmove',  sigDraw,      { passive: false });
+    canvas.addEventListener('touchend',   sigEndDraw,   { passive: false });
+  });
+
+  /* ═══════════════════════════════════════════════════════════
+     TENANT APPLICATION IMPORT
+     Called when HML is opened with #hml-app= URL hash
+  ═══════════════════════════════════════════════════════════ */
+  function showApplicationImportDialog(appData) {
+    const existing = document.getElementById('hml-app-import-overlay');
+    if (existing) existing.remove();
+
+    const fmt = (v) => v ? String(v).trim() : '—';
+    const name = [appData.firstName, appData.lastName].filter(Boolean).join(' ') || 'Applicant';
+    const submittedAt = appData._submittedAt
+      ? new Date(appData._submittedAt).toLocaleString('en-US', {month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})
+      : '';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'hml-app-import-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(27,43,75,0.85);z-index:9999;overflow-y:auto;padding:24px 16px;font-family:var(--font-body);';
+
+    const rows = [
+      ['Email',           fmt(appData.email)],
+      ['Phone',           fmt(appData.phone)],
+      ['Date of Birth',    fmt(appData.dob)],
+      ['SSN Last 4',       fmt(appData.ssnLast4)],
+      ['Applying For',     fmt(appData.propertyAddress)],
+      ['Check-In',         fmt(appData.checkInDate)],
+      ['Check-Out',        fmt(appData.checkOutDate)],
+      ['Purpose of Stay',  fmt(appData.stayPurpose)],
+      ['Permanent Address',[appData.currentAddress, appData.currentCity, appData.currentState].filter(Boolean).join(', ') || '—'],
+      ['Employer',         fmt(appData.employer)],
+      ['Job Title',        fmt(appData.jobTitle)],
+      ['Monthly Income',   appData.monthlyIncome ? '$' + Number(appData.monthlyIncome).toLocaleString() : '—'],
+      ['Emp. Status',      fmt(appData.employmentStatus)],
+      ['Occupants',        fmt(appData.occupants)],
+      ['Pets',             appData.hasPets === 'Yes' ? 'Yes — ' + fmt(appData.petDescription) : 'No'],
+      ['Vehicles',         fmt(appData.hasVehicle)],
+      ['Eviction',         appData.eviction === 'Yes' ? 'Yes — ' + fmt(appData.evictionDetails) : 'No'],
+      ['Emergency Contact',[appData.emergencyName, appData.emergencyRelationship, appData.emergencyPhone].filter(Boolean).join(' · ')],
+      ['Notes',            fmt(appData.notes)],
+    ].map(([k,v]) => `
+      <div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);width:108px;flex-shrink:0;padding-top:2px;">${k}</div>
+        <div style="font-size:0.875rem;color:var(--text);flex:1;line-height:1.4;">${v}</div>
+      </div>`).join('');
+
+    overlay.innerHTML = `
+      <div style="background:var(--card);border-radius:var(--radius-lg);max-width:500px;margin:0 auto;overflow:hidden;">
+        <div style="background:var(--navy);padding:16px 20px;display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;background:var(--amber);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:1rem;color:var(--navy);font-weight:700;flex-shrink:0;">H</div>
+          <div>
+            <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.5);">Tenant Application</div>
+            <div style="font-size:1rem;font-weight:600;color:#fff;">${name}</div>
+          </div>
+          ${submittedAt ? `<div style="margin-left:auto;font-size:0.7rem;color:rgba(255,255,255,0.45);text-align:right;">Submitted<br>${submittedAt}</div>` : ''}
+        </div>
+        <div style="padding:16px 20px;max-height:55vh;overflow-y:auto;">${rows}</div>
+        <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;">
+          <div style="font-size:0.75rem;color:var(--muted);margin-bottom:4px;">Import creates a prospect lease record with tenant info pre-filled. You can review and edit before saving.</div>
+          <button onclick="importApplicationAsLease(window._hmlPendingApp)" ontouchstart=""
+            style="padding:13px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.9375rem;font-weight:700;cursor:pointer;">
+            Import as Prospect Lease →
+          </button>
+          <button onclick="document.getElementById('hml-app-import-overlay').remove()" ontouchstart=""
+            style="padding:11px;background:transparent;color:var(--muted);border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;font-weight:600;cursor:pointer;">
+            Dismiss
+          </button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    window._hmlPendingApp = appData;
+  }
+
+  function importApplicationAsLease(appData) {
+    if (!appData) return;
+    // Find property match by address if present
+    let propertyId = '';
+    if (appData.propertyAddress) {
+      const matched = activeRecords('properties').find(p =>
+        (p.address || '').toLowerCase().includes(appData.propertyAddress.toLowerCase()) ||
+        (p.name    || '').toLowerCase().includes(appData.propertyAddress.toLowerCase())
+      );
+      if (matched) propertyId = matched.id;
+    }
+
+    const lease = {
+      id:              genId(),
+      propertyId,
+      firstName:       appData.firstName || '',
+      lastName:        appData.lastName  || '',
+      email:           appData.email     || '',
+      phone:           appData.phone     || '',
+      coTenantFirst:   '',
+      coTenantLast:    '',
+      coTenantInclude: false,
+      emergencyName:   appData.emergencyName   || '',
+      emergencyPhone:  appData.emergencyPhone  || '',
+      relationship:    appData.emergencyRelationship || '',
+      pets:            appData.hasPets === 'Yes' ? (appData.petDescription || 'Yes') : 'No pets',
+      petDesc:         appData.petDescription || '',
+      startDate:       appData.checkInDate || '',
+      endDate:         appData.checkOutDate || '',
+      endDate:         '',
+      monthlyRent:     '',
+      securityDeposit: '',
+      petDeposit:      '',
+      cleaningDeposit: '',
+      platform:        '',
+      bookingId:       '',
+      paymentMethod:   '',
+      paymentNote:     '',
+      status:          'prospect',
+      // Store application data for reference
+      appData: {
+        employer:        appData.employer,
+        jobTitle:        appData.jobTitle,
+        monthlyIncome:   appData.monthlyIncome,
+        employmentStatus:appData.employmentStatus,
+        permanentAddress:[appData.currentAddress, appData.currentCity, appData.currentState].filter(Boolean).join(', '),
+        stayPurpose:     appData.stayPurpose,
+        occupants:       appData.occupants,
+        hasVehicle:      appData.hasVehicle,
+        smokes:          appData.smokes,
+        eviction:        appData.eviction,
+        evictionDetails: appData.evictionDetails,
+        emergencyContact:[appData.emergencyName, appData.emergencyRelationship, appData.emergencyPhone].filter(Boolean).join(' · '),
+        ssnLast4:        appData.ssnLast4,
+        notes:           appData.notes,
+        submittedAt:     appData._submittedAt,
+      },
+      createdAt: now(),
+    };
+
+    upsert('leases', lease);
+    document.getElementById('hml-app-import-overlay')?.remove();
+    window._hmlPendingApp = null;
+
+    // Navigate to tenants to see the new prospect
+    navigate('properties');
+    showToast(`✅ ${lease.firstName} ${lease.lastName} added as prospect`);
+
+    // Open edit form so user can review and fill in rent/dates
+    setTimeout(() => openLeaseForm(lease), 400);
+  }
+
   function showToast(msg, durationMs = 3000) {
     const el = document.getElementById('hml-toast');
     if (!el) return;
@@ -8821,11 +9050,6 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     // Apply saved app name
     applyAppName(getAppName());
 
-    // Init signature UI
-// Init GitHub PAT UI
-    if (typeof syncGhPatSettingsUI === 'function') syncGhPatSettingsUI();
-    if (typeof syncSignatureSettingsUI === 'function') syncSignatureSettingsUI();
-
     // Apply saved tax year
     const savedYear = localStorage.getItem('hml_taxYear');
     if (savedYear) {
@@ -8840,135 +9064,6 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     const greeting = hr < 12 ? 'Good morning 👋' : hr < 17 ? 'Good afternoon 👋' : 'Good evening 👋';
     const greetEl = document.querySelector('#screen-home .greeting');
     if (greetEl) greetEl.textContent = greeting;
-
-
-  /* ── SIGNATURE CANVAS ─────────────────────────────────────── */
-  /* ── SIGNATURE CANVAS ───────────────────────────────────────────── */
-  var _sigHasContent = false;
-  var _sigDrawing    = false;
-
-  // All sig functions on window.* so modal onclick attrs can reach them
-  window.openSignatureModal = function() {
-    openModal('modal-signature');
-    requestAnimationFrame(function() {
-      var wrap   = document.getElementById('sig-canvas-wrap');
-      var canvas = document.getElementById('sig-canvas');
-      if (!canvas || !wrap) return;
-      var w = wrap.clientWidth;
-      var h = Math.round(w * 0.38);
-      canvas.width  = w;
-      canvas.height = h;
-      canvas.style.height = h + 'px';
-      window.sigClear();
-      // Wire events here — canvas exists only after modal opens
-      canvas.addEventListener('mousedown',  window._sigStart);
-      canvas.addEventListener('mousemove',  window._sigMove);
-      canvas.addEventListener('mouseup',    window._sigEnd);
-      canvas.addEventListener('mouseleave', window._sigEnd);
-      canvas.addEventListener('touchstart', window._sigStart, { passive: false });
-      canvas.addEventListener('touchmove',  window._sigMove,  { passive: false });
-      canvas.addEventListener('touchend',   window._sigEnd,   { passive: false });
-    });
-  };
-
-  function _sigCtx() {
-    var c = document.getElementById('sig-canvas');
-    return c ? c.getContext('2d') : null;
-  }
-
-  window.sigClear = function() {
-    var canvas = document.getElementById('sig-canvas');
-    var ctx    = _sigCtx();
-    if (!ctx || !canvas) return;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    _sigHasContent = false;
-    var hint = document.getElementById('sig-canvas-hint');
-    if (hint) hint.style.opacity = '0.5';
-  };
-
-  function _sigPos(e, canvas) {
-    var rect   = canvas.getBoundingClientRect();
-    var scaleX = canvas.width  / rect.width;
-    var scaleY = canvas.height / rect.height;
-    var src    = e.touches ? e.touches[0] : e;
-    return {
-      x: (src.clientX - rect.left) * scaleX,
-      y: (src.clientY - rect.top)  * scaleY,
-    };
-  }
-
-  window._sigStart = function(e) {
-    e.preventDefault();
-    var canvas = document.getElementById('sig-canvas');
-    var ctx    = _sigCtx();
-    if (!ctx || !canvas) return;
-    _sigDrawing = true;
-    var pos = _sigPos(e, canvas);
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
-    ctx.strokeStyle = '#1A1A2E';
-    ctx.lineWidth   = 2.2;
-    ctx.lineCap     = 'round';
-    ctx.lineJoin    = 'round';
-    var hint = document.getElementById('sig-canvas-hint');
-    if (hint) hint.style.opacity = '0';
-    _sigHasContent = true;
-  };
-
-  window._sigMove = function(e) {
-    if (!_sigDrawing) return;
-    e.preventDefault();
-    var canvas = document.getElementById('sig-canvas');
-    var ctx    = _sigCtx();
-    if (!ctx || !canvas) return;
-    var pos = _sigPos(e, canvas);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-  };
-
-  window._sigEnd = function() {
-    _sigDrawing = false;
-    var ctx = _sigCtx();
-    if (ctx) ctx.beginPath();
-  };
-
-  window.sigSave = function() {
-    if (!_sigHasContent) { showToast('Draw your signature first'); return; }
-    var canvas = document.getElementById('sig-canvas');
-    if (!canvas) return;
-    var dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-    localStorage.setItem('hml_signature', dataUrl);
-    syncSignatureSettingsUI();
-    closeModal('modal-signature');
-    showToast('✅ Signature saved');
-  };
-
-  window.clearSavedSignature = function() {
-    localStorage.removeItem('hml_signature');
-    syncSignatureSettingsUI();
-    showToast('Signature cleared');
-  };
-
-  function syncSignatureSettingsUI() {
-    var saved    = localStorage.getItem('hml_signature');
-    var preview  = document.getElementById('settings-sig-preview');
-    var img      = document.getElementById('settings-sig-img');
-    var none     = document.getElementById('settings-sig-none');
-    var clearBtn = document.getElementById('settings-sig-clear-btn');
-    if (saved) {
-      if (preview)  { preview.style.display  = 'block'; }
-      if (img)      { img.src = saved; }
-      if (none)     { none.style.display     = 'none'; }
-      if (clearBtn) { clearBtn.style.display = 'inline-flex'; }
-    } else {
-      if (preview)  { preview.style.display  = 'none'; }
-      if (img)      { img.src = ''; }
-      if (none)     { none.style.display     = 'block'; }
-      if (clearBtn) { clearBtn.style.display = 'none'; }
-    }
-  }
-
 
     // Keyboard: Escape closes drawer
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
@@ -8991,8 +9086,78 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     }, { passive: true });
 
     // Wire settings export/import buttons — handled by inline onclick in HTML
+
+    // Sync signature settings UI
+    syncSignatureSettingsUI();
+    // Sync GitHub PAT settings UI
+    if (typeof syncGhPatSettingsUI === 'function') syncGhPatSettingsUI();
+
+    // ── TENANT APPLICATION IMPORT ────────────────────────────────
+    // Detects #hml-app= in URL (from hml-apply.html confirmation link)
+    (function checkApplicationImport() {
+      const hash = window.location.hash;
+      if (!hash.startsWith('#hml-app=')) return;
+      try {
+        const encoded = hash.slice('#hml-app='.length);
+        const appData = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+        // Clear hash without triggering reload
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+        // Show import dialog after app is ready
+        setTimeout(() => showApplicationImportDialog(appData), 400);
+      } catch(e) {
+        console.warn('HML: could not decode application import', e);
+      }
+    })();
   });
 
+
+
+  /* ── GITHUB PAT — LEASE SHARING ──────────────────────────────────── */
+  function saveGhPat() {
+    var inp = document.getElementById('settings-gh-pat');
+    var val = inp ? inp.value.trim() : '';
+    if (!val || val.charCodeAt(0) === 8226) { showToast('⚠️ Enter your GitHub token first'); return; }
+    localStorage.setItem('hml_gh_pat', val);
+    if (inp) inp.value = '••••••••••••••••';
+    showToast('✅ GitHub token saved');
+  }
+
+  function testGhPat() {
+    var pat = localStorage.getItem('hml_gh_pat') || '';
+    var statusEl = document.getElementById('gh-pat-test-status');
+    var btn = document.getElementById('gh-pat-test-btn');
+    if (!pat) {
+      if (statusEl) { statusEl.textContent = '⚠️ No token saved'; statusEl.style.color = 'var(--amber)'; }
+      return;
+    }
+    if (window.location.protocol === 'file:') {
+      if (statusEl) { statusEl.textContent = '⚠️ Open via GitHub Pages to test'; statusEl.style.color = 'var(--amber)'; }
+      return;
+    }
+    if (btn) { btn.textContent = 'Testing…'; btn.disabled = true; }
+    fetch('https://api.github.com/user', {
+      headers: { 'Authorization': 'Bearer ' + pat, 'Accept': 'application/vnd.github+json' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (btn) { btn.textContent = 'Test Token'; btn.disabled = false; }
+      if (data.login) {
+        if (statusEl) { statusEl.textContent = '✓ Connected as ' + data.login; statusEl.style.color = 'var(--green)'; }
+      } else {
+        if (statusEl) { statusEl.textContent = '✗ Invalid token'; statusEl.style.color = 'var(--red)'; }
+      }
+    })
+    .catch(function() {
+      if (btn) { btn.textContent = 'Test Token'; btn.disabled = false; }
+      if (statusEl) { statusEl.textContent = '✗ Network error'; statusEl.style.color = 'var(--red)'; }
+    });
+  }
+
+  function syncGhPatSettingsUI() {
+    var pat = localStorage.getItem('hml_gh_pat') || '';
+    var inp = document.getElementById('settings-gh-pat');
+    if (inp) inp.value = pat ? '••••••••••••••••' : '';
+  }
 
 </script>
 
@@ -9413,7 +9578,7 @@ function lbPromptOverlay(message, placeholder, onSubmit) {
 
 /* Synchronous download helper — stays within the user gesture frame */
 function lbDownloadNow(filename, content, mimeType) {
-  // Path 1: Web Share API with files (iOS PWA + HTTPS — works for PDF, images)
+  // Path 1: Web Share API with files (iOS 15+, requires HTTPS + gesture)
   try {
     var shareBlob = new Blob([content], { type: mimeType });
     var shareFile = new File([shareBlob], filename, { type: mimeType });
@@ -9425,21 +9590,19 @@ function lbDownloadNow(filename, content, mimeType) {
     }
   } catch(e1) {}
 
-  // Path 2: Desktop/Android blob anchor download
+  // Path 2: blob URL download (works on desktop/Android)
   try {
-    if (!navigator.standalone && !window.matchMedia('(display-mode: standalone)').matches) {
-      var dlBlob = new Blob([content], { type: mimeType });
-      var dlUrl  = URL.createObjectURL(dlBlob);
-      var dlA    = document.createElement('a');
-      dlA.href = dlUrl; dlA.download = filename;
-      document.body.appendChild(dlA); dlA.click(); document.body.removeChild(dlA);
-      setTimeout(function(){ URL.revokeObjectURL(dlUrl); }, 1500);
-      if (window.lbToast) window.lbToast('✅ ' + filename);
-      return true;
-    }
+    var dlBlob = new Blob([content], { type: mimeType });
+    var dlUrl  = URL.createObjectURL(dlBlob);
+    var dlA    = document.createElement('a');
+    dlA.href = dlUrl; dlA.download = filename;
+    document.body.appendChild(dlA); dlA.click(); document.body.removeChild(dlA);
+    setTimeout(function(){ URL.revokeObjectURL(dlUrl); }, 1500);
+    if (window.lbToast) window.lbToast('✅ ' + filename);
+    return true;
   } catch(e2) {}
 
-  // Path 3: In-app content overlay — tap Share ↗ or Copy to save
+  // Path 3 (iOS PWA fallback): show content in copy modal
   lbShowContent(filename, content);
   return true;
 }
@@ -10057,10 +10220,8 @@ window.lbGoStep = function(step) {
   }
   if (step === 'preview') {
     lbRenderPreview();
-    lbUpdateStep4Buttons();
+    lbUpdateStep4Buttons(); // update Execute/Amend based on agreement status
   }
-  var _stickyBar = document.getElementById('lb-sticky-actions');
-  if (_stickyBar) _stickyBar.style.display = step === 'preview' ? '' : 'none';
   var body = document.getElementById('lb-body-scroll');
   if (body) body.scrollTo({ top: 0, behavior: 'smooth' });
 };
@@ -10176,18 +10337,12 @@ function lbUpdateStep4Buttons() {
 
   var status = agreement ? agreement.status : 'draft';
 
-  var _se = document.getElementById('lb-sticky-execute');
-  var _sa = document.getElementById('lb-sticky-amend');
   if (status === 'executed' || status === 'amended') {
-    if (executeBtn) executeBtn.style.display = 'none';
-    if (amendBtn)   amendBtn.style.display   = '';
-    if (_se) _se.style.display = 'none';
-    if (_sa) _sa.style.display = '';
+    executeBtn.style.display = 'none';
+    amendBtn.style.display   = '';
   } else {
-    if (executeBtn) executeBtn.style.display = '';
-    if (amendBtn)   amendBtn.style.display   = 'none';
-    if (_se) _se.style.display = '';
-    if (_sa) _sa.style.display = 'none';
+    executeBtn.style.display = '';
+    amendBtn.style.display   = 'none';
   }
 }
 // Each clause stores its default text separately so we can reset.
@@ -11175,7 +11330,13 @@ window.lbExportDocx = function() {
   rtf += para('IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement as of the Effective Date.', false, 11);
   rtf += para('', false, 11);
   rtf += para('Landlord: ' + landlordName, false, 11);
-  rtf += para('By: _________________________________   Date: ___________', false, 11);
+  // Signature line: show [signed] if signature is saved, otherwise blank underline
+  var rtfSigSaved = localStorage.getItem('hml_signature');
+  if (rtfSigSaved) {
+    rtf += para('By: ' + landlordName + ' [signed]   Date: ___________', false, 11);
+  } else {
+    rtf += para('By: _________________________________   Date: ___________', false, 11);
+  }
   rtf += para('', false, 11);
   rtf += para('Tenant: ' + tenantFull, false, 11);
   rtf += para('By: _________________________________   Date: ___________', false, 11);
@@ -11236,7 +11397,8 @@ window.lbExportTxt = function() {
   lines.push('Total Received:    $' + totalDep);
   lines.push('', 'IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement.', '');
   lines.push('Landlord: ' + landlordName);
-  lines.push('By: _________________________________  Date: ___________', '');
+  var txtSig = localStorage.getItem('hml_signature') ? landlordName + ' [signed]' : '_________________________________';
+  lines.push('By: ' + txtSig + '   Date: ___________', '');
   lines.push('Tenant: ' + tenantFull);
   lines.push('By: _________________________________  Date: ___________');
 
@@ -11413,29 +11575,6 @@ window.lbExportPdf = function() {
   var cleanLabel  = tokens['{{CLEANING_FEE_LABEL}}'] || 'Cleaning Fee';
   var petLabel    = tokens['{{PET_FEE_LABEL}}']      || 'Pet Fee';
   var fname       = 'lease-' + tenantFull.replace(/\s+/g,'-').toLowerCase() + '-' + effDate + '.pdf';
-  // Read signature — re-encode to JPEG if stored as PNG (older saves used PNG)
-  var sigDataUrl = (function() {
-    var stored = localStorage.getItem('hml_signature') || '';
-    if (!stored) return '';
-    if (stored.indexOf('data:image/jpeg') === 0) return stored; // already JPEG
-    // Re-encode PNG → JPEG via offscreen canvas (synchronous)
-    try {
-      var tmpImg = new window.Image();
-      tmpImg.src = stored;
-      if (!tmpImg.complete || tmpImg.naturalWidth === 0) {
-        // Image not loaded synchronously (shouldn't happen for data URLs but fallback)
-        return stored; // keep original, embed will skip
-      }
-      var tmpCanvas = document.createElement('canvas');
-      tmpCanvas.width  = tmpImg.naturalWidth  || 320;
-      tmpCanvas.height = tmpImg.naturalHeight || 88;
-      var tmpCtx = tmpCanvas.getContext('2d');
-      tmpCtx.fillStyle = '#ffffff';
-      tmpCtx.fillRect(0, 0, tmpCanvas.width, tmpCanvas.height);
-      tmpCtx.drawImage(tmpImg, 0, 0);
-      return tmpCanvas.toDataURL('image/jpeg', 0.95);
-    } catch(e) { return stored; }
-  }());
 
   /* ── 2. Build logical lines array (same as lbExportTxt) ── */
   var lines = [
@@ -11488,12 +11627,11 @@ window.lbExportPdf = function() {
   lines.push({ text: 'IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement as of the Effective Date.', size: 11 });
   lines.push({ text: '', size: 11 });
   lines.push({ text: 'Landlord: ' + landlordName, size: 11 });
-  lines.push({ text: '_________________________________', size: 11, _landlordSig: true });
-  lines.push({ text: 'Date: ___________', size: 11 });
+  var pdfSigLine = sigDataUrl ? (landlordName + ' [signed]   Date: ___________') : 'By: _________________________________   Date: ___________';
+  lines.push({ text: pdfSigLine, size: 11, _landlordSig: true });
   lines.push({ text: '', size: 11 });
   lines.push({ text: 'Tenant: ' + tenantFull, size: 11 });
-  lines.push({ text: 'By: _________________________________', size: 11 });
-  lines.push({ text: 'Date: ___________', size: 11 });
+  lines.push({ text: 'By: _________________________________   Date: ___________', size: 11 });
 
   /* ── 3. Minimal raw PDF 1.4 writer ── */
   // Page: US Letter 8.5" × 11" = 612 × 792 pt
@@ -11541,11 +11679,12 @@ window.lbExportPdf = function() {
     });
   }
 
-  // ── SIGNATURE EMBED (JPEG → DCT) ────────────────────────────────────
-  // sigDataUrl, sigPdfW, sigPdfH declared at top of function (used in lines[] above)
+  // ── SIGNATURE SETUP ──────────────────────────────────────────
+  // Load saved signature and decode PNG bytes for embedding
+  var sigDataUrl = localStorage.getItem('hml_signature') || '';
   var sigPdfW    = 160;  // target width in PDF points
-  var sigPdfH    = 48;   // target height in PDF points
-  var SIG_OBJ_ID = null; // will be set to PDF object number if embed succeeds
+  var sigPdfH    = 44;   // target height in PDF points
+  var SIG_OBJ_ID = null; // set if image XObject is successfully embedded
 
   // Expand logical lines into render lines [{text, bold, center, _landlordSig}]
   var renderLines = [];
@@ -11596,53 +11735,10 @@ window.lbExportPdf = function() {
   w('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
   w('endobj');
 
-  // Embed JPEG signature as PDF image XObject (synchronous — no Image() needed)
+  // Signature image embedding removed — async Image() load is unreliable in a
+  // synchronous PDF writer. The signature line uses landlordName + [signed] instead.
+  // SIG_OBJ_ID stays null; the _landlordSig render path shows text-only signature.
   var nextObj = 5;
-  if (sigDataUrl && sigDataUrl.indexOf('data:image/jpeg;base64,') === 0) {
-    try {
-      var jpegB64   = sigDataUrl.replace('data:image/jpeg;base64,', '');
-      var jpegBin   = atob(jpegB64);
-      var jpegBytes = new Uint8Array(jpegBin.length);
-      for (var si = 0; si < jpegBin.length; si++) jpegBytes[si] = jpegBin.charCodeAt(si);
-
-      // Read JPEG dimensions (SOF0/SOF2 marker scan)
-      var jpegW = 0, jpegH = 0;
-      for (var ji = 0; ji < jpegBytes.length - 8; ji++) {
-        if (jpegBytes[ji] === 0xFF && (jpegBytes[ji+1] === 0xC0 || jpegBytes[ji+1] === 0xC2)) {
-          jpegH = (jpegBytes[ji+5] << 8) | jpegBytes[ji+6];
-          jpegW = (jpegBytes[ji+7] << 8) | jpegBytes[ji+8];
-          break;
-        }
-      }
-      // Adjust PDF height to match canvas aspect ratio
-      if (jpegW > 0 && jpegH > 0) {
-        sigPdfH = Math.round(sigPdfW * (jpegH / jpegW));
-        if (sigPdfH > 60) { sigPdfH = 60; sigPdfW = Math.round(60 * (jpegW / jpegH)); }
-      }
-
-      // Convert bytes to binary string for PDF stream
-      var jpegStream = '';
-      for (var sk = 0; sk < jpegBytes.length; sk++) jpegStream += String.fromCharCode(jpegBytes[sk]);
-
-      var sigObjId = nextObj++;
-      offsets[sigObjId] = out.join('').length;
-      w(sigObjId + ' 0 obj');
-      w('<< /Type /XObject /Subtype /Image');
-      w('   /Width '  + (jpegW || 320));
-      w('   /Height ' + (jpegH || 88));
-      w('   /ColorSpace /DeviceRGB');
-      w('   /BitsPerComponent 8');
-      w('   /Filter /DCTDecode');
-      w('   /Length ' + jpegStream.length + ' >>');
-      w('stream');
-      out.push(jpegStream + '\n');
-      w('endstream');
-      w('endobj');
-      SIG_OBJ_ID = sigObjId;
-    } catch(sigErr) {
-      SIG_OBJ_ID = null;
-    }
-  }
 
   // Page content objects — each page = 2 objects: content stream + page dict
   var pageObjIds = [];
@@ -11748,205 +11844,6 @@ window.lbExportPdf = function() {
   /* ── 4. Deliver via lbDownloadNow (Web Share → blob download → copy overlay) ── */
   lbDownloadNow(fname, pdfText, 'application/pdf');
 };
-
-/* == SHARE LEASE == */
-/* ── SHARE LEASE VIA GIST ─────────────────────────────────────────── */
-
-function lbQrSvg(url, sizePx) {
-  sizePx = sizePx || 200;
-  return '<img src="https://api.qrserver.com/v1/create-qr-code/?size='
-    + sizePx + 'x' + sizePx + '&ecc=M&data=' + encodeURIComponent(url)
-    + '" width="' + sizePx + '" height="' + sizePx
-    + '" style="display:block;border-radius:8px;" alt="QR code" />';
-}
-
-function lbPreFlight() {
-  var tokens    = lbGetTokens();
-  var getCol    = window.lbGetCollection || function(){ return []; };
-  var pat       = localStorage.getItem('hml_gh_pat') || '';
-  var agreement = LB.agreementId
-    ? getCol('leaseAgreements').find(function(a){ return a.id === LB.agreementId; })
-    : null;
-  return [
-    { label: 'GitHub token configured',
-      ok: !!pat,
-      hint: 'Settings \u2192 Lease Sharing \u2192 add GitHub PAT' },
-    { label: 'Lease executed',
-      ok: !!(agreement && (agreement.status === 'executed' || agreement.status === 'amended')),
-      hint: 'Tap \u2705 Execute on Step 4 first' },
-    { label: 'Landlord name',
-      ok: !!(tokens['{{LANDLORD_NAME}}'] && tokens['{{LANDLORD_NAME}}'] !== '___________'),
-      hint: 'Settings \u2192 Owner Profile \u2192 Your Name' },
-    { label: 'Tenant name',
-      ok: !!(tokens['{{TENANT_FULL_NAME}}'] && tokens['{{TENANT_FULL_NAME}}'] !== '___________'),
-      hint: 'Step 1 \u2192 select a lease with a tenant' },
-    { label: 'Property address',
-      ok: !!(tokens['{{PROP_ADDRESS}}'] && tokens['{{PROP_ADDRESS}}'] !== '___________'),
-      hint: 'Step 1 \u2192 link a property' },
-    { label: 'Lease dates set',
-      ok: !!(tokens['{{EFF_DATE}}'] && tokens['{{EFF_DATE}}'] !== '___________'),
-      hint: 'Step 2 \u2192 set start date' },
-    { label: 'Monthly rent set',
-      ok: parseFloat(tokens['{{RENT}}'] || 0) > 0,
-      hint: 'Step 2 \u2192 monthly rent' },
-    { label: 'Payment address',
-      ok: !!(tokens['{{PAY_ADDRESS}}'] && tokens['{{PAY_ADDRESS}}'] !== '___________'),
-      hint: 'Step 2 \u2192 Payment Address' },
-    { label: 'Governing state',
-      ok: !!( (document.getElementById('lb-state') || {}).value ),
-      hint: 'Step 2 \u2192 State' },
-  ];
-}
-
-function lbBuildLeasePayload() {
-  var tokens   = lbGetTokens();
-  var getCol   = window.lbGetCollection || function(){ return []; };
-  var stateVal = (document.getElementById('lb-state') || {}).value || 'Virginia';
-  var rentAmt  = parseFloat(tokens['{{RENT}}']     || 0);
-  var secDep   = parseFloat(tokens['{{SEC_DEP}}']  || 0);
-  var cleanDep = parseFloat(tokens['{{CLEAN_DEP}}'] || 0);
-  var petFee   = parseFloat(tokens['{{PET_FEE}}']  || 0);
-
-  var proratedAmt = 0, proratedNote = '';
-  var lease2 = LB.linkedLeaseId
-    ? getCol('leases').find(function(l){ return l.id === LB.linkedLeaseId; })
-    : null;
-  if (lease2 && lease2.startDate) {
-    var sd = new Date(lease2.startDate + 'T12:00:00');
-    if (sd.getDate() !== 1) {
-      var dim = new Date(sd.getFullYear(), sd.getMonth() + 1, 0).getDate();
-      var rem = dim - sd.getDate() + 1;
-      proratedAmt  = Math.round((rentAmt / dim) * rem * 100) / 100;
-      proratedNote = rem + '/' + dim + ' days';
-    }
-  }
-
-  var clauses = LB.clauses.filter(function(c){ return c.included; }).map(function(c) {
-    return { num: c.num, title: c.title, text: lbSubstitute(c.text) };
-  });
-
-  return {
-    v:            1,
-    state:        stateVal,
-    landlord:     tokens['{{LANDLORD_NAME}}'],
-    tenant:       tokens['{{TENANT_FULL_NAME}}'],
-    effDate:      tokens['{{EFF_DATE}}'],
-    rent:         rentAmt,
-    secDep:       secDep,
-    cleanDep:     cleanDep,
-    cleanLabel:   tokens['{{CLEANING_FEE_LABEL}}'] || 'Cleaning Fee',
-    petFee:       petFee,
-    petLabel:     tokens['{{PET_FEE_LABEL}}'] || 'Pet Fee',
-    proratedAmt:  proratedAmt,
-    proratedNote: proratedNote,
-    payInFull:    LB.payInFull || null,
-    clauses:      clauses,
-    sharedAt:     new Date().toISOString(),
-  };
-}
-
-window.lbShareLease = function() {
-  var checks = lbPreFlight();
-  var allOk  = checks.every(function(c){ return c.ok; });
-
-  var rows = checks.map(function(c) {
-    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">'
-      + '<span style="font-size:1rem;flex-shrink:0;">' + (c.ok ? '\u2705' : '\u274c') + '</span>'
-      + '<div style="flex:1;">'
-        + '<div style="font-size:0.8125rem;font-weight:600;color:var(--navy);">' + c.label + '</div>'
-        + (!c.ok ? '<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">' + c.hint + '</div>' : '')
-      + '</div></div>';
-  }).join('');
-
-  var o = document.createElement('div');
-  o.id  = 'lb-share-preflight';
-  o.style.cssText = 'position:fixed;inset:0;z-index:10010;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;justify-content:center;';
-  o.innerHTML = ''
-    + '<div style="background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">'
-      + '<div style="padding:16px 16px 0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">'
-        + '<div style="font-size:1rem;font-weight:700;color:var(--navy);">Share Lease Checklist</div>'
-        + '<button onclick="document.getElementById(\'lb-share-preflight\').remove()" style="background:none;border:none;font-size:1.25rem;color:var(--muted);cursor:pointer;padding:4px;">\u2715</button>'
-      + '</div>'
-      + '<div style="padding:0 16px;overflow-y:auto;flex:1;">' + rows + '</div>'
-      + '<div style="padding:16px;flex-shrink:0;">'
-        + (allOk
-            ? '<button class="btn btn-primary" style="width:100%;" onclick="lbShareLeaseConfirmed()">\ud83d\udce4 Create Share Link</button>'
-            : '<button class="btn btn-primary" style="width:100%;opacity:0.45;" disabled>Fix issues above to share</button>'
-          )
-      + '</div>'
-    + '</div>';
-  document.body.appendChild(o);
-};
-
-window.lbShareLeaseConfirmed = function() {
-  var o   = document.getElementById('lb-share-preflight');
-  var btn = o ? o.querySelector('button.btn-primary') : null;
-  if (btn) { btn.textContent = '\u23f3 Creating link\u2026'; btn.disabled = true; }
-
-  var pat     = localStorage.getItem('hml_gh_pat') || '';
-  var payload = lbBuildLeasePayload();
-  var tokens  = lbGetTokens();
-  var fname   = 'lease-' + (tokens['{{TENANT_FULL_NAME}}'] || 'tenant')
-    .replace(/\s+/g, '-').toLowerCase() + '-' + (tokens['{{EFF_DATE}}'] || 'draft') + '.json';
-
-  var files = {};
-  files[fname] = { content: JSON.stringify(payload, null, 2) };
-
-  fetch('https://api.github.com/gists', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + pat,
-      'Accept': 'application/vnd.github+json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      description: 'HML Lease \u2014 ' + payload.tenant + ' \u2014 ' + payload.effDate,
-      public: false,
-      files: files
-    })
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(data){
-    if (!data.id) throw new Error(data.message || 'Gist creation failed');
-    var base = window.location.origin
-      + window.location.pathname.replace(/[^/]*$/, '');
-    var url = base + 'hml-lease.html?g=' + data.id;
-    if (o) o.remove();
-    lbShowShareResult(url, payload.tenant);
-  })
-  .catch(function(err){
-    if (btn) { btn.textContent = '\ud83d\udce4 Create Share Link'; btn.disabled = false; }
-    if (window.lbToast) window.lbToast('\u26a0\ufe0f ' + (err.message || 'Failed to create link'));
-  });
-};
-
-function lbShowShareResult(url, tenantName) {
-  var o = document.createElement('div');
-  o.id  = 'lb-share-result';
-  o.style.cssText = 'position:fixed;inset:0;z-index:10010;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;justify-content:center;';
-
-  var safeUrl = url.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-
-  o.innerHTML = ''
-    + '<div style="background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:20px 16px 32px;display:flex;flex-direction:column;align-items:center;gap:14px;">'
-      + '<div style="width:100%;display:flex;justify-content:space-between;align-items:center;">'
-        + '<div style="font-size:1rem;font-weight:700;color:var(--navy);">\ud83d\udce4 Lease Link Ready</div>'
-        + '<button onclick="document.getElementById(\'lb-share-result\').remove()" style="background:none;border:none;font-size:1.25rem;color:var(--muted);cursor:pointer;">\u2715</button>'
-      + '</div>'
-      + '<div style="font-size:0.8125rem;color:var(--muted);text-align:center;line-height:1.5;">Share with <strong>' + (tenantName || 'tenant') + '</strong> \u2014 they can open, read, and print from any device.</div>'
-      + '<div style="background:#fff;padding:10px;border-radius:12px;border:1px solid var(--border);">' + lbQrSvg(url, 180) + '</div>'
-      + '<div style="font-size:0.7rem;color:var(--muted);">Tenant scans QR to open lease</div>'
-      + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;width:100%;word-break:break-all;font-family:monospace;font-size:0.7rem;color:var(--navy);">' + url + '</div>'
-      + '<div style="display:flex;gap:8px;width:100%;">'
-        + '<button class="btn btn-primary" style="flex:1;" onclick="navigator.clipboard&&navigator.clipboard.writeText(\'' + safeUrl + '\').then(function(){if(window.lbToast)window.lbToast(\'\u2705 Link copied\');})">\ud83d\udccb Copy Link</button>'
-        + '<button class="btn btn-outline" style="flex:1;" onclick="try{navigator.share({url:\'' + safeUrl + '\',title:\'Lease Agreement\'});}catch(e){}">\u2197 Share</button>'
-      + '</div>'
-      + '<div style="font-size:0.7rem;color:var(--muted);text-align:center;">Anyone with this link can view the lease. Delete the Gist from github.com to revoke access.</div>'
-    + '</div>';
-  document.body.appendChild(o);
-}
-
-
 window.openLeaseBuilder = function() {
   // Build HTML for the modal if not already present
   var existing = document.getElementById('hml-lb-modal');
@@ -11975,23 +11872,6 @@ window.openLeaseBuilder = function() {
           '<button class="lb-step-tab"        id="lb-tab-terms"    onclick="lbGoStep(\'terms\')">2 Terms</button>',
           '<button class="lb-step-tab"        id="lb-tab-clauses"  onclick="lbGoStep(\'clauses\')">3 Clauses</button>',
           '<button class="lb-step-tab"        id="lb-tab-preview"  onclick="lbGoStep(\'preview\')">4 Preview</button>',
-        '</div>',
-      '</div>',
-      '<div id="lb-sticky-actions" style="display:none;background:var(--card);border-bottom:1px solid var(--border);padding:8px 12px;flex-shrink:0;">',
-        '<div style="display:flex;gap:6px;margin-bottom:6px;">',
-          '<button class="btn btn-outline btn-sm" style="flex:1;" onclick="lbGoStep(\'clauses\')">\u2190 Edit</button>',
-          '<button class="btn btn-amber btn-sm" style="flex:1;" onclick="lbSaveDraft()">💾 Save Draft</button>',
-          '<button id="lb-sticky-execute" class="btn btn-sm" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:0.75rem;font-weight:700;cursor:pointer;" onclick="lbExecute()">✅ Execute</button>',
-          '<button id="lb-sticky-amend" class="btn btn-sm" style="flex:1;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:0.75rem;font-weight:700;cursor:pointer;display:none;" onclick="lbPromptAmend()">&#x1F4DD; Amend</button>',
-        '</div>',
-        '<div style="display:flex;gap:6px;">',
-          '<button class="btn btn-primary btn-sm" style="flex:1;" onclick="lbExportDocx()" ontouchstart="">⬇ .doc</button>',
-          '<button class="btn btn-primary btn-sm" style="flex:1;background:#4A7C59;border-color:#4A7C59;" onclick="lbExportTxt()" ontouchstart="">⬇ .txt</button>',
-          '<button class="btn btn-primary btn-sm" style="flex:1;background:var(--red);border-color:var(--red);" onclick="lbExportPdf()" ontouchstart="">⬇ .pdf</button>',
-        '</div>',
-        '<div style="margin-top:6px;">',
-          '<button class="btn btn-primary btn-sm" style="width:100%;background:var(--navy);border-color:var(--navy);" onclick="lbShareLease()" ontouchstart="">&#128228; Share Lease (SMS / QR)</button>',
-        '</div>',
         '</div>',
       '</div>',
       '<div class="lb-body" id="lb-body-scroll">',
@@ -12182,10 +12062,24 @@ window.openLeaseBuilder = function() {
         '</div>',
         // STEP 4
         '<div class="lb-panel" id="lb-panel-preview">',
-          '<div style="display:none;"><button id="lb-btn-execute"></button><button id="lb-btn-amend"></button></div>',
-          '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">',
-            '<button class="btn btn-outline btn-sm" style="flex:1;font-size:0.7rem;" onclick="lbExportSnapshot()" title="Export frozen snapshot">📜 Export Snapshot</button>',
-            '<button class="btn btn-outline btn-sm" style="flex:1;font-size:0.7rem;" onclick="lbShowChangelog()" title="View all versions">🕐 Change Log</button>',
+          '<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">',
+            '<button class="btn btn-outline btn-sm" style="flex:1;" onclick="lbGoStep(\'clauses\')">← Edit</button>',
+            '<button class="btn btn-amber btn-sm" style="flex:1;" onclick="lbSaveDraft()">💾 Save Draft</button>',
+            '<button id="lb-btn-execute" class="btn btn-sm" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:0.75rem;font-weight:600;cursor:pointer;" onclick="lbExecute()">✅ Execute</button>',
+            '<button id="lb-btn-amend"   class="btn btn-sm" style="flex:1;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:0.75rem;font-weight:600;cursor:pointer;display:none;" onclick="lbPromptAmend()">📝 Amend</button>',
+          '</div>',
+          '<div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap;">',
+            '<button class="btn btn-primary btn-sm" style="flex:1;" onclick="lbExportDocx()" title="Word-compatible RTF">⬇ .doc</button>',
+            '<button class="btn btn-primary btn-sm" style="flex:1;background:#4A7C59;border-color:#4A7C59;" onclick="lbExportTxt()" title="Plain text">⬇ .txt</button>',
+            '<button class="btn btn-primary btn-sm" style="flex:1;background:var(--red);border-color:var(--red);" onclick="lbExportPdf()" title="Save as PDF">⬇ .pdf</button>',
+          '</div>',
+          '<div style="margin-bottom:14px;">',
+            '<button class="btn btn-primary btn-sm" style="width:100%;background:var(--navy);border-color:var(--navy);" onclick="lbShareLease()">📤 Share Lease (SMS / QR)</button>',
+          '</div>',
+          '</div>',
+          '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">',
+            '<button class="btn btn-outline btn-sm" style="flex:1;font-size:0.7rem;" onclick="lbExportSnapshot()" title="Export frozen snapshot of executed agreement">📜 Export Snapshot</button>',
+            '<button class="btn btn-outline btn-sm" style="flex:1;font-size:0.7rem;" onclick="lbShowChangelog()" title="View all versions and changes">🕐 Change Log</button>',
           '</div>',
           '<div id="lb-changelog-panel" style="display:none;margin-bottom:14px;background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;"></div>',
           '<div id="lb-preview-doc" class="lb-preview"></div>',
@@ -12227,6 +12121,201 @@ window.renderLeaseBuilder = function() {
     }
   }
 };
+
+
+/* ── LEASE SHARING — PRE-FLIGHT + GIST + RESULT ─────────────────── */
+
+function lbQrSvg(url, sizePx) {
+  sizePx = sizePx || 200;
+  return '<img src="https://api.qrserver.com/v1/create-qr-code/?size='
+    + sizePx + 'x' + sizePx + '&ecc=M&data=' + encodeURIComponent(url)
+    + '" width="' + sizePx + '" height="' + sizePx
+    + '" style="display:block;border-radius:8px;" alt="QR code" />';
+}
+
+function lbPreFlight() {
+  var tokens   = lbGetTokens();
+  var getCol   = window.lbGetCollection || function(){ return []; };
+  var pat      = localStorage.getItem('hml_gh_pat') || '';
+  var agreement = LB.agreementId
+    ? getCol('leaseAgreements').find(function(a){ return a.id === LB.agreementId; })
+    : null;
+  return [
+    { label: 'GitHub token configured',
+      ok: !!pat,
+      hint: 'Settings \u2192 Lease Sharing \u2192 add GitHub PAT (classic, gist scope)' },
+    { label: 'Lease executed',
+      ok: !!(agreement && (agreement.status === 'executed' || agreement.status === 'amended')),
+      hint: 'Tap \u2705 Execute in Step 4 first' },
+    { label: 'Landlord name',
+      ok: !!(tokens['{{LANDLORD_NAME}}'] && tokens['{{LANDLORD_NAME}}'] !== '___________'),
+      hint: 'Settings \u2192 Owner Profile \u2192 Full Name' },
+    { label: 'Tenant name',
+      ok: !!(tokens['{{TENANT_FULL_NAME}}'] && tokens['{{TENANT_FULL_NAME}}'] !== '___________'),
+      hint: 'Step 1 \u2192 select a lease with a tenant name' },
+    { label: 'Property address',
+      ok: !!(tokens['{{PROP_ADDRESS}}'] && tokens['{{PROP_ADDRESS}}'] !== '___________'),
+      hint: 'Step 1 \u2192 link a property with an address' },
+    { label: 'Lease dates set',
+      ok: !!(tokens['{{EFF_DATE}}'] && tokens['{{EFF_DATE}}'] !== '___________'),
+      hint: 'Step 2 \u2192 lease start date' },
+    { label: 'Monthly rent set',
+      ok: parseFloat(tokens['{{RENT}}'] || 0) > 0,
+      hint: 'Lease record must have a monthly rent amount' },
+    { label: 'Payment address',
+      ok: !!(tokens['{{PAY_ADDRESS}}'] && tokens['{{PAY_ADDRESS}}'] !== '___________'),
+      hint: 'Step 2 \u2192 Payment Address fields' },
+    { label: 'Governing state',
+      ok: !!( (document.getElementById('lb-state') || {}).value ),
+      hint: 'Step 2 \u2192 link a property with a state' },
+  ];
+}
+
+function lbBuildLeasePayload() {
+  var tokens   = lbGetTokens();
+  var getCol   = window.lbGetCollection || function(){ return []; };
+  var stateVal = (document.getElementById('lb-state') || {}).value || 'Virginia';
+  var rentAmt  = parseFloat(tokens['{{RENT}}']     || 0);
+  var secDep   = parseFloat(tokens['{{SEC_DEP}}']  || 0);
+  var cleanDep = parseFloat(tokens['{{CLEAN_DEP}}'] || 0);
+  var petFee   = parseFloat(tokens['{{PET_FEE}}']  || 0);
+
+  var proratedAmt = 0, proratedNote = '';
+  var lease2 = LB.linkedLeaseId
+    ? getCol('leases').find(function(l){ return l.id === LB.linkedLeaseId; })
+    : null;
+  if (lease2 && lease2.startDate) {
+    var sd = new Date(lease2.startDate + 'T12:00:00');
+    if (sd.getDate() !== 1) {
+      var dim = new Date(sd.getFullYear(), sd.getMonth() + 1, 0).getDate();
+      var rem = dim - sd.getDate() + 1;
+      proratedAmt  = Math.round((rentAmt / dim) * rem * 100) / 100;
+      proratedNote = rem + '/' + dim + ' days';
+    }
+  }
+
+  var clauses = LB.clauses.filter(function(c){ return c.included; }).map(function(c) {
+    return { num: c.num, title: c.title, text: lbSubstitute(c.text) };
+  });
+
+  return {
+    v:            1,
+    state:        stateVal,
+    landlord:     tokens['{{LANDLORD_NAME}}'],
+    tenant:       tokens['{{TENANT_FULL_NAME}}'],
+    effDate:      tokens['{{EFF_DATE}}'],
+    rent:         rentAmt,
+    secDep:       secDep,
+    cleanDep:     cleanDep,
+    cleanLabel:   tokens['{{CLEANING_FEE_LABEL}}'] || 'Cleaning Fee',
+    petFee:       petFee,
+    petLabel:     tokens['{{PET_FEE_LABEL}}']      || 'Pet Fee',
+    proratedAmt:  proratedAmt,
+    proratedNote: proratedNote,
+    clauses:      clauses,
+    sharedAt:     new Date().toISOString(),
+  };
+}
+
+window.lbShareLease = function() {
+  var checks = lbPreFlight();
+  var allOk  = checks.every(function(c){ return c.ok; });
+
+  var rows = checks.map(function(c) {
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">'
+      + '<span style="font-size:1rem;flex-shrink:0;">' + (c.ok ? '\u2705' : '\u274c') + '</span>'
+      + '<div style="flex:1;">'
+        + '<div style="font-size:0.8125rem;font-weight:600;color:var(--navy);">' + c.label + '</div>'
+        + (!c.ok ? '<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">' + c.hint + '</div>' : '')
+      + '</div></div>';
+  }).join('');
+
+  var o = document.createElement('div');
+  o.id  = 'lb-share-preflight';
+  o.style.cssText = 'position:fixed;inset:0;z-index:10010;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;justify-content:center;';
+  o.innerHTML = ''
+    + '<div style="background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">'
+      + '<div style="padding:16px 16px 0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">'
+        + '<div style="font-size:1rem;font-weight:700;color:var(--navy);">Share Lease Checklist</div>'
+        + '<button onclick="document.getElementById(\'lb-share-preflight\').remove()" style="background:none;border:none;font-size:1.25rem;color:var(--muted);cursor:pointer;padding:4px;">\u2715</button>'
+      + '</div>'
+      + '<div style="padding:0 16px;overflow-y:auto;flex:1;">' + rows + '</div>'
+      + '<div style="padding:16px;flex-shrink:0;">'
+        + (allOk
+            ? '<button class="btn btn-primary" style="width:100%;" onclick="lbShareLeaseConfirmed()">\U0001f4e4 Create Share Link</button>'
+            : '<button class="btn btn-primary" style="width:100%;opacity:0.45;" disabled>Fix issues above to share</button>'
+          )
+      + '</div>'
+    + '</div>';
+  document.body.appendChild(o);
+};
+
+window.lbShareLeaseConfirmed = function() {
+  var o   = document.getElementById('lb-share-preflight');
+  var btn = o ? o.querySelector('button.btn-primary') : null;
+  if (btn) { btn.textContent = '\u23f3 Creating link\u2026'; btn.disabled = true; }
+
+  var pat     = localStorage.getItem('hml_gh_pat') || '';
+  var payload = lbBuildLeasePayload();
+  var tokens  = lbGetTokens();
+  var fname   = 'lease-' + (tokens['{{TENANT_FULL_NAME}}'] || 'tenant')
+    .replace(/\s+/g, '-').toLowerCase() + '-' + (tokens['{{EFF_DATE}}'] || 'draft') + '.json';
+
+  var files = {};
+  files[fname] = { content: JSON.stringify(payload, null, 2) };
+
+  fetch('https://api.github.com/gists', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + pat,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      description: 'HML Lease \u2014 ' + payload.tenant + ' \u2014 ' + payload.effDate,
+      public: false,
+      files: files
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if (!data.id) throw new Error(data.message || 'Gist creation failed');
+    var base = window.location.origin
+      + window.location.pathname.replace(/[^/]*$/, '');
+    var url = base + 'hml-lease.html?g=' + data.id;
+    if (o) o.remove();
+    lbShowShareResult(url, payload.tenant);
+  })
+  .catch(function(err){
+    if (btn) { btn.textContent = '\U0001f4e4 Create Share Link'; btn.disabled = false; }
+    var toast = window.lbToast || (typeof showToast === 'function' ? showToast : function(){});
+    toast('\u26a0\ufe0f ' + (err.message || 'Failed to create link'));
+  });
+};
+
+function lbShowShareResult(url, tenantName) {
+  var safeUrl = url.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var o = document.createElement('div');
+  o.id  = 'lb-share-result';
+  o.style.cssText = 'position:fixed;inset:0;z-index:10010;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;justify-content:center;';
+  o.innerHTML = ''
+    + '<div style="background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:20px 16px 32px;display:flex;flex-direction:column;align-items:center;gap:14px;">'
+      + '<div style="width:100%;display:flex;justify-content:space-between;align-items:center;">'
+        + '<div style="font-size:1rem;font-weight:700;color:var(--navy);">\U0001f4e4 Lease Link Ready</div>'
+        + '<button onclick="document.getElementById(\'lb-share-result\').remove()" style="background:none;border:none;font-size:1.25rem;color:var(--muted);cursor:pointer;">\u2715</button>'
+      + '</div>'
+      + '<div style="font-size:0.8125rem;color:var(--muted);text-align:center;line-height:1.5;">Share with <strong>' + (tenantName || 'tenant') + '</strong> \u2014 they can open, read, and print from any device.</div>'
+      + '<div style="background:#fff;padding:10px;border-radius:12px;border:1px solid var(--border);">' + lbQrSvg(url, 180) + '</div>'
+      + '<div style="font-size:0.7rem;color:var(--muted);">Tenant scans QR to open lease</div>'
+      + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;width:100%;word-break:break-all;font-family:monospace;font-size:0.7rem;color:var(--navy);">' + url + '</div>'
+      + '<div style="display:flex;gap:8px;width:100%;">'
+        + '<button class="btn btn-primary" style="flex:1;" onclick="navigator.clipboard&&navigator.clipboard.writeText(\'' + safeUrl + '\').then(function(){if(typeof showToast===\'function\')showToast(\'\u2705 Link copied\');})">\U0001f4cb Copy Link</button>'
+        + '<button class="btn btn-outline" style="flex:1;" onclick="try{navigator.share({url:\'' + safeUrl + '\',title:\'Lease Agreement\'});}catch(e){}">\u2197 Share</button>'
+      + '</div>'
+      + '<div style="font-size:0.7rem;color:var(--muted);text-align:center;">Anyone with this link can view the lease. Delete the Gist from github.com to revoke access.</div>'
+    + '</div>';
+  document.body.appendChild(o);
+}
 
 })(); // end IIFE
 </script>
@@ -12943,7 +13032,7 @@ window.renderLeaseBuilder = function() {
 
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 var DK_KEY        = 'hml_devlog';        // localStorage key — isolated from app data
-var DK_APP_VER    = 'Homemade Lane v4.1.1';
+var DK_APP_VER    = 'Homemade Lane v4.2.0';
 // Single source of truth — badge reads this at init; update only DK_APP_VER for future releases
 (function(){ var b=document.getElementById('hml-build-ref'); if(b) b.textContent='v'+DK_APP_VER.replace('Homemade Lane v',''); })();
 var DK_MAX_RECENT = 3;                   // entries shown in Log tab preview
@@ -14302,6 +14391,8 @@ window.dkmTagDismiss = function(silent) {
     <div id="backup-done-msg" style="display:none; font-size:0.75rem; color:var(--green); font-weight:600; margin-top:10px; text-align:center;">✓ Backup downloaded — safe to delete</div>
   </div>
 </div>
+
+<!-- Signature Capture Modal — body-level for iOS tap reliability -->
 <div class="modal-overlay" id="modal-signature" onclick="overlayClose(event,'modal-signature')">
   <div class="modal-sheet" style="max-height:90vh;">
     <div class="modal-handle"></div>
@@ -14311,10 +14402,13 @@ window.dkmTagDismiss = function(silent) {
     </div>
     <div class="modal-body" style="padding-bottom:max(20px, env(safe-area-inset-bottom));">
       <div style="font-size:0.8125rem;color:var(--muted);margin-bottom:12px;line-height:1.4;">Draw your signature below. It will be saved and stamped on lease PDFs.</div>
+
+      <!-- Canvas -->
       <div style="border:2px solid var(--border);border-radius:var(--radius-sm);background:#fff;touch-action:none;overflow:hidden;position:relative;" id="sig-canvas-wrap">
         <canvas id="sig-canvas" style="display:block;width:100%;touch-action:none;cursor:crosshair;"></canvas>
         <div id="sig-canvas-hint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;color:var(--muted);font-size:0.875rem;opacity:0.5;">Sign here</div>
       </div>
+
       <div style="display:flex;gap:8px;margin-top:12px;">
         <button class="btn btn-outline btn-sm" style="flex:1;" onclick="sigClear()" ontouchstart="">Clear</button>
         <button class="btn btn-primary btn-sm" style="flex:2;" onclick="sigSave()" ontouchstart="">Save Signature</button>
@@ -14322,7 +14416,6 @@ window.dkmTagDismiss = function(silent) {
     </div>
   </div>
 </div>
-
 
 </body>
 </html>
