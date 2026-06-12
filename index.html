@@ -2,7 +2,7 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.1.4                                             ║
+  ║  Version: 4.1.1                                             ║
   ║  Date: 2026-06-11                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
@@ -11343,7 +11343,29 @@ window.lbExportPdf = function() {
   var cleanLabel  = tokens['{{CLEANING_FEE_LABEL}}'] || 'Cleaning Fee';
   var petLabel    = tokens['{{PET_FEE_LABEL}}']      || 'Pet Fee';
   var fname       = 'lease-' + tenantFull.replace(/\s+/g,'-').toLowerCase() + '-' + effDate + '.pdf';
-  var sigDataUrl  = localStorage.getItem('hml_signature') || '';  // read early — used in sig line below
+  // Read signature — re-encode to JPEG if stored as PNG (older saves used PNG)
+  var sigDataUrl = (function() {
+    var stored = localStorage.getItem('hml_signature') || '';
+    if (!stored) return '';
+    if (stored.indexOf('data:image/jpeg') === 0) return stored; // already JPEG
+    // Re-encode PNG → JPEG via offscreen canvas (synchronous)
+    try {
+      var tmpImg = new window.Image();
+      tmpImg.src = stored;
+      if (!tmpImg.complete || tmpImg.naturalWidth === 0) {
+        // Image not loaded synchronously (shouldn't happen for data URLs but fallback)
+        return stored; // keep original, embed will skip
+      }
+      var tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width  = tmpImg.naturalWidth  || 320;
+      tmpCanvas.height = tmpImg.naturalHeight || 88;
+      var tmpCtx = tmpCanvas.getContext('2d');
+      tmpCtx.fillStyle = '#ffffff';
+      tmpCtx.fillRect(0, 0, tmpCanvas.width, tmpCanvas.height);
+      tmpCtx.drawImage(tmpImg, 0, 0);
+      return tmpCanvas.toDataURL('image/jpeg', 0.95);
+    } catch(e) { return stored; }
+  }());
 
   /* ── 2. Build logical lines array (same as lbExportTxt) ── */
   var lines = [
@@ -11396,11 +11418,12 @@ window.lbExportPdf = function() {
   lines.push({ text: 'IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement as of the Effective Date.', size: 11 });
   lines.push({ text: '', size: 11 });
   lines.push({ text: 'Landlord: ' + landlordName, size: 11 });
-  var pdfSigLine = sigDataUrl ? (landlordName + ' [signed]   Date: ___________') : 'By: _________________________________   Date: ___________';
-  lines.push({ text: pdfSigLine, size: 11, _landlordSig: true });
+  lines.push({ text: '_________________________________', size: 11, _landlordSig: true });
+  lines.push({ text: 'Date: ___________', size: 11 });
   lines.push({ text: '', size: 11 });
   lines.push({ text: 'Tenant: ' + tenantFull, size: 11 });
-  lines.push({ text: 'By: _________________________________   Date: ___________', size: 11 });
+  lines.push({ text: 'By: _________________________________', size: 11 });
+  lines.push({ text: 'Date: ___________', size: 11 });
 
   /* ── 3. Minimal raw PDF 1.4 writer ── */
   // Page: US Letter 8.5" × 11" = 612 × 792 pt
