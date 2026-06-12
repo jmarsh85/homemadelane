@@ -2,7 +2,7 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.1.5                                             ║
+  ║  Version: 4.1.1                                             ║
   ║  Date: 2026-06-11                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
@@ -1939,6 +1939,27 @@
           </div>
         </div>
       </div>
+
+
+      <p class="section-label">Lease Sharing</p>
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:4px;">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.875rem;font-weight:600;color:var(--navy);margin-bottom:4px;">GitHub Personal Access Token</div>
+          <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px;">Required to share leases via link. Create a token with <strong>gist</strong> scope only at github.com/settings/tokens</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="password" id="settings-gh-pat" placeholder="github_pat_..." autocomplete="off"
+              style="flex:1;font-family:var(--font-body);font-size:0.875rem;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none;"
+              onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'" />
+            <button class="btn btn-amber btn-sm" onclick="saveGhPat()">Save</button>
+          </div>
+          <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
+            <button class="btn btn-outline btn-sm" onclick="testGhPat()" id="gh-pat-test-btn">Test Token</button>
+            <span id="gh-pat-test-status" style="font-size:0.75rem;"></span>
+          </div>
+          <div style="margin-top:8px;font-size:0.75rem;color:var(--muted);">Token stored locally on device only — used only to create secret Gists on your GitHub account.</div>
+        </div>
+      </div>
+
 
       <p class="section-label">AI Features</p>
       <div class="card" style="padding:0;overflow:hidden;margin-bottom:4px;">
@@ -4541,6 +4562,53 @@
     syncAiButton();
     showToast('✅ API key saved');
   }
+
+  function saveGhPat() {
+    var inp = document.getElementById('settings-gh-pat');
+    var val = inp && inp.value ? inp.value.trim() : '';
+    if (!val || val.charAt(0) === '\u2022') { showToast('\u26a0\ufe0f Enter your GitHub token first'); return; }
+    localStorage.setItem('hml_gh_pat', val);
+    if (inp) inp.value = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+    showToast('\u2705 GitHub token saved');
+  }
+
+  function testGhPat() {
+    var pat = localStorage.getItem('hml_gh_pat') || '';
+    var statusEl = document.getElementById('gh-pat-test-status');
+    var btn = document.getElementById('gh-pat-test-btn');
+    if (!pat) {
+      if (statusEl) { statusEl.textContent = '\u26a0\ufe0f No token saved'; statusEl.style.color = 'var(--amber)'; }
+      return;
+    }
+    if (window.location.protocol === 'file:') {
+      if (statusEl) { statusEl.textContent = '\u26a0\ufe0f Open via GitHub Pages to test'; statusEl.style.color = 'var(--amber)'; }
+      return;
+    }
+    if (btn) { btn.textContent = 'Testing...'; btn.disabled = true; }
+    fetch('https://api.github.com/user', {
+      headers: { 'Authorization': 'Bearer ' + pat, 'Accept': 'application/vnd.github+json' }
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (btn) { btn.textContent = 'Test Token'; btn.disabled = false; }
+      if (data.login) {
+        if (statusEl) { statusEl.textContent = '\u2713 Connected as ' + data.login; statusEl.style.color = 'var(--green)'; }
+      } else {
+        if (statusEl) { statusEl.textContent = '\u2717 Invalid token'; statusEl.style.color = 'var(--red)'; }
+      }
+    })
+    .catch(function(){
+      if (btn) { btn.textContent = 'Test Token'; btn.disabled = false; }
+      if (statusEl) { statusEl.textContent = '\u2717 Network error'; statusEl.style.color = 'var(--red)'; }
+    });
+  }
+
+  function syncGhPatSettingsUI() {
+    var pat = localStorage.getItem('hml_gh_pat') || '';
+    var inp = document.getElementById('settings-gh-pat');
+    if (inp) inp.value = pat ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : '';
+  }
+
 
   function testAiApiKey() {
     const apiKey = localStorage.getItem('hml_lb_apikey') || '';
@@ -8754,6 +8822,8 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     applyAppName(getAppName());
 
     // Init signature UI
+// Init GitHub PAT UI
+    if (typeof syncGhPatSettingsUI === 'function') syncGhPatSettingsUI();
     if (typeof syncSignatureSettingsUI === 'function') syncSignatureSettingsUI();
 
     // Apply saved tax year
@@ -11678,6 +11748,205 @@ window.lbExportPdf = function() {
   /* ── 4. Deliver via lbDownloadNow (Web Share → blob download → copy overlay) ── */
   lbDownloadNow(fname, pdfText, 'application/pdf');
 };
+
+/* == SHARE LEASE == */
+/* ── SHARE LEASE VIA GIST ─────────────────────────────────────────── */
+
+function lbQrSvg(url, sizePx) {
+  sizePx = sizePx || 200;
+  return '<img src="https://api.qrserver.com/v1/create-qr-code/?size='
+    + sizePx + 'x' + sizePx + '&ecc=M&data=' + encodeURIComponent(url)
+    + '" width="' + sizePx + '" height="' + sizePx
+    + '" style="display:block;border-radius:8px;" alt="QR code" />';
+}
+
+function lbPreFlight() {
+  var tokens    = lbGetTokens();
+  var getCol    = window.lbGetCollection || function(){ return []; };
+  var pat       = localStorage.getItem('hml_gh_pat') || '';
+  var agreement = LB.agreementId
+    ? getCol('leaseAgreements').find(function(a){ return a.id === LB.agreementId; })
+    : null;
+  return [
+    { label: 'GitHub token configured',
+      ok: !!pat,
+      hint: 'Settings \u2192 Lease Sharing \u2192 add GitHub PAT' },
+    { label: 'Lease executed',
+      ok: !!(agreement && (agreement.status === 'executed' || agreement.status === 'amended')),
+      hint: 'Tap \u2705 Execute on Step 4 first' },
+    { label: 'Landlord name',
+      ok: !!(tokens['{{LANDLORD_NAME}}'] && tokens['{{LANDLORD_NAME}}'] !== '___________'),
+      hint: 'Settings \u2192 Owner Profile \u2192 Your Name' },
+    { label: 'Tenant name',
+      ok: !!(tokens['{{TENANT_FULL_NAME}}'] && tokens['{{TENANT_FULL_NAME}}'] !== '___________'),
+      hint: 'Step 1 \u2192 select a lease with a tenant' },
+    { label: 'Property address',
+      ok: !!(tokens['{{PROP_ADDRESS}}'] && tokens['{{PROP_ADDRESS}}'] !== '___________'),
+      hint: 'Step 1 \u2192 link a property' },
+    { label: 'Lease dates set',
+      ok: !!(tokens['{{EFF_DATE}}'] && tokens['{{EFF_DATE}}'] !== '___________'),
+      hint: 'Step 2 \u2192 set start date' },
+    { label: 'Monthly rent set',
+      ok: parseFloat(tokens['{{RENT}}'] || 0) > 0,
+      hint: 'Step 2 \u2192 monthly rent' },
+    { label: 'Payment address',
+      ok: !!(tokens['{{PAY_ADDRESS}}'] && tokens['{{PAY_ADDRESS}}'] !== '___________'),
+      hint: 'Step 2 \u2192 Payment Address' },
+    { label: 'Governing state',
+      ok: !!( (document.getElementById('lb-state') || {}).value ),
+      hint: 'Step 2 \u2192 State' },
+  ];
+}
+
+function lbBuildLeasePayload() {
+  var tokens   = lbGetTokens();
+  var getCol   = window.lbGetCollection || function(){ return []; };
+  var stateVal = (document.getElementById('lb-state') || {}).value || 'Virginia';
+  var rentAmt  = parseFloat(tokens['{{RENT}}']     || 0);
+  var secDep   = parseFloat(tokens['{{SEC_DEP}}']  || 0);
+  var cleanDep = parseFloat(tokens['{{CLEAN_DEP}}'] || 0);
+  var petFee   = parseFloat(tokens['{{PET_FEE}}']  || 0);
+
+  var proratedAmt = 0, proratedNote = '';
+  var lease2 = LB.linkedLeaseId
+    ? getCol('leases').find(function(l){ return l.id === LB.linkedLeaseId; })
+    : null;
+  if (lease2 && lease2.startDate) {
+    var sd = new Date(lease2.startDate + 'T12:00:00');
+    if (sd.getDate() !== 1) {
+      var dim = new Date(sd.getFullYear(), sd.getMonth() + 1, 0).getDate();
+      var rem = dim - sd.getDate() + 1;
+      proratedAmt  = Math.round((rentAmt / dim) * rem * 100) / 100;
+      proratedNote = rem + '/' + dim + ' days';
+    }
+  }
+
+  var clauses = LB.clauses.filter(function(c){ return c.included; }).map(function(c) {
+    return { num: c.num, title: c.title, text: lbSubstitute(c.text) };
+  });
+
+  return {
+    v:            1,
+    state:        stateVal,
+    landlord:     tokens['{{LANDLORD_NAME}}'],
+    tenant:       tokens['{{TENANT_FULL_NAME}}'],
+    effDate:      tokens['{{EFF_DATE}}'],
+    rent:         rentAmt,
+    secDep:       secDep,
+    cleanDep:     cleanDep,
+    cleanLabel:   tokens['{{CLEANING_FEE_LABEL}}'] || 'Cleaning Fee',
+    petFee:       petFee,
+    petLabel:     tokens['{{PET_FEE_LABEL}}'] || 'Pet Fee',
+    proratedAmt:  proratedAmt,
+    proratedNote: proratedNote,
+    payInFull:    LB.payInFull || null,
+    clauses:      clauses,
+    sharedAt:     new Date().toISOString(),
+  };
+}
+
+window.lbShareLease = function() {
+  var checks = lbPreFlight();
+  var allOk  = checks.every(function(c){ return c.ok; });
+
+  var rows = checks.map(function(c) {
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">'
+      + '<span style="font-size:1rem;flex-shrink:0;">' + (c.ok ? '\u2705' : '\u274c') + '</span>'
+      + '<div style="flex:1;">'
+        + '<div style="font-size:0.8125rem;font-weight:600;color:var(--navy);">' + c.label + '</div>'
+        + (!c.ok ? '<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">' + c.hint + '</div>' : '')
+      + '</div></div>';
+  }).join('');
+
+  var o = document.createElement('div');
+  o.id  = 'lb-share-preflight';
+  o.style.cssText = 'position:fixed;inset:0;z-index:10010;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;justify-content:center;';
+  o.innerHTML = ''
+    + '<div style="background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">'
+      + '<div style="padding:16px 16px 0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">'
+        + '<div style="font-size:1rem;font-weight:700;color:var(--navy);">Share Lease Checklist</div>'
+        + '<button onclick="document.getElementById(\'lb-share-preflight\').remove()" style="background:none;border:none;font-size:1.25rem;color:var(--muted);cursor:pointer;padding:4px;">\u2715</button>'
+      + '</div>'
+      + '<div style="padding:0 16px;overflow-y:auto;flex:1;">' + rows + '</div>'
+      + '<div style="padding:16px;flex-shrink:0;">'
+        + (allOk
+            ? '<button class="btn btn-primary" style="width:100%;" onclick="lbShareLeaseConfirmed()">\ud83d\udce4 Create Share Link</button>'
+            : '<button class="btn btn-primary" style="width:100%;opacity:0.45;" disabled>Fix issues above to share</button>'
+          )
+      + '</div>'
+    + '</div>';
+  document.body.appendChild(o);
+};
+
+window.lbShareLeaseConfirmed = function() {
+  var o   = document.getElementById('lb-share-preflight');
+  var btn = o ? o.querySelector('button.btn-primary') : null;
+  if (btn) { btn.textContent = '\u23f3 Creating link\u2026'; btn.disabled = true; }
+
+  var pat     = localStorage.getItem('hml_gh_pat') || '';
+  var payload = lbBuildLeasePayload();
+  var tokens  = lbGetTokens();
+  var fname   = 'lease-' + (tokens['{{TENANT_FULL_NAME}}'] || 'tenant')
+    .replace(/\s+/g, '-').toLowerCase() + '-' + (tokens['{{EFF_DATE}}'] || 'draft') + '.json';
+
+  var files = {};
+  files[fname] = { content: JSON.stringify(payload, null, 2) };
+
+  fetch('https://api.github.com/gists', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + pat,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      description: 'HML Lease \u2014 ' + payload.tenant + ' \u2014 ' + payload.effDate,
+      public: false,
+      files: files
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if (!data.id) throw new Error(data.message || 'Gist creation failed');
+    var base = window.location.origin
+      + window.location.pathname.replace(/[^/]*$/, '');
+    var url = base + 'hml-lease.html?g=' + data.id;
+    if (o) o.remove();
+    lbShowShareResult(url, payload.tenant);
+  })
+  .catch(function(err){
+    if (btn) { btn.textContent = '\ud83d\udce4 Create Share Link'; btn.disabled = false; }
+    if (window.lbToast) window.lbToast('\u26a0\ufe0f ' + (err.message || 'Failed to create link'));
+  });
+};
+
+function lbShowShareResult(url, tenantName) {
+  var o = document.createElement('div');
+  o.id  = 'lb-share-result';
+  o.style.cssText = 'position:fixed;inset:0;z-index:10010;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;justify-content:center;';
+
+  var safeUrl = url.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+  o.innerHTML = ''
+    + '<div style="background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:20px 16px 32px;display:flex;flex-direction:column;align-items:center;gap:14px;">'
+      + '<div style="width:100%;display:flex;justify-content:space-between;align-items:center;">'
+        + '<div style="font-size:1rem;font-weight:700;color:var(--navy);">\ud83d\udce4 Lease Link Ready</div>'
+        + '<button onclick="document.getElementById(\'lb-share-result\').remove()" style="background:none;border:none;font-size:1.25rem;color:var(--muted);cursor:pointer;">\u2715</button>'
+      + '</div>'
+      + '<div style="font-size:0.8125rem;color:var(--muted);text-align:center;line-height:1.5;">Share with <strong>' + (tenantName || 'tenant') + '</strong> \u2014 they can open, read, and print from any device.</div>'
+      + '<div style="background:#fff;padding:10px;border-radius:12px;border:1px solid var(--border);">' + lbQrSvg(url, 180) + '</div>'
+      + '<div style="font-size:0.7rem;color:var(--muted);">Tenant scans QR to open lease</div>'
+      + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;width:100%;word-break:break-all;font-family:monospace;font-size:0.7rem;color:var(--navy);">' + url + '</div>'
+      + '<div style="display:flex;gap:8px;width:100%;">'
+        + '<button class="btn btn-primary" style="flex:1;" onclick="navigator.clipboard&&navigator.clipboard.writeText(\'' + safeUrl + '\').then(function(){if(window.lbToast)window.lbToast(\'\u2705 Link copied\');})">\ud83d\udccb Copy Link</button>'
+        + '<button class="btn btn-outline" style="flex:1;" onclick="try{navigator.share({url:\'' + safeUrl + '\',title:\'Lease Agreement\'});}catch(e){}">\u2197 Share</button>'
+      + '</div>'
+      + '<div style="font-size:0.7rem;color:var(--muted);text-align:center;">Anyone with this link can view the lease. Delete the Gist from github.com to revoke access.</div>'
+    + '</div>';
+  document.body.appendChild(o);
+}
+
+
 window.openLeaseBuilder = function() {
   // Build HTML for the modal if not already present
   var existing = document.getElementById('hml-lb-modal');
@@ -11719,6 +11988,10 @@ window.openLeaseBuilder = function() {
           '<button class="btn btn-primary btn-sm" style="flex:1;" onclick="lbExportDocx()" ontouchstart="">⬇ .doc</button>',
           '<button class="btn btn-primary btn-sm" style="flex:1;background:#4A7C59;border-color:#4A7C59;" onclick="lbExportTxt()" ontouchstart="">⬇ .txt</button>',
           '<button class="btn btn-primary btn-sm" style="flex:1;background:var(--red);border-color:var(--red);" onclick="lbExportPdf()" ontouchstart="">⬇ .pdf</button>',
+'</div>',
+        '<div style="margin-top:6px;">',
+          '<button class="btn btn-primary btn-sm" style="width:100%;background:var(--navy);border-color:var(--navy);" onclick="lbShareLease()" ontouchstart="">&#128228; Share Lease (SMS / QR)</button>',
+        '</div>',
         '</div>',
       '</div>',
       '<div class="lb-body" id="lb-body-scroll">',
