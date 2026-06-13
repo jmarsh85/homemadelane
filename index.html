@@ -1984,6 +1984,13 @@
           </div>
           <div style="margin-top:8px;font-size:0.75rem;color:var(--muted);">Key stored locally on device only — never transmitted except to Anthropic.</div>
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;cursor:pointer;" onclick="openAiDialog()">
+          <div>
+            <div style="font-weight:600;font-size:0.9375rem;">AI Assistant</div>
+            <div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">Chat about your properties, finances &amp; tenants</div>
+          </div>
+          <span style="color:var(--muted);">✨</span>
+        </div>
       </div>
 
       <p class="section-label">Data</p>
@@ -2008,6 +2015,13 @@
             <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;" id="settings-last-export">Never</div>
           </div>
           <span class="badge badge-amber" id="settings-backup-badge">Backup due</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:16px;border-top:1px solid var(--border);cursor:pointer;" onclick="generateHandoff()">
+          <div>
+            <div style="font-weight:600;font-size:0.9375rem;">Generate Session Context</div>
+            <div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">Copy a full summary to start a new Claude session</div>
+          </div>
+          <span style="color:var(--muted);">📋</span>
         </div>
       </div>
 
@@ -8926,9 +8940,8 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       relationship:    appData.emergencyRelationship || '',
       pets:            appData.hasPets === 'Yes' ? (appData.petDescription || 'Yes') : 'No pets',
       petDesc:         appData.petDescription || '',
-      startDate:       appData.checkInDate || '',
+      startDate:       appData.checkInDate  || '',
       endDate:         appData.checkOutDate || '',
-      endDate:         '',
       monthlyRent:     '',
       securityDeposit: '',
       petDeposit:      '',
@@ -8988,6 +9001,393 @@ Respond ONLY in this JSON format, no markdown, no preamble:
   // Wire up export/import buttons in settings
   function handleExport() { exportDB('my device'); }
   function handleImport() { importDB(); }
+
+  /* ── GENERATE SESSION HANDOFF ───────────────────────────────────────
+     Reads live DB and produces a structured markdown prompt ready to
+     paste at the start of a new Claude session.
+  ─────────────────────────────────────────────────────────────────── */
+  function generateHandoff() {
+    const props     = activeRecords('properties');
+    const leases    = activeRecords('leases');
+    const txns      = activeRecords('transactions');
+    const items     = activeRecords('items');
+    const svcReqs   = activeRecords('serviceRequests');
+    const leaseDocs = activeRecords('leaseAgreements');
+    const ver       = (typeof DK_APP_VER !== 'undefined') ? DK_APP_VER : 'unknown';
+    const schema    = localStorage.getItem('hml_app_schema') || '?';
+    const today     = new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'});
+
+    // Active leases with key details
+    const activeLeases = leases.filter(l => l.status === 'active');
+    const prospectLeases = leases.filter(l => l.status === 'prospect');
+
+    // Recent transactions (last 10)
+    const recentTxns = txns
+      .slice().sort((a,b) => (b.date||'').localeCompare(a.date||''))
+      .slice(0, 10);
+
+    // YTD income/expense
+    const thisYear = new Date().getFullYear().toString();
+    const ytdTxns  = txns.filter(t => (t.date||'').startsWith(thisYear));
+    const ytdIncome  = ytdTxns.filter(t => t.type === 'income').reduce((s,t) => s + parseFloat(t.amount||0), 0);
+    const ytdExpense = ytdTxns.filter(t => t.type === 'expense').reduce((s,t) => s + parseFloat(t.amount||0), 0);
+
+    // Open service requests
+    const openSvc = svcReqs.filter(r => r.status !== 'completed' && r.status !== 'closed');
+
+    // DevKit log entries (open issues)
+    let dkLog = [];
+    try { dkLog = JSON.parse(localStorage.getItem('hml_devlog') || '[]'); } catch(e) {}
+    const openIssues = dkLog.filter(e => e.status === 'open' || e.status === 'in-progress').slice(0, 10);
+
+    // Build property summaries
+    const propLines = props.map(p => {
+      const disp   = getPropertyDisplay(p);
+      const active = getActiveLease(p.id);
+      let line = `  - **${p.name || p.address}** (${p.address || '—'})`;
+      if (p.isPrimary) line += ' [PRIMARY RESIDENCE — excluded from financials]';
+      if (disp.occupied && active) {
+        line += `\n    Tenant: ${disp.tenant} | Rent: $${parseFloat(active.monthlyRent||0).toFixed(2)}/mo | Lease ends: ${active.endDate || 'open-ended'}`;
+      } else {
+        line += '\n    Status: Vacant';
+      }
+      return line;
+    }).join('\n');
+
+    // Build recent txn summaries
+    const txnLines = recentTxns.map(t =>
+      `  - ${t.date||'?'} | ${t.type === 'income' ? '+ ' : '- '}$${parseFloat(t.amount||0).toFixed(2)} | ${t.category||'Uncategorized'} | ${t.description||t.vendor||'—'}`
+    ).join('\n');
+
+    // Build service request summary
+    const svcLines = openSvc.length
+      ? openSvc.map(r => `  - [${r.status||'open'}] ${r.title||r.description||'—'} (${r.property||'—'})`).join('\n')
+      : '  None open';
+
+    // Build open issues from DevKit log
+    const issueLines = openIssues.length
+      ? openIssues.map(e => `  - [${e.status}] ${e.note||e.title||'—'}`).join('\n')
+      : '  None logged in DevKit';
+
+    const md = `# Homemade Lane — Claude Session Context
+**Generated:** ${today}
+**App Version:** ${ver}
+**Schema Version:** v${schema}
+**Storage Key:** nestAndNest_db
+
+---
+
+## Database Summary
+| Collection | Count |
+|---|---|
+| Properties | ${props.length} |
+| Leases (active) | ${activeLeases.length} |
+| Leases (prospect) | ${prospectLeases.length} |
+| Transactions | ${txns.length} |
+| Resale Items | ${items.length} |
+| Service Requests | ${svcReqs.length} |
+| Lease Agreements | ${leaseDocs.length} |
+
+---
+
+## Properties & Active Leases
+${propLines || '  No properties'}
+
+---
+
+## Financial Snapshot (${thisYear} YTD)
+- **Income:** $${ytdIncome.toFixed(2)}
+- **Expenses:** $${ytdExpense.toFixed(2)}
+- **Net:** $${(ytdIncome - ytdExpense).toFixed(2)}
+
+### Recent Transactions (last 10)
+${txnLines || '  None'}
+
+---
+
+## Open Service Requests
+${svcLines}
+
+---
+
+## Known Open Issues (DevKit Log)
+${issueLines}
+
+---
+
+## Architecture Quick Reference
+- Single-file vanilla HTML/CSS/JS PWA — GitHub Pages deployment
+- Three script blocks: B0 (main app, lines ~2897–9161), B1 (Lease Builder, ~9527–12320), B2 (DevKit, ~13028–14293)
+- Cross-block scope: use \`lbBridge()\` / \`window.*\` aliases — blocks cannot share closures
+- Modal pattern: body-appended dynamic modals are iOS-safe; static modals inside \`#app\` risk stacking failures
+- Canonical accessors: always use \`getActiveLease(propertyId)\` and \`getPropertyDisplay(p)\` — never read \`p.currentTenant\` or \`p.leaseEnd\` directly
+- \`DK_APP_VER\` is single source of truth for version string
+- \`node --check\` all three blocks before every delivery
+
+---
+
+## Files in Play
+| File | Purpose |
+|---|---|
+| \`index_s12_1.html\` | Main app |
+| \`hml-apply.html\` | Tenant application form (standalone) |
+| \`hml-lease.html\` | Lease viewer — reads GitHub Gist by \`?g=\` param |
+
+---
+
+## Session Prompt
+I am continuing development on **Homemade Lane**, a single-file vanilla HTML/CSS/JS property management PWA deployed on GitHub Pages. The above context reflects the live state of my database and app as of ${today}. Please review this context before making any changes, and follow the architecture rules listed above. My active file is \`index_s12_1.html\`.
+`;
+
+    // Show result in a modal overlay
+    const existing = document.getElementById('hml-handoff-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id    = 'hml-handoff-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;font-family:var(--font-body);';
+
+    overlay.innerHTML = `
+      <div style="background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">
+        <div style="padding:16px 16px 0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+          <div>
+            <div style="font-size:1rem;font-weight:700;color:var(--navy);">📋 Session Context</div>
+            <div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">Copy and paste at the start of a new Claude session</div>
+          </div>
+          <button onclick="document.getElementById('hml-handoff-overlay').remove()" style="background:none;border:none;font-size:1.25rem;color:var(--muted);cursor:pointer;padding:4px;">✕</button>
+        </div>
+        <div style="padding:12px 16px;flex:1;overflow-y:auto;">
+          <textarea id="hml-handoff-text" readonly
+            style="width:100%;height:340px;font-family:monospace;font-size:0.7rem;line-height:1.5;padding:12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);resize:none;outline:none;">${md.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+        </div>
+        <div style="padding:12px 16px 28px;display:flex;gap:8px;flex-shrink:0;">
+          <button class="btn btn-primary" style="flex:1;" id="hml-handoff-copy-btn"
+            onclick="(function(){
+              var ta = document.getElementById('hml-handoff-text');
+              var raw = ta.value;
+              if(navigator.clipboard){
+                navigator.clipboard.writeText(raw).then(function(){
+                  var b = document.getElementById('hml-handoff-copy-btn');
+                  b.textContent = '✓ Copied!';
+                  setTimeout(function(){ b.textContent = '📋 Copy to Clipboard'; }, 2500);
+                });
+              } else {
+                ta.select();
+                document.execCommand('copy');
+              }
+            })()">📋 Copy to Clipboard</button>
+          <button class="btn btn-outline" style="flex:1;"
+            onclick="(function(){
+              var ta = document.getElementById('hml-handoff-text');
+              var blob = new Blob([ta.value], {type:'text/markdown'});
+              var url  = URL.createObjectURL(blob);
+              var a    = document.createElement('a');
+              a.href   = url;
+              a.download = 'hml-session-context-' + new Date().toISOString().slice(0,10) + '.md';
+              document.body.appendChild(a);
+              a.click();
+              setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+            })()">⬇ Download .md</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    // Decode HTML entities in textarea so raw markdown is copyable
+    const ta = overlay.querySelector('#hml-handoff-text');
+    if (ta) ta.value = md;
+  }
+
+  /* ── IN-APP AI DIALOG ───────────────────────────────────────────────
+     Conversational chat interface. Injects DB context into system
+     prompt so Claude answers from your actual property/lease/financial
+     data. History maintained for session; not persisted to localStorage.
+  ─────────────────────────────────────────────────────────────────── */
+  function openAiDialog() {
+    const apiKey = localStorage.getItem('hml_lb_apikey') || '';
+    if (!apiKey) {
+      showToast('⚠️ Add your Anthropic API key in Settings → AI Features first');
+      return;
+    }
+
+    const existing = document.getElementById('hml-ai-dialog-overlay');
+    if (existing) { existing.style.display = 'flex'; return; }
+
+    // Build context snapshot for system prompt
+    const props       = activeRecords('properties');
+    const leases      = activeRecords('leases');
+    const txns        = activeRecords('transactions');
+    const items       = activeRecords('items');
+    const svcReqs     = activeRecords('serviceRequests');
+    const thisYear    = new Date().getFullYear().toString();
+    const ytdTxns     = txns.filter(t => (t.date||'').startsWith(thisYear));
+    const ytdIncome   = ytdTxns.filter(t => t.type === 'income').reduce((s,t) => s + parseFloat(t.amount||0), 0);
+    const ytdExpense  = ytdTxns.filter(t => t.type === 'expense').reduce((s,t) => s + parseFloat(t.amount||0), 0);
+
+    const propContext = props.map(p => {
+      const active = getActiveLease(p.id);
+      const disp   = getPropertyDisplay(p);
+      return `Property: ${p.name||p.address} | Address: ${p.address||'—'} | ${p.isPrimary ? 'PRIMARY RESIDENCE' : (disp.occupied ? `Tenant: ${disp.tenant}, Rent: $${parseFloat(active&&active.monthlyRent||0).toFixed(2)}/mo, Lease ends: ${active&&active.endDate||'open-ended'}` : 'Vacant')}`;
+    }).join('\n');
+
+    const recentTxnContext = txns
+      .slice().sort((a,b) => (b.date||'').localeCompare(a.date||''))
+      .slice(0, 20)
+      .map(t => `${t.date||'?'} | ${t.type} | $${parseFloat(t.amount||0).toFixed(2)} | ${t.category||'—'} | ${t.description||t.vendor||'—'}`)
+      .join('\n');
+
+    const openSvc = svcReqs.filter(r => r.status !== 'completed' && r.status !== 'closed')
+      .map(r => `[${r.status||'open'}] ${r.title||r.description||'—'}`).join('\n');
+
+    const systemPrompt = `You are an AI assistant embedded in Homemade Lane, a personal property management app. You help the owner — a landlord and resale operator — manage their rental properties, tenants, finances, and service requests.
+
+You have access to their current data:
+
+PROPERTIES (${props.length} total):
+${propContext || 'None'}
+
+FINANCIAL SNAPSHOT (${thisYear} YTD):
+Income: $${ytdIncome.toFixed(2)}
+Expenses: $${ytdExpense.toFixed(2)}
+Net: $${(ytdIncome - ytdExpense).toFixed(2)}
+Total transactions on record: ${txns.length}
+
+RECENT TRANSACTIONS (last 20):
+${recentTxnContext || 'None'}
+
+RESALE INVENTORY: ${items.length} items
+OPEN SERVICE REQUESTS: ${openSvc || 'None'}
+ACTIVE LEASES: ${leases.filter(l => l.status === 'active').length}
+PROSPECT LEASES: ${leases.filter(l => l.status === 'prospect').length}
+
+Answer questions about their properties, finances, tenants, and operations. You can draft notices, summarize data, suggest categories, calculate prorated amounts, or help with any property management task. Keep responses concise and practical. When drafting documents, use a professional but friendly tone appropriate for small landlord operations.`;
+
+    // Chat state
+    const history = [];
+
+    function renderMessages(container) {
+      container.innerHTML = history.length === 0
+        ? `<div style="text-align:center;padding:32px 16px;color:var(--muted);">
+            <div style="font-size:1.5rem;margin-bottom:8px;">🏠</div>
+            <div style="font-size:0.875rem;font-weight:600;color:var(--navy);margin-bottom:4px;">Ask me anything</div>
+            <div style="font-size:0.75rem;line-height:1.5;">Which property has the most expenses?<br>Draft a late payment notice for [tenant].<br>What's my net income this year?</div>
+          </div>`
+        : history.map(m => {
+            const isUser = m.role === 'user';
+            return `<div style="display:flex;justify-content:${isUser ? 'flex-end' : 'flex-start'};margin-bottom:10px;">
+              <div style="max-width:82%;padding:10px 13px;border-radius:${isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px'};background:${isUser ? 'var(--navy)' : 'var(--surface)'};color:${isUser ? '#fff' : 'var(--text)'};font-size:0.8125rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;">${m.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+            </div>`;
+          }).join('');
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function sendMessage(input, msgContainer, sendBtn) {
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      input.style.height = 'auto';
+      sendBtn.disabled = true;
+
+      history.push({ role: 'user', content: text });
+      renderMessages(msgContainer);
+
+      // Thinking indicator
+      const thinking = document.createElement('div');
+      thinking.style.cssText = 'display:flex;justify-content:flex-start;margin-bottom:10px;';
+      thinking.innerHTML = '<div style="padding:10px 13px;border-radius:14px 14px 14px 4px;background:var(--surface);color:var(--muted);font-size:0.8125rem;">…</div>';
+      msgContainer.appendChild(thinking);
+      msgContainer.scrollTop = msgContainer.scrollHeight;
+
+      try {
+        const resp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1024,
+            system: systemPrompt,
+            messages: history,
+          }),
+        });
+        const data = await resp.json();
+        thinking.remove();
+
+        if (data.error) {
+          showToast('⚠️ API error: ' + (data.error.message || data.error.type));
+          history.pop();
+          renderMessages(msgContainer);
+        } else {
+          const reply = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : '(no response)';
+          history.push({ role: 'assistant', content: reply });
+          renderMessages(msgContainer);
+        }
+      } catch(err) {
+        thinking.remove();
+        showToast('⚠️ Request failed — check connection');
+        history.pop();
+        renderMessages(msgContainer);
+      } finally {
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id    = 'hml-ai-dialog-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9997;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;justify-content:center;font-family:var(--font-body);';
+
+    overlay.innerHTML = `
+      <div style="background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:520px;height:82vh;display:flex;flex-direction:column;overflow:hidden;">
+        <div style="padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:32px;height:32px;background:var(--navy);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">✨</div>
+          <div style="flex:1;">
+            <div style="font-size:0.9375rem;font-weight:700;color:var(--navy);">AI Assistant</div>
+            <div style="font-size:0.7rem;color:var(--muted);">Knows your ${props.length} propert${props.length===1?'y':'ies'} &amp; ${txns.length} transactions</div>
+          </div>
+          <button onclick="document.getElementById('hml-ai-dialog-overlay').remove()" style="background:none;border:none;font-size:1.25rem;color:var(--muted);cursor:pointer;padding:4px;">✕</button>
+        </div>
+        <div id="hml-ai-messages" style="flex:1;overflow-y:auto;padding:14px 16px;"></div>
+        <div style="padding:10px 12px 24px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;flex-shrink:0;">
+          <textarea id="hml-ai-input" placeholder="Ask about your properties, finances, tenants…" rows="1"
+            style="flex:1;font-family:var(--font-body);font-size:0.875rem;padding:10px 12px;border:1.5px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);resize:none;outline:none;line-height:1.4;max-height:120px;overflow-y:auto;"
+            onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+          <button id="hml-ai-send-btn" class="btn btn-primary" style="padding:10px 14px;border-radius:12px;flex-shrink:0;">↑</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    const msgContainer = overlay.querySelector('#hml-ai-messages');
+    const input        = overlay.querySelector('#hml-ai-input');
+    const sendBtn      = overlay.querySelector('#hml-ai-send-btn');
+
+    renderMessages(msgContainer);
+
+    // Auto-resize textarea
+    input.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
+
+    // Send on Enter (Shift+Enter for newline)
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage(input, msgContainer, sendBtn);
+      }
+    });
+
+    sendBtn.addEventListener('click', function() {
+      sendMessage(input, msgContainer, sendBtn);
+    });
+
+    input.focus();
+  }
   function exportDBAndConfirm() {
     exportDB('pre-delete backup').then(result => {
       if (result && !result.aborted) showBackupConfirmation();
@@ -12076,7 +12476,6 @@ window.openLeaseBuilder = function() {
           '<div style="margin-bottom:14px;">',
             '<button class="btn btn-primary btn-sm" style="width:100%;background:var(--navy);border-color:var(--navy);" onclick="lbShareLease()">📤 Share Lease (SMS / QR)</button>',
           '</div>',
-          '</div>',
           '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">',
             '<button class="btn btn-outline btn-sm" style="flex:1;font-size:0.7rem;" onclick="lbExportSnapshot()" title="Export frozen snapshot of executed agreement">📜 Export Snapshot</button>',
             '<button class="btn btn-outline btn-sm" style="flex:1;font-size:0.7rem;" onclick="lbShowChangelog()" title="View all versions and changes">🕐 Change Log</button>',
@@ -12212,6 +12611,7 @@ function lbBuildLeasePayload() {
     petLabel:     tokens['{{PET_FEE_LABEL}}']      || 'Pet Fee',
     proratedAmt:  proratedAmt,
     proratedNote: proratedNote,
+    payInFull:    LB.payInFull || null,
     clauses:      clauses,
     sharedAt:     new Date().toISOString(),
   };
@@ -13032,7 +13432,7 @@ function lbShowShareResult(url, tenantName) {
 
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 var DK_KEY        = 'hml_devlog';        // localStorage key — isolated from app data
-var DK_APP_VER    = 'Homemade Lane v4.2.0';
+var DK_APP_VER    = 'Homemade Lane v4.2.1';
 // Single source of truth — badge reads this at init; update only DK_APP_VER for future releases
 (function(){ var b=document.getElementById('hml-build-ref'); if(b) b.textContent='v'+DK_APP_VER.replace('Homemade Lane v',''); })();
 var DK_MAX_RECENT = 3;                   // entries shown in Log tab preview
