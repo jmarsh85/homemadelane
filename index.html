@@ -2,8 +2,8 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.2.0                                             ║
-  ║  Date: 2026-06-06                                           ║
+  ║  Version: 4.2.1                                             ║
+  ║  Date: 2026-06-14                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
   ║                                                             ║
@@ -1824,8 +1824,19 @@
         <button class="btn btn-primary" style="font-size:0.8125rem;padding:8px 14px;" onclick="openMaintenanceForm()">+ Log</button>
       </div>
       <!-- Air Filters -->
-      <p class="section-label">Air Filters</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <p class="section-label" style="margin:0;">Air Filters</p>
+        <button class="btn btn-outline" style="font-size:0.75rem;padding:5px 10px;" onclick="openFilterLocationConfig(null,'hvac')">+ Location</button>
+      </div>
       <div id="personal-air-filters" class="card" style="padding:0;overflow:hidden;margin-bottom:20px;">
+        <div style="padding:20px;text-align:center;color:var(--muted);font-size:0.875rem;">Loading…</div>
+      </div>
+      <!-- Mini-Splits -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <p class="section-label" style="margin:0;">Mini-Splits</p>
+        <button class="btn btn-outline" style="font-size:0.75rem;padding:5px 10px;" onclick="openFilterLocationConfig(null,'mini-split')">+ Location</button>
+      </div>
+      <div id="personal-mini-splits" class="card" style="padding:0;overflow:hidden;margin-bottom:20px;">
         <div style="padding:20px;text-align:center;color:var(--muted);font-size:0.875rem;">Loading…</div>
       </div>
       <!-- Vehicles -->
@@ -2917,7 +2928,7 @@
                  deletes → marked with deletedAt, honored on merge
   ════════════════════════════════════════════════════════════ */
 
-  const SCHEMA_VERSION = 3;
+  const SCHEMA_VERSION = 4;
 
   /* ── ID + TIMESTAMP HELPERS ─────────────────────────────── */
   function genId() {
@@ -2942,6 +2953,8 @@
     sales:            [],   // resale completed sales
     vehicles:         [],   // personal vehicles
     maintenance:      [],   // air filter / personal maintenance logs
+    filterLocations:  [],   // per-location filter config (size, count, interval, type)
+    maintenanceTypes: [],   // user-defined custom maintenance type labels
     serviceRequests:  [],   // property service requests
     paymentMethods:   [],   // user-customizable payment method labels
   };
@@ -2973,6 +2986,31 @@
           DB.version = 3;
           saveDB(); // persist the bumped version immediately
         }
+        // ── v3 → v4 migration ─────────────────────────────────────
+        // filterLocations collection added in v4.
+        if (DB.version < 4) {
+          if (!Array.isArray(DB.filterLocations)) DB.filterLocations = [];
+          if (!Array.isArray(DB.maintenanceTypes)) DB.maintenanceTypes = [];
+          DB.version = 4;
+          console.log('[HML] Schema migration complete → v4');
+          saveDB();
+        }
+        // ── __personal → primary residence remapping ───────────────
+        // If any filterLocations or maintenance records were saved with
+        // locationId '__personal' and a primary residence now exists,
+        // remap them to the real property ID so there's no duplicate.
+        (function() {
+          const primary = DB.properties.find(function(p){ return p.isPrimaryResidence && !p.deletedAt; });
+          if (!primary) return;
+          var changed = false;
+          DB.filterLocations.forEach(function(r) {
+            if (r.locationId === '__personal') { r.locationId = primary.id; r.locationName = primary.name || primary.address || r.locationName; changed = true; }
+          });
+          DB.maintenance.forEach(function(r) {
+            if (r.locationId === '__personal') { r.locationId = primary.id; r.locationName = primary.name || primary.address || r.locationName; changed = true; }
+          });
+          if (changed) saveDB();
+        })();
       }
     } catch(e) { console.warn('Load failed:', e); }
   }
@@ -8013,36 +8051,128 @@ Respond ONLY in this JSON format, no markdown, no preamble:
 
   function renderPersonalScreen() {
     renderAirFilters();
+    renderMiniSplits();
     renderVehicles();
     renderMaintenanceLogs();
+  }
+
+  // ── Helper: get filter location config record ─────────────────
+  function getFilterConfig(locationId, type) {
+    return activeRecords('filterLocations').find(r => r.locationId === locationId && r.type === type) || null;
+  }
+
+  // ── Helper: personal location list ───────────────────────────
+  // Primary residence property takes the "home" slot. Falls back to
+  // synthetic __personal only when no property is flagged as primary.
+  function getPersonalLocations() {
+    const allProps = activeRecords('properties');
+    const primary  = allProps.find(p => p.isPrimaryResidence);
+    const others   = allProps.filter(p => !p.isPrimaryResidence);
+    const homeEntry = primary
+      ? { id: primary.id, name: primary.name || primary.address || 'My Home' }
+      : { id: '__personal', name: 'My Home (Personal)' };
+    return [homeEntry, ...others];
   }
 
   function renderAirFilters() {
     const el = document.getElementById('personal-air-filters');
     if (!el) return;
-    const props = [{ id:'__personal', name:'My Home (Personal)' }, ...activeRecords('properties')];
-    const logs  = activeRecords('maintenance').filter(l => l.type === 'air-filter');
+    const props = getPersonalLocations();
+    const configs = activeRecords('filterLocations').filter(r => r.type === 'hvac');
+    const configuredIds = new Set(configs.map(c => c.locationId));
+    const logs = activeRecords('maintenance').filter(l => l.type === 'air-filter');
+    // Show any location that has a config OR has existing logs (prevents apparent data loss on import)
+    const loggedIds = new Set(logs.map(l => l.locationId));
+    const locations = props.filter(p => configuredIds.has(p.id) || loggedIds.has(p.id));
     const fmt = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'Never';
     const daysSince = d => d ? Math.floor((new Date()-new Date(d))/86400000) : null;
 
-    el.innerHTML = props.map((p,i) => {
-      const last = logs.filter(l=>l.locationId===p.id).sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+    if (!locations.length) {
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:0.875rem;">No locations configured — tap <strong>+ Location</strong> to add one.</div>';
+      return;
+    }
+
+    el.innerHTML = locations.map((p, i) => {
+      const cfg = getFilterConfig(p.id, 'hvac');
+      const intervalDays = cfg ? (cfg.intervalDays || 30) : 30;
+      const last = logs.filter(l => l.locationId === p.id).sort((a,b) => new Date(b.date)-new Date(a.date))[0];
       const ds   = last ? daysSince(last.date) : null;
-      const due  = ds !== null ? ds >= (AIR_FILTER_MONTHS*30) : true;
-      const border = i<props.length-1 ? 'border-bottom:1px solid var(--border);' : '';
+      const due  = ds !== null ? ds >= intervalDays : true;
+      const border = i < locations.length-1 ? 'border-bottom:1px solid var(--border);' : '';
       const statusColor = due ? 'var(--red)' : 'var(--green)';
-      const statusText  = due ? (ds?`Overdue (${ds} days ago)`:'Not logged') : `OK — changed ${ds} days ago`;
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:13px 16px;'+border+'">'
-        +'<div>'
+      const statusText  = due ? (ds ? 'Overdue ('+ds+' days ago)' : 'Not logged') : 'OK — changed '+ds+' days ago';
+      const metaParts = [];
+      if (cfg && cfg.filterCount) metaParts.push(cfg.filterCount + ' filter' + (cfg.filterCount > 1 ? 's' : ''));
+      if (cfg && cfg.filterSize)  metaParts.push(cfg.filterSize);
+      metaParts.push('Every ' + intervalDays + 'd');
+      const meta = metaParts.join(' · ');
+      const safeName = p.name.replace(/'/g, "\\'");
+      return '<div style="padding:13px 16px;'+border+'">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+        +'<div style="flex:1;min-width:0;">'
         +'<div style="font-weight:600;font-size:0.875rem;">'+p.name+'</div>'
         +'<div style="font-size:0.75rem;color:'+statusColor+';">'+statusText+'</div>'
-        +(last?'<div style="font-size:0.75rem;color:var(--muted);">Last: '+fmt(last.date)+'</div>':'')
+        +(last ? '<div style="font-size:0.75rem;color:var(--muted);">Last: '+fmt(last.date)+'</div>' : '')
+        +'<div style="font-size:0.7rem;color:var(--muted-light);margin-top:2px;">'+meta+'</div>'
         +'</div>'
+        +'<div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">'
+        +'<button class="btn btn-outline" style="font-size:0.7rem;padding:5px 8px;" '
+        +'onclick="openFilterLocationConfig(\''+p.id+'\',\'hvac\')">⚙</button>'
         +'<button class="btn btn-outline" style="font-size:0.75rem;padding:6px 10px;white-space:nowrap;" '
-        +'onclick="openMaintenanceForm({type:\'air-filter\',locationId:\''+p.id+'\',locationName:\''+p.name+'\'})">Log Change</button>'
+        +'onclick="openMaintenanceForm({type:\'air-filter\',locationId:\''+p.id+'\',locationName:\''+safeName+'\'})">Log Change</button>'
+        +'</div>'
+        +'</div>'
         +'</div>';
     }).join('');
   }
+
+  function renderMiniSplits() {
+    const el = document.getElementById('personal-mini-splits');
+    if (!el) return;
+    const props = getPersonalLocations();
+    const configs = activeRecords('filterLocations').filter(r => r.type === 'mini-split');
+    const logs = activeRecords('maintenance').filter(l => l.type === 'mini-split');
+    const fmt = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'Never';
+    const daysSince = d => d ? Math.floor((new Date()-new Date(d))/86400000) : null;
+
+    if (!configs.length) {
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:0.875rem;">No mini-split locations — tap <strong>+ Location</strong> to add one.</div>';
+      return;
+    }
+
+    el.innerHTML = configs.map((cfg, i) => {
+      const p = props.find(x => x.id === cfg.locationId) || { name: cfg.locationName || cfg.locationId };
+      const intervalDays = cfg.intervalDays || 90;
+      const last = logs.filter(l => l.locationId === cfg.locationId).sort((a,b) => new Date(b.date)-new Date(a.date))[0];
+      const ds   = last ? daysSince(last.date) : null;
+      const due  = ds !== null ? ds >= intervalDays : true;
+      const border = i < configs.length-1 ? 'border-bottom:1px solid var(--border);' : '';
+      const statusColor = due ? 'var(--red)' : 'var(--green)';
+      const statusText  = due ? (ds ? 'Overdue ('+ds+' days ago)' : 'Not logged') : 'OK — cleaned '+ds+' days ago';
+      const metaParts = [];
+      if (cfg.filterCount) metaParts.push(cfg.filterCount + ' unit' + (cfg.filterCount > 1 ? 's' : ''));
+      metaParts.push('Every ' + intervalDays + 'd');
+      const meta = metaParts.join(' · ');
+      const safeName = p.name.replace(/'/g, "\\'");
+      return '<div style="padding:13px 16px;'+border+'">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+        +'<div style="flex:1;min-width:0;">'
+        +'<div style="font-weight:600;font-size:0.875rem;">'+p.name+'</div>'
+        +'<div style="font-size:0.75rem;color:'+statusColor+';">'+statusText+'</div>'
+        +(last ? '<div style="font-size:0.75rem;color:var(--muted);">Last: '+fmt(last.date)+'</div>' : '')
+        +'<div style="font-size:0.7rem;color:var(--muted-light);margin-top:2px;">'+meta+'</div>'
+        +'</div>'
+        +'<div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">'
+        +'<button class="btn btn-outline" style="font-size:0.7rem;padding:5px 8px;" '
+        +'onclick="openFilterLocationConfig(\''+cfg.locationId+'\',\'mini-split\')">⚙</button>'
+        +'<button class="btn btn-outline" style="font-size:0.75rem;padding:6px 10px;white-space:nowrap;" '
+        +'onclick="openMaintenanceForm({type:\'mini-split\',locationId:\''+cfg.locationId+'\',locationName:\''+safeName+'\'})">Log Clean</button>'
+        +'</div>'
+        +'</div>'
+        +'</div>';
+    }).join('');
+  }
+
 
   function renderVehicles() {
     const el = document.getElementById('personal-vehicles');
@@ -8060,8 +8190,6 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       const title  = [v.year, v.make, v.model, v.trim].filter(Boolean).join(' ');
       const sub    = [v.color, v.bodyStyle].filter(Boolean).join(' · ');
       const plate  = v.licensePlate ? `${v.licensePlate}${v.state ? ' ('+v.state+')' : ''}` : null;
-
-      // Oil change status
       const interval = v.oilChangeInterval || 5000;
       const milesSinceOil = (v.currentMileage && v.lastOilChangeMileage)
         ? v.currentMileage - v.lastOilChangeMileage : null;
@@ -8072,20 +8200,14 @@ Respond ONLY in this JSON format, no markdown, no preamble:
         : oilDue
         ? { text: `🛢 Oil overdue — ${milesSinceOil.toLocaleString()} mi since last`, color: 'var(--red)' }
         : { text: `🛢 Oil OK — ${oilMilesLeft.toLocaleString()} mi remaining`, color: 'var(--green)' };
-
-      // Registration / insurance expiry
-      const regDays = daysUntil(v.registrationExpiry);
-      const insDays = daysUntil(v.insuranceExpiry);
+      const regDays  = daysUntil(v.registrationExpiry);
+      const insDays  = daysUntil(v.insuranceExpiry);
       const regAlert = regDays !== null && regDays <= 30;
       const insAlert = insDays !== null && insDays <= 30;
-
-      // Next service
-      const svcDays = daysUntil(v.nextServiceDate);
+      const svcDays  = daysUntil(v.nextServiceDate);
       const svcAlert = svcDays !== null && svcDays <= 14;
-
-      const swId = 'sv-' + v.id;
+      const swId   = 'sv-' + v.id;
       const border = i < vehicles.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
-
       return `<div class="swipe-wrap" id="${swId}">
         <div class="swipe-content" style="padding:14px 16px;${border}" onclick="toggleSwipe('${swId}')">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
@@ -8114,39 +8236,135 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     }).join('');
   }
 
+  // ── Filter location config sheet ─────────────────────────────
+  function openFilterLocationConfig(locationId, type) {
+    const existing = document.getElementById('hml-filter-config-modal');
+    if (existing) existing.remove();
+    const unitType = type || 'hvac';
+    const isHvac   = unitType === 'hvac';
+    const props = getPersonalLocations();
+    const cfg = locationId ? (getFilterConfig(locationId, unitType) || {}) : {};
+    const selLocId = locationId || cfg.locationId || (props[0] ? props[0].id : '__personal');
+    const title = isHvac ? 'Air Filter Location' : 'Mini-Split Location';
+
+    const modal = document.createElement('div');
+    modal.id = 'hml-filter-config-modal';
+    modal.className = 'modal-overlay';
+    modal.onclick = e => { if (e.target === modal) closeDynModal('hml-filter-config-modal'); };
+    modal.innerHTML = '<div class="modal-sheet">'
+      +'<div class="modal-header">'
+      +'<div class="modal-title">'+title+'</div>'
+      +'<button class="modal-close" onclick="closeDynModal(\'hml-filter-config-modal\')">✕</button>'
+      +'</div>'
+      +'<div class="modal-body">'
+      +'<div class="field"><label>Location / Property</label>'
+      +'<select id="fcfg-location">'
+      +props.map(p => '<option value="'+p.id+'" data-name="'+p.name+'"'+(p.id===selLocId?' selected':'')+'>'+p.name+'</option>').join('')
+      +'</select></div>'
+      +(isHvac
+        ? '<div class="field"><label>Filter Size (e.g. 16x25x1)</label>'
+          +'<input id="fcfg-size" type="text" placeholder="e.g. 20x25x1" value="'+(cfg.filterSize||'')+'" /></div>'
+        : '<input type="hidden" id="fcfg-size" value="" />')
+      +'<div class="field"><label>'+(isHvac ? 'Number of Filters' : 'Number of Units')+'</label>'
+      +'<input id="fcfg-count" type="number" min="1" placeholder="1" inputmode="numeric" value="'+(cfg.filterCount||'')+'" /></div>'
+      +'<div class="field"><label>Clean/Replace Every (days)</label>'
+      +'<input id="fcfg-interval" type="number" min="1" placeholder="'+(isHvac?'30':'90')+'" inputmode="numeric" value="'+(cfg.intervalDays||'')+'" />'
+      +'<div style="font-size:0.7rem;color:var(--muted);margin-top:4px;">Default: '+(isHvac?'30 days (monthly)':'90 days (quarterly)')+'</div></div>'
+      +'<input type="hidden" id="fcfg-type" value="'+unitType+'" />'
+      +'<input type="hidden" id="fcfg-existing-id" value="'+(cfg.id||'')+'" />'
+      +'<div style="display:flex;gap:10px;margin-top:4px;">'
+      +'<button class="btn btn-outline" style="flex:1;" onclick="closeDynModal(\'hml-filter-config-modal\')">Cancel</button>'
+      +'<button class="btn btn-primary" style="flex:2;" onclick="saveFilterLocationConfig()">Save</button>'
+      +'</div>'
+      +'</div></div>';
+    document.body.appendChild(modal);
+    requestAnimationFrame(() => modal.classList.add('open'));
+  }
+
+  function saveFilterLocationConfig() {
+    const locSel   = document.getElementById('fcfg-location');
+    const locId    = locSel ? locSel.value : '';
+    const locName  = locSel ? (locSel.options[locSel.selectedIndex] ? locSel.options[locSel.selectedIndex].dataset.name : '') : '';
+    const unitType = document.getElementById('fcfg-type') ? document.getElementById('fcfg-type').value : 'hvac';
+    const existId  = document.getElementById('fcfg-existing-id') ? document.getElementById('fcfg-existing-id').value : '';
+    const sizeEl   = document.getElementById('fcfg-size');
+    const size     = sizeEl ? sizeEl.value.trim() : '';
+    const countEl  = document.getElementById('fcfg-count');
+    const count    = countEl ? (parseInt(countEl.value) || null) : null;
+    const intEl    = document.getElementById('fcfg-interval');
+    const interval = intEl ? (parseInt(intEl.value) || (unitType === 'hvac' ? 30 : 90)) : (unitType === 'hvac' ? 30 : 90);
+    if (!locId) { showToast('Please select a location'); return; }
+    const dup = activeRecords('filterLocations').find(r => r.locationId === locId && r.type === unitType);
+    const record = {
+      id:           existId || (dup ? dup.id : genId()),
+      locationId:   locId,
+      locationName: locName,
+      type:         unitType,
+      filterSize:   size,
+      filterCount:  count,
+      intervalDays: interval,
+      createdAt:    (dup ? dup.createdAt : null) || now(),
+    };
+    upsert('filterLocations', record);
+    closeDynModal('hml-filter-config-modal');
+    renderPersonalScreen();
+    showToast('Location saved');
+  }
+
   function renderMaintenanceLogs() {
     const el = document.getElementById('personal-logs');
     if (!el) return;
     const logs = activeRecords('maintenance').sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,15);
     const fmt = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
-    const typeLabel = { 'air-filter':'🌬 Air Filter', 'oil-change':'🛢 Oil Change', 'other':'🔧 Service' };
+    const builtinLabel = { 'air-filter':'🌬 Air Filter', 'oil-change':'🛢 Oil Change', 'mini-split':'❄️ Mini-Split', 'other':'🔧 Service' };
+    const allTypes = getMaintTypes();
+    const resolveLabel = l => l.typeLabel || builtinLabel[l.type] || (allTypes.find(t=>t.v===l.type)||{label:'🔧 '+l.type}).label;
     if (!logs.length) {
       el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);font-size:0.875rem;">No logs yet.</div>';
       return;
     }
     el.innerHTML = logs.map((l,i) => {
-      const label = typeLabel[l.type]||'🔧 '+l.type;
+      const label = resolveLabel(l);
       const target = l.locationName || l.vehicleName || '—';
-      const border = i<logs.length-1?'border-bottom:1px solid var(--border);':'';
+      const border = i < logs.length-1 ? 'border-bottom:1px solid var(--border);' : '';
       const swId = 'ml-'+l.id;
       return '<div class="swipe-wrap" id="'+swId+'">'
         +'<div class="swipe-content" style="padding:13px 16px;'+border+'display:flex;justify-content:space-between;align-items:center;" onclick="toggleSwipe(\''+swId+'\')">'
         +'<div><div style="font-weight:600;font-size:0.875rem;">'+label+'</div>'
-        +'<div style="font-size:0.75rem;color:var(--muted);">'+target+' &middot; '+fmt(l.date)+'</div>'
-        +(l.notes?'<div style="font-size:0.75rem;color:var(--muted);">'+l.notes+'</div>':'')
+        +'<div style="font-size:0.75rem;color:var(--muted);">'+target+' \u00b7 '+fmt(l.date)+'</div>'
+        +(l.notes ? '<div style="font-size:0.75rem;color:var(--muted);">'+l.notes+'</div>' : '')
         +'</div>'
-        +(l.cost?'<div style="font-weight:700;color:var(--navy);">$'+l.cost+'</div>':'')
+        +(l.cost ? '<div style="font-weight:700;color:var(--navy);">$'+parseFloat(l.cost).toFixed(2)+'</div>' : '')
         +'</div>'
         +'<div class="swipe-actions">'
+        +'<button class="swipe-btn swipe-btn-edit" onclick="resetSwipe(\''+swId+'\');openMaintenanceForm(activeRecords(\'maintenance\').find(x=>x.id===\''+l.id+'\'))"><span class="swipe-icon">✏️</span>Edit</button>'
         +'<button class="swipe-btn swipe-btn-delete" onclick="resetSwipe(\''+swId+'\');confirmDelete(\'log\',\''+label+'\',function(){softDelete(\'maintenance\',\''+l.id+'\');renderPersonalScreen();})"><span class="swipe-icon">&#128465;</span>Delete</button>'
         +'</div></div>';
     }).join('');
   }
 
-  // ── Maintenance form ─────────────────────────────────────────
+  // ── Built-in maintenance types ──────────────────────────────
+  const MAINT_BUILTIN = [
+    {v:'air-filter', label:'🌬 Air Filter Change', forVehicle: false},
+    {v:'mini-split', label:'❄️ Mini-Split Clean',  forVehicle: false},
+    {v:'oil-change', label:'🛢 Oil Change',         forVehicle: true},
+    {v:'other',      label:'🔧 Other Service',      forVehicle: false},
+  ];
+
+  function getMaintTypes() {
+    const custom = activeRecords('maintenanceTypes');
+    return [...MAINT_BUILTIN, ...custom.map(t => ({v: t.id, label: (t.emoji||'🔧')+' '+t.label, forVehicle: !!t.forVehicle, custom: true}))];
+  }
+
+  function escAttr(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // ── Maintenance form (create + edit) ─────────────────────────
   function openMaintenanceForm(defaults) {
     const d = defaults || {};
-    const props = [{ id:'__personal', name:'My Home (Personal)' }, ...activeRecords('properties')];
+    const isEdit = !!d.id;
+    const props = getPersonalLocations();
     const vehicles = activeRecords('vehicles');
     const today = new Date().toISOString().slice(0,10);
 
@@ -8157,93 +8375,183 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     modal.id = 'hml-maintenance-modal';
     modal.className = 'modal-overlay';
     modal.onclick = e => { if (e.target===modal) closeDynModal('hml-maintenance-modal'); };
-    modal.innerHTML = `
-      <div class="modal-sheet">
-        <div class="modal-header">
-          <div class="modal-title">Log Maintenance</div>
-          <button class="modal-close" onclick="closeDynModal('hml-maintenance-modal')">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="field"><label>Type</label>
-            <select id="maint-type" onchange="toggleMaintenanceFields()">
-              <option value="air-filter" ${d.type==='air-filter'?'selected':''}>🌬 Air Filter Change</option>
-              <option value="oil-change" ${d.type==='oil-change'?'selected':''}>🛢 Oil Change</option>
-              <option value="other" ${!d.type||d.type==='other'?'selected':''}>🔧 Other Service</option>
-            </select>
-          </div>
-          <div id="maint-location-row" class="field">
-            <label>Location / Property</label>
-            <select id="maint-location">
-              ${props.map(p=>`<option value="${p.id}" data-name="${p.name}" ${d.locationId===p.id?'selected':''}>${p.name}</option>`).join('')}
-            </select>
-          </div>
-          <div id="maint-vehicle-row" class="field" style="display:none;">
-            <label>Vehicle</label>
-            <select id="maint-vehicle">
-              ${vehicles.map(v=>`<option value="${v.id}" data-name="${(v.year?v.year+' ':'')+v.make+' '+v.model}" ${d.vehicleId===v.id?'selected':''}>${(v.year?v.year+' ':'')+v.make+' '+v.model}</option>`).join('')}
-              ${!vehicles.length?'<option value="">No vehicles — add one first</option>':''}
-            </select>
-          </div>
-          <div class="field"><label>Date</label><input id="maint-date" type="date" value="${today}" /></div>
-          <div class="field"><label>Cost ($, optional)</label><input id="maint-cost" type="number" placeholder="0.00" inputmode="decimal" /></div>
-          <div class="field"><label>Mileage (oil changes)</label><input id="maint-mileage" type="number" placeholder="Current odometer reading" inputmode="numeric" /></div>
-          <div class="field"><label>Notes (optional)</label><textarea id="maint-notes" placeholder="Brand, filter size, shop name, etc." style="min-height:60px;"></textarea></div>
-          <div style="display:flex;gap:10px;margin-top:4px;">
-            <button class="btn btn-outline" style="flex:1;" onclick="closeDynModal('hml-maintenance-modal')">Cancel</button>
-            <button class="btn btn-primary" style="flex:2;" onclick="saveMaintenanceLog()">Save Log</button>
-          </div>
-        </div>
-      </div>`;
+
+    const allTypes = getMaintTypes();
+    const activeType = d.type || 'other';
+    const typeOpts = allTypes.map(o =>
+      '<option value="'+escAttr(o.v)+'"'+(o.v===activeType?' selected':'')+'>'+o.label+'</option>'
+    ).join('') + '<option value="__add_new__">+ Add Custom Type…</option>';
+
+    const locOpts = props.map(p =>
+      '<option value="'+escAttr(p.id)+'" data-name="'+escAttr(p.name)+'"'+(d.locationId===p.id?' selected':'')+'>'+p.name+'</option>'
+    ).join('');
+    const vehOpts = vehicles.map(v => {
+      const name = escAttr((v.year ? v.year+' ' : '')+v.make+' '+v.model);
+      return '<option value="'+escAttr(v.id)+'" data-name="'+name+'"'+(d.vehicleId===v.id?' selected':'')+'>'+name+'</option>';
+    }).join('') + (!vehicles.length ? '<option value="">No vehicles — add one first</option>' : '');
+
+    modal.innerHTML = '<div class="modal-sheet">'
+      +'<div class="modal-header">'
+      +'<div class="modal-title">'+(isEdit ? 'Edit Log' : 'Log Maintenance')+'</div>'
+      +'<button class="modal-close" onclick="closeDynModal(\'hml-maintenance-modal\')">✕</button>'
+      +'</div>'
+      +'<div class="modal-body">'
+      +'<input type="hidden" id="maint-edit-id" value="'+(d.id||'')+'" />'
+      +'<div class="field"><label>Type</label>'
+      +'<select id="maint-type" onchange="toggleMaintenanceFields()">'+typeOpts+'</select></div>'
+      +'<div id="maint-location-row" class="field"><label>Location / Property</label>'
+      +'<select id="maint-location">'+locOpts+'</select></div>'
+      +'<div id="maint-vehicle-row" class="field" style="display:none;"><label>Vehicle</label>'
+      +'<select id="maint-vehicle">'+vehOpts+'</select></div>'
+      +'<div class="field"><label>Date</label>'
+      +'<input id="maint-date" type="date" value="'+(d.date||today)+'" /></div>'
+      +'<div class="field"><label>Cost ($, optional)</label>'
+      +'<input id="maint-cost" type="number" placeholder="0.00" inputmode="decimal" value="'+(d.cost||'')+'" /></div>'
+      +'<div id="maint-mileage-row" class="field"><label>Mileage (oil changes)</label>'
+      +'<input id="maint-mileage" type="number" placeholder="Current odometer reading" inputmode="numeric" value="'+(d.mileage||'')+'" /></div>'
+      +'<div class="field"><label>Notes (optional)</label>'
+      +'<textarea id="maint-notes" placeholder="Brand, filter size, shop name, etc." style="min-height:60px;">'+(d.notes||'')+'</textarea></div>'
+      +'<div style="display:flex;gap:10px;margin-top:4px;">'
+      +'<button class="btn btn-outline" style="flex:1;" onclick="closeDynModal(\'hml-maintenance-modal\')">Cancel</button>'
+      +'<button class="btn btn-primary" style="flex:2;" onclick="saveMaintenanceLog()">'+(isEdit ? 'Update Log' : 'Save Log')+'</button>'
+      +'</div></div></div>';
     document.body.appendChild(modal);
     requestAnimationFrame(() => modal.classList.add('open'));
     toggleMaintenanceFields();
   }
 
   function toggleMaintenanceFields() {
-    const type = document.getElementById('maint-type')?.value;
+    const sel  = document.getElementById('maint-type');
+    const type = sel ? sel.value : '';
+    // If user chose "+ Add Custom Type", intercept immediately
+    if (type === '__add_new__') {
+      openCustomTypeForm(function(newType) {
+        // Rebuild the select with the new type added and pre-selected
+        if (sel && newType) {
+          var opt = document.createElement('option');
+          opt.value = newType.v;
+          opt.textContent = newType.label;
+          // Insert before the __add_new__ option
+          var addOpt = sel.querySelector('option[value="__add_new__"]');
+          if (addOpt) sel.insertBefore(opt, addOpt); else sel.appendChild(opt);
+          sel.value = newType.v;
+        }
+        toggleMaintenanceFields();
+      });
+      // Reset select back to previous value while modal is open
+      if (sel && sel.dataset.lastType) sel.value = sel.dataset.lastType;
+      return;
+    }
+    if (sel) sel.dataset.lastType = type;
+    const allTypes = getMaintTypes();
+    const typeMeta = allTypes.find(t => t.v === type);
+    const isVehicle = typeMeta ? !!typeMeta.forVehicle : (type === 'oil-change');
     const locRow = document.getElementById('maint-location-row');
     const vehRow = document.getElementById('maint-vehicle-row');
-    const milRow = document.getElementById('maint-mileage')?.parentElement;
-    if (locRow) locRow.style.display = (type==='oil-change') ? 'none' : 'block';
-    if (vehRow) vehRow.style.display = (type==='oil-change') ? 'block' : 'none';
-    if (milRow) milRow.style.display = (type==='oil-change') ? 'block' : 'none';
+    const milRow = document.getElementById('maint-mileage-row');
+    if (locRow) locRow.style.display = isVehicle ? 'none' : 'block';
+    if (vehRow) vehRow.style.display = isVehicle ? 'block' : 'none';
+    if (milRow) milRow.style.display = isVehicle ? 'block' : 'none';
+  }
+
+  // ── Custom type form ─────────────────────────────────────────
+  function openCustomTypeForm(onSave) {
+    const ex = document.getElementById('hml-custom-type-modal');
+    if (ex) ex.remove();
+    const modal = document.createElement('div');
+    modal.id = 'hml-custom-type-modal';
+    modal.className = 'modal-overlay';
+    modal.style.zIndex = '1002'; // above maintenance modal
+    modal.onclick = e => { if (e.target === modal) modal.remove(); };
+    modal.innerHTML = '<div class="modal-sheet" style="max-height:60vh;">'
+      +'<div class="modal-header"><div class="modal-title">New Service Type</div>'
+      +'<button class="modal-close" onclick="closeCustomTypeModal()">\u2715</button></div>'
+      +'<div class="modal-body">'
+      +'<div class="field"><label>Emoji</label>'
+      +'<input id="ctype-emoji" type="text" placeholder="\uD83D\uDD27" maxlength="4" style="width:64px;text-align:center;font-size:1.4rem;" value="\uD83D\uDD27" /></div>'
+      +'<div class="field"><label>Label</label>'
+      +'<input id="ctype-label" type="text" placeholder="e.g. HVAC Inspection" /></div>'
+      +'<div class="field" style="display:flex;align-items:center;gap:10px;">'
+      +'<input type="checkbox" id="ctype-vehicle" style="accent-color:var(--navy);width:17px;height:17px;" />'
+      +'<label for="ctype-vehicle" style="font-weight:400;font-size:0.875rem;">Vehicle service (uses vehicle + mileage fields)</label></div>'
+      +'<div style="display:flex;gap:10px;margin-top:4px;">'
+      +'<button class="btn btn-outline" style="flex:1;" onclick="closeCustomTypeModal()">Cancel</button>'
+      +'<button class="btn btn-primary" style="flex:2;" onclick="saveCustomType()">Add Type</button>'
+      +'</div></div></div>';
+    // Store callback for saveCustomType
+    _customTypeCb = onSave || null;
+    document.body.appendChild(modal);
+    requestAnimationFrame(() => modal.classList.add('open'));
+    setTimeout(() => { var el = document.getElementById('ctype-label'); if(el) el.focus(); }, 300);
+  }
+
+  var _customTypeCb = null; // callback set by openCustomTypeForm
+
+  function closeCustomTypeModal() {
+    var m = document.getElementById('hml-custom-type-modal');
+    if (m) m.remove();
+  }
+
+  function saveCustomType() {
+    var emojiEl = document.getElementById('ctype-emoji');
+    var labelEl = document.getElementById('ctype-label');
+    var vehEl   = document.getElementById('ctype-vehicle');
+    var emoji   = emojiEl ? emojiEl.value.trim() : '';
+    if (!emoji) emoji = '🔧';
+    var label   = labelEl ? labelEl.value.trim() : '';
+    var forVehicle = !!(vehEl && vehEl.checked);
+    if (!label) { showToast('Please enter a label'); return; }
+    var record = { id: genId(), emoji: emoji, label: label, forVehicle: forVehicle, createdAt: now() };
+    upsert('maintenanceTypes', record);
+    closeCustomTypeModal();
+    showToast('Type added');
+    var cb = _customTypeCb;
+    _customTypeCb = null;
+    if (cb) cb({ v: record.id, label: emoji+' '+label, forVehicle: forVehicle });
   }
 
   function saveMaintenanceLog() {
-    const type     = document.getElementById('maint-type')?.value || 'other';
-    const locSel   = document.getElementById('maint-location');
-    const vehSel   = document.getElementById('maint-vehicle');
-    const date     = document.getElementById('maint-date')?.value;
-    const cost     = document.getElementById('maint-cost')?.value;
-    const mileage  = document.getElementById('maint-mileage')?.value;
-    const notes    = document.getElementById('maint-notes')?.value;
-    if (!date) { showToast('⚠️ Please enter a date'); return; }
+    const editId  = document.getElementById('maint-edit-id') ? document.getElementById('maint-edit-id').value : '';
+    const type    = document.getElementById('maint-type') ? document.getElementById('maint-type').value : 'other';
+    const locSel  = document.getElementById('maint-location');
+    const vehSel  = document.getElementById('maint-vehicle');
+    const date    = document.getElementById('maint-date') ? document.getElementById('maint-date').value : '';
+    const cost    = document.getElementById('maint-cost') ? document.getElementById('maint-cost').value : '';
+    const mileage = document.getElementById('maint-mileage') ? document.getElementById('maint-mileage').value : '';
+    const notes   = document.getElementById('maint-notes') ? document.getElementById('maint-notes').value : '';
+    if (!date) { showToast('Please enter a date'); return; }
 
+    const prev = editId ? activeRecords('maintenance').find(r => r.id === editId) : null;
+    // Resolve label for the type (builtin or custom)
+    const typeMeta = getMaintTypes().find(t => t.v === type);
     const record = {
-      id:          genId(),
+      id:        editId || genId(),
       type,
+      typeLabel: typeMeta ? typeMeta.label : type,
       date,
-      cost:        cost ? parseFloat(cost) : null,
-      notes:       notes || '',
-      createdAt:   now(),
+      cost:      cost ? parseFloat(cost) : null,
+      notes:     notes || '',
+      createdAt: prev ? prev.createdAt : now(),
     };
-    if (type === 'oil-change') {
-      record.vehicleId   = vehSel?.value || '';
-      record.vehicleName = vehSel?.options[vehSel.selectedIndex]?.dataset.name || '';
+    const isVehicleType = typeMeta ? !!typeMeta.forVehicle : (type === 'oil-change');
+    if (isVehicleType) {
+      record.vehicleId   = vehSel ? vehSel.value : '';
+      record.vehicleName = (vehSel && vehSel.options[vehSel.selectedIndex]) ? vehSel.options[vehSel.selectedIndex].dataset.name : '';
       record.mileage     = mileage ? parseInt(mileage) : null;
-      // Update vehicle currentMileage
       if (record.vehicleId && record.mileage) {
-        const v = activeRecords('vehicles').find(x=>x.id===record.vehicleId);
-        if (v) upsert('vehicles', { ...v, currentMileage: record.mileage });
+        const v = activeRecords('vehicles').find(x => x.id === record.vehicleId);
+        if (v) upsert('vehicles', Object.assign({}, v, { currentMileage: record.mileage }));
       }
     } else {
-      record.locationId   = locSel?.value || '';
-      record.locationName = locSel?.options[locSel.selectedIndex]?.dataset.name || '';
+      record.locationId   = locSel ? locSel.value : '';
+      record.locationName = (locSel && locSel.options[locSel.selectedIndex]) ? locSel.options[locSel.selectedIndex].dataset.name : '';
     }
+    // Don't save if somehow __add_new__ slipped through
+    if (type === '__add_new__') { showToast('Please select a valid type'); return; }
     upsert('maintenance', record);
     closeDynModal('hml-maintenance-modal');
     renderPersonalScreen();
-    showToast('✅ Maintenance logged');
+    showToast(editId ? 'Log updated' : 'Maintenance logged');
   }
 
   // ── Vehicle form ─────────────────────────────────────────────
@@ -12811,8 +13119,7 @@ function lbShowShareResult(url, tenantName) {
   right: 0;
   max-width: 480px;
   margin: 0 auto;
-  height: 72dvh;
-  max-height: 580px;
+  height: 92dvh;
   background: var(--dk-bg0);
   border-radius: 16px 16px 0 0;
   border-top: 1px solid var(--dk-border);
@@ -13340,16 +13647,16 @@ function lbShowShareResult(url, tenantName) {
   </div>
 
   <!-- ── MAP TAB ──────────────────────────────────────────────────── -->
-  <div class="dk-tab-panel" id="dk-panel-map">
+  <div class="dk-tab-panel" id="dk-panel-map" style="flex-direction:column;overflow:hidden;">
     <!-- Breadcrumb nav -->
     <div id="dkm-breadcrumb" style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;display:flex;align-items:center;gap:5px;background:var(--card-alt,#f8f9fb)"></div>
     <!-- Step 1: Screen picker -->
-    <div id="dkm-step-screen" style="padding:8px 0">
+    <div id="dkm-step-screen" style="padding:8px 0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;">
       <div style="padding:4px 12px 6px;font-size:11px;color:var(--muted)">Select a screen to explore its interactions:</div>
       <div id="dkm-screen-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 10px 8px"></div>
     </div>
     <!-- Step 2: Object list -->
-    <div id="dkm-step-object" style="display:none">
+    <div id="dkm-step-object" style="display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;">
       <div style="padding:6px 10px 0">
         <input id="dkm-search" style="width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:12px;padding:7px 10px;border-radius:8px;outline:none;font-family:inherit" placeholder="🔍 Filter…" oninput="dkmRenderObjects()">
       </div>
@@ -13357,7 +13664,7 @@ function lbShowShareResult(url, tenantName) {
       <div id="dkm-obj-list" style="padding:4px 0 8px"></div>
     </div>
     <!-- Step 3: Detail + edit form -->
-    <div id="dkm-step-detail" style="display:none;padding:8px 10px 12px">
+    <div id="dkm-step-detail" style="display:none;padding:8px 10px 12px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;">
       <div id="dkm-detail-card" style="background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden"></div>
       <div id="dkm-form-card" style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">
         <div style="padding:10px 12px;border-bottom:1px solid var(--border)">
@@ -14640,6 +14947,30 @@ window.dkmTagDismiss = function(silent) {
   DK._tagElDesc     = null;
   DK._tagElContext  = null;
 };
+
+/* ── DKM GLOBAL EXPORTS ─────────────────────────────────────────── */
+// All functions called from inline onclick= attributes must be globally
+// accessible. The IIFE closure hides them otherwise → "Script error." on tap.
+window.dkmStep          = dkmStep;
+window.dkmSelectScreen  = dkmSelectScreen;
+window.dkmRenderObjects = dkmRenderObjects;
+window.dkmSelectRow     = dkmSelectRow;
+window.dkmSetType       = dkmSetType;
+window.dkmSetStatus     = dkmSetStatus;
+window.dkmSetPri        = dkmSetPri;
+window.dkmNavDetail     = dkmNavDetail;
+window.dkmSaveDetail    = dkmSaveDetail;
+window.dkmNewRow        = dkmNewRow;
+window.dkmNewSetStatus  = dkmNewSetStatus;
+window.dkmSaveNew       = dkmSaveNew;
+window.dkTab            = dkTab;
+window.dkSelCat         = dkSelCat;
+window.dkSubmit         = dkSubmit;
+window.dkClearRef       = dkClearRef;
+window.dkToggleInspect  = dkToggleInspect;
+window.dkExport         = dkExport;
+window.dkClearAll       = dkClearAll;
+window.dkTogglePanel    = dkTogglePanel;
 
 /* ── INIT ───────────────────────────────────────────────────────── */
 // Auto-refresh screen badge whenever the user navigates (passive observer)
