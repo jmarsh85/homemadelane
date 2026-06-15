@@ -2037,7 +2037,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;padding:16px;border-top:1px solid var(--border);cursor:pointer;" onclick="toggleLbTestMode()">
           <div>
             <div style="font-weight:600;font-size:0.9375rem;">Lease Builder Test Mode</div>
-            <div style="font-size:0.75rem;color:var(--muted);margin-top:2px;" id="lb-test-mode-label">Off — shows Force Execute button in Step 4</div>
+            <div style="font-size:0.75rem;color:var(--muted);margin-top:2px;" id="lb-test-mode-label">Off — shows Force Execute in Step 4</div>
           </div>
           <span id="lb-test-mode-badge" style="font-size:0.75rem;padding:3px 10px;border-radius:20px;background:#f0f0f0;color:#888;font-weight:600;">OFF</span>
         </div>
@@ -9522,21 +9522,16 @@ I am continuing development on **Homemade Lane**, a single-file vanilla HTML/CSS
     var active = localStorage.getItem('hml_lb_test_mode') === '1';
     active = !active;
     localStorage.setItem('hml_lb_test_mode', active ? '1' : '0');
-    var badge = document.getElementById('lb-test-mode-badge');
-    var label = document.getElementById('lb-test-mode-label');
-    if (badge) { badge.textContent = active ? 'ON' : 'OFF'; badge.style.background = active ? 'rgba(155,89,182,0.15)' : '#f0f0f0'; badge.style.color = active ? '#9b59b6' : '#888'; }
-    if (label) label.textContent = active ? 'On — Force Execute visible in Step 4' : 'Off — shows Force Execute button in Step 4';
+    syncLbTestModeUI();
     showToast(active ? '🧪 Test mode ON — open Lease Builder Step 4' : 'Test mode OFF');
   }
-
   function syncLbTestModeUI() {
     var active = localStorage.getItem('hml_lb_test_mode') === '1';
-    var badge = document.getElementById('lb-test-mode-badge');
-    var label = document.getElementById('lb-test-mode-label');
+    var badge  = document.getElementById('lb-test-mode-badge');
+    var label  = document.getElementById('lb-test-mode-label');
     if (badge) { badge.textContent = active ? 'ON' : 'OFF'; badge.style.background = active ? 'rgba(155,89,182,0.15)' : '#f0f0f0'; badge.style.color = active ? '#9b59b6' : '#888'; }
-    if (label) label.textContent = active ? 'On — Force Execute visible in Step 4' : 'Off — shows Force Execute button in Step 4';
+    if (label) label.textContent = active ? 'On — Force Execute visible in Step 4' : 'Off — shows Force Execute in Step 4';
   }
-
   function openAiDialog() {
     const apiKey = localStorage.getItem('hml_lb_apikey') || '';
     if (!apiKey) {
@@ -11078,12 +11073,8 @@ function lbUpdateStep4Buttons() {
     executeBtn.style.display = '';
     amendBtn.style.display   = 'none';
   }
-
-  // Show/hide test mode bar based on Settings toggle
   var testBar = document.getElementById('lb-test-mode-bar');
-  if (testBar) {
-    testBar.style.display = localStorage.getItem('hml_lb_test_mode') === '1' ? 'block' : 'none';
-  }
+  if (testBar) testBar.style.display = localStorage.getItem('hml_lb_test_mode') === '1' ? 'block' : 'none';
 }
 // Each clause stores its default text separately so we can reset.
 // {{TOKEN}} placeholders are substituted from form fields.
@@ -11832,41 +11823,36 @@ window.lbExecuteConfirmed = function() {
   try { if (typeof renderLbDraftsTable === 'function') renderLbDraftsTable(); } catch(e) {}
 };
 
-/* ── TEST EXECUTE (dev/testing only) ────────────────────────
-   Saves a draft and marks it executed in one tap, bypassing
-   the confirm dialog. Only visible in DevKit test mode.
-─────────────────────────────────────────────────────────────*/
+/* ── TEST EXECUTE (dev/testing only) ─────────────────────────
+   Saves a draft and marks it executed in one tap.
+   Only visible when Settings → Lease Builder Test Mode is ON.
+─────────────────────────────────────────────────────────*/
 window.lbTestExecute = function() {
   lbBridge();
   var upsertFn = window.lbUpsert;
   var getCol   = window.lbGetCollection || function(){ return []; };
   var toastFn  = window.lbToast || function(){};
   if (!LB.linkedLeaseId) { toastFn('⚠️ No lease linked — complete Step 1 first'); return; }
-
-  // Save draft first if no agreementId yet
   if (!LB.agreementId) {
     window.lbSaveDraft();
-    // Brief delay to let upsert settle, then execute
     setTimeout(function() {
       if (!LB.agreementId) { toastFn('⚠️ Draft save failed — try Save Draft manually first'); return; }
       _lbForceExecute(upsertFn, getCol, toastFn);
-    }, 200);
+    }, 300);
   } else {
     _lbForceExecute(upsertFn, getCol, toastFn);
   }
 };
-
 function _lbForceExecute(upsertFn, getCol, toastFn) {
   var existing = getCol('leaseAgreements').find(function(a){ return a.id === LB.agreementId; });
   if (!existing) { toastFn('⚠️ No draft found'); return; }
   if (existing.status === 'executed' || existing.status === 'amended') {
-    toastFn('ℹ️ Already executed — proceed to Share Lease');
-    return;
+    toastFn('ℹ️ Already executed — tap Share Lease'); return;
   }
   var ts  = (typeof window.now === 'function') ? window.now() : new Date().toISOString();
   var rec = Object.assign({}, existing, { status: 'executed', updatedAt: ts });
   upsertFn('leaseAgreements', rec);
-  toastFn('🧪 Test: agreement marked executed — tap Share Lease');
+  toastFn('🧪 Test: marked executed — tap Share Lease');
   try { lbUpdateStep4Buttons(); } catch(e) {}
 }
 
@@ -13061,9 +13047,18 @@ window.lbShareLeaseConfirmed = function() {
       files: files
     })
   })
-  .then(function(r){ return r.json(); })
-  .then(function(data){
-    if (!data.id) throw new Error(data.message || 'Gist creation failed');
+  .then(function(r){
+    var status = r.status;
+    return r.json().then(function(data){ return { status: status, data: data }; });
+  })
+  .then(function(res){
+    var data = res.data;
+    if (!data.id) {
+      var msg = data.message || ('GitHub error ' + res.status);
+      if (res.status === 401) msg = 'GitHub token invalid or expired — re-enter in Settings → Lease Sharing';
+      if (res.status === 403) msg = 'GitHub token lacks Gist permission — use a classic token with gist scope';
+      throw new Error(msg);
+    }
     var base = window.location.origin
       + window.location.pathname.replace(/[^/]*$/, '');
     var url = base + 'hml-lease.html?g=' + data.id;
@@ -13071,9 +13066,9 @@ window.lbShareLeaseConfirmed = function() {
     lbShowShareResult(url, payload.tenant);
   })
   .catch(function(err){
-    if (btn) { btn.textContent = '\U0001f4e4 Create Share Link'; btn.disabled = false; }
+    if (btn) { btn.textContent = '📤 Create Share Link'; btn.disabled = false; }
     var toast = window.lbToast || (typeof showToast === 'function' ? showToast : function(){});
-    toast('\u26a0\ufe0f ' + (err.message || 'Failed to create link'));
+    toast('⚠️ ' + (err.message || 'Failed to create link'));
   });
 };
 
