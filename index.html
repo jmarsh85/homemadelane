@@ -2034,6 +2034,13 @@
           </div>
           <span style="color:var(--muted);">📋</span>
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:16px;border-top:1px solid var(--border);cursor:pointer;" onclick="toggleLbTestMode()">
+          <div>
+            <div style="font-weight:600;font-size:0.9375rem;">Lease Builder Test Mode</div>
+            <div style="font-size:0.75rem;color:var(--muted);margin-top:2px;" id="lb-test-mode-label">Off — shows Force Execute button in Step 4</div>
+          </div>
+          <span id="lb-test-mode-badge" style="font-size:0.75rem;padding:3px 10px;border-radius:20px;background:#f0f0f0;color:#888;font-weight:600;">OFF</span>
+        </div>
       </div>
 
       <p class="section-label">Tax</p>
@@ -5354,7 +5361,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     if (screen === 'tenants')         { renderTenantsScreen(); }
     if (screen === 'resale')          { renderResaleScreen(); }
     if (screen === 'finances')        { renderFinancesOverview(); setTimeout(renderTransactionTable, 30); }
-    if (screen === 'settings')        { updateStorageStats(); renderCategories(); renderPaymentMethods(); initAiSettings(); }
+    if (screen === 'settings')        { updateStorageStats(); renderCategories(); renderPaymentMethods(); initAiSettings(); if (typeof syncLbTestModeUI === 'function') syncLbTestModeUI(); }
     if (screen === 'personal')        { renderPersonalScreen(); }
     if (screen === 'service')         { renderServiceRequests(); }
     if (screen === 'property-detail') { /* rendered by openProperty */ }
@@ -9511,6 +9518,25 @@ I am continuing development on **Homemade Lane**, a single-file vanilla HTML/CSS
      prompt so Claude answers from your actual property/lease/financial
      data. History maintained for session; not persisted to localStorage.
   ─────────────────────────────────────────────────────────────────── */
+  function toggleLbTestMode() {
+    var active = localStorage.getItem('hml_lb_test_mode') === '1';
+    active = !active;
+    localStorage.setItem('hml_lb_test_mode', active ? '1' : '0');
+    var badge = document.getElementById('lb-test-mode-badge');
+    var label = document.getElementById('lb-test-mode-label');
+    if (badge) { badge.textContent = active ? 'ON' : 'OFF'; badge.style.background = active ? 'rgba(155,89,182,0.15)' : '#f0f0f0'; badge.style.color = active ? '#9b59b6' : '#888'; }
+    if (label) label.textContent = active ? 'On — Force Execute visible in Step 4' : 'Off — shows Force Execute button in Step 4';
+    showToast(active ? '🧪 Test mode ON — open Lease Builder Step 4' : 'Test mode OFF');
+  }
+
+  function syncLbTestModeUI() {
+    var active = localStorage.getItem('hml_lb_test_mode') === '1';
+    var badge = document.getElementById('lb-test-mode-badge');
+    var label = document.getElementById('lb-test-mode-label');
+    if (badge) { badge.textContent = active ? 'ON' : 'OFF'; badge.style.background = active ? 'rgba(155,89,182,0.15)' : '#f0f0f0'; badge.style.color = active ? '#9b59b6' : '#888'; }
+    if (label) label.textContent = active ? 'On — Force Execute visible in Step 4' : 'Off — shows Force Execute button in Step 4';
+  }
+
   function openAiDialog() {
     const apiKey = localStorage.getItem('hml_lb_apikey') || '';
     if (!apiKey) {
@@ -11052,6 +11078,12 @@ function lbUpdateStep4Buttons() {
     executeBtn.style.display = '';
     amendBtn.style.display   = 'none';
   }
+
+  // Show/hide test mode bar based on Settings toggle
+  var testBar = document.getElementById('lb-test-mode-bar');
+  if (testBar) {
+    testBar.style.display = localStorage.getItem('hml_lb_test_mode') === '1' ? 'block' : 'none';
+  }
 }
 // Each clause stores its default text separately so we can reset.
 // {{TOKEN}} placeholders are substituted from form fields.
@@ -11799,6 +11831,44 @@ window.lbExecuteConfirmed = function() {
   try { lbUpdateStep4Buttons(); } catch(e) {}
   try { if (typeof renderLbDraftsTable === 'function') renderLbDraftsTable(); } catch(e) {}
 };
+
+/* ── TEST EXECUTE (dev/testing only) ────────────────────────
+   Saves a draft and marks it executed in one tap, bypassing
+   the confirm dialog. Only visible in DevKit test mode.
+─────────────────────────────────────────────────────────────*/
+window.lbTestExecute = function() {
+  lbBridge();
+  var upsertFn = window.lbUpsert;
+  var getCol   = window.lbGetCollection || function(){ return []; };
+  var toastFn  = window.lbToast || function(){};
+  if (!LB.linkedLeaseId) { toastFn('⚠️ No lease linked — complete Step 1 first'); return; }
+
+  // Save draft first if no agreementId yet
+  if (!LB.agreementId) {
+    window.lbSaveDraft();
+    // Brief delay to let upsert settle, then execute
+    setTimeout(function() {
+      if (!LB.agreementId) { toastFn('⚠️ Draft save failed — try Save Draft manually first'); return; }
+      _lbForceExecute(upsertFn, getCol, toastFn);
+    }, 200);
+  } else {
+    _lbForceExecute(upsertFn, getCol, toastFn);
+  }
+};
+
+function _lbForceExecute(upsertFn, getCol, toastFn) {
+  var existing = getCol('leaseAgreements').find(function(a){ return a.id === LB.agreementId; });
+  if (!existing) { toastFn('⚠️ No draft found'); return; }
+  if (existing.status === 'executed' || existing.status === 'amended') {
+    toastFn('ℹ️ Already executed — proceed to Share Lease');
+    return;
+  }
+  var ts  = (typeof window.now === 'function') ? window.now() : new Date().toISOString();
+  var rec = Object.assign({}, existing, { status: 'executed', updatedAt: ts });
+  upsertFn('leaseAgreements', rec);
+  toastFn('🧪 Test: agreement marked executed — tap Share Lease');
+  try { lbUpdateStep4Buttons(); } catch(e) {}
+}
 
 /* ── AMEND ───────────────────────────────────────────────────
    Creates a new amendment version on an executed agreement.
@@ -12783,6 +12853,12 @@ window.openLeaseBuilder = function() {
           '</div>',
           '<div style="margin-bottom:14px;">',
             '<button class="btn btn-primary btn-sm" style="width:100%;background:var(--navy);border-color:var(--navy);" onclick="lbShareLease()">📤 Share Lease (SMS / QR)</button>',
+          '</div>',
+          '<div id="lb-test-mode-bar" style="display:none;margin-bottom:10px;padding:8px 12px;background:rgba(155,89,182,0.1);border:1.5px dashed #9b59b6;border-radius:10px;text-align:center;">',
+            '<span style="font-size:0.7rem;font-weight:700;color:#9b59b6;text-transform:uppercase;letter-spacing:0.05em;">🧪 Test Mode</span>',
+            '<button class="btn btn-sm" style="margin-left:10px;background:#9b59b6;color:#fff;border:none;border-radius:8px;font-size:0.75rem;padding:5px 12px;cursor:pointer;" onclick="lbTestExecute()">Force Execute &amp; Test Share</button>',
+          '</div>',
+          '<div style="display:none">',
           '</div>',
           '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">',
             '<button class="btn btn-outline btn-sm" style="flex:1;font-size:0.7rem;" onclick="lbExportSnapshot()" title="Export frozen snapshot of executed agreement">📜 Export Snapshot</button>',
