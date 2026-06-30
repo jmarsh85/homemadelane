@@ -2,8 +2,8 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.2.5                                             ║
-  ║  Date: 2026-06-29                                           ║
+  ║  Version: 4.2.1                                             ║
+  ║  Date: 2026-06-14                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
   ║                                                             ║
@@ -3652,22 +3652,53 @@
     document.getElementById('content').scrollTo({ top: 0, behavior: 'instant' });
   }
 
+  const PROP_FIN_SERVICE_CATS = ['Repairs', 'Cleaning & maintenance', 'Legal & professional fees'];
+  let PROP_FIN_FILTER = 'expenses'; // 'expenses' (default, excludes utilities) | 'utilities' | 'services' | 'all'
+
+  function setPropFinFilter(filter) {
+    PROP_FIN_FILTER = filter;
+    renderPropertyFinancials();
+  }
+
   function renderPropertyFinancials() {
     const panel = document.getElementById('ptab-financials');
     if (!panel || !currentProperty) return;
 
     const propId = currentProperty.id;
+
+    // Build the skeleton once — snapshot row, year selector, filter bar, and txn card —
+    // since the panel starts as an empty placeholder with nothing for us to query into.
+    if (!panel.querySelector('.snapshot-row')) {
+      const curYear = new Date().getFullYear().toString();
+      const years = [];
+      for (let i = 0; i < 5; i++) years.push((curYear - i).toString());
+      panel.innerHTML = `
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+          <select onchange="renderPropertyFinancials()" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.8125rem;background:var(--surface);color:var(--text);">
+            ${years.map(y => `<option value="${y}" ${y===curYear?'selected':''}>${y}</option>`).join('')}
+          </select>
+        </div>
+        <div class="snapshot-row" style="margin-bottom:16px;">
+          <div class="snapshot-cell"><div class="snapshot-label">Income</div><div class="snapshot-value income">—</div></div>
+          <div class="snapshot-cell"><div class="snapshot-label">Expenses</div><div class="snapshot-value expense">—</div></div>
+          <div class="snapshot-cell"><div class="snapshot-label">Net</div><div class="snapshot-value net">—</div></div>
+        </div>
+        <div id="prop-fin-filter-bar" style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px;"></div>
+        <div class="card"></div>
+      `;
+    }
+
     const yearSel = panel.querySelector('select');
     const year = yearSel?.value || new Date().getFullYear().toString();
 
-    const txns  = activeRecords('transactions')
+    const allTxns = activeRecords('transactions')
       .filter(t => t.propertyId === propId && ((t.taxYear===year)||(t.date||'').startsWith(year)));
-    const income   = txns.filter(t=>t.type==='income').reduce((s,t)=>s+(t.amount||0),0);
-    const expenses = txns.filter(t=>t.type==='expense').reduce((s,t)=>s+Math.abs(t.amount||0),0);
+    const income   = allTxns.filter(t=>t.type==='income').reduce((s,t)=>s+(t.amount||0),0);
+    const expenses = allTxns.filter(t=>t.type==='expense').reduce((s,t)=>s+Math.abs(t.amount||0),0);
     const net      = income - expenses;
     const fmt = n => '$' + (n||0).toLocaleString();
 
-    // Update snapshot cells
+    // Update snapshot cells (always reflects full P&L for the year, independent of the list filter below)
     panel.querySelectorAll('.snapshot-cell').forEach(cell => {
       const lbl = cell.querySelector('.snapshot-label')?.textContent?.trim();
       const el  = cell.querySelector('.snapshot-value');
@@ -3677,12 +3708,41 @@
       if (lbl === 'Net')      el.textContent = fmt(net);
     });
 
+    // Render filter bar (reflects current PROP_FIN_FILTER state)
+    const filterBar = document.getElementById('prop-fin-filter-bar');
+    if (filterBar) {
+      const filters = [
+        { id: 'expenses',  label: 'Expenses' },
+        { id: 'utilities', label: 'Utilities' },
+        { id: 'services',  label: 'Services' },
+        { id: 'all',       label: 'All' }
+      ];
+      filterBar.innerHTML = filters.map(f => {
+        const active = PROP_FIN_FILTER === f.id;
+        return `<button onclick="setPropFinFilter('${f.id}')" style="flex-shrink:0;padding:6px 14px;border-radius:999px;font-size:0.8125rem;font-weight:600;border:1.5px solid ${active?'var(--navy)':'var(--border)'};background:${active?'var(--navy)':'var(--surface)'};color:${active?'#fff':'var(--text)'};cursor:pointer;white-space:nowrap;">${f.label}</button>`;
+      }).join('');
+    }
+
+    // Apply the selected filter to the transaction list
+    let txns;
+    if (PROP_FIN_FILTER === 'utilities') {
+      txns = allTxns.filter(t => t.type === 'expense' && t.category === 'Utilities');
+    } else if (PROP_FIN_FILTER === 'services') {
+      txns = allTxns.filter(t => t.type === 'expense' && PROP_FIN_SERVICE_CATS.includes(t.category));
+    } else if (PROP_FIN_FILTER === 'all') {
+      txns = allTxns;
+    } else {
+      // 'expenses' (default) — all expenses excluding Utilities
+      txns = allTxns.filter(t => t.type === 'expense' && t.category !== 'Utilities');
+    }
+    txns = txns.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
     // Render transaction rows for this property
     const txnCard = panel.querySelector('.card');
     if (!txnCard) return;
     const fmtDate = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
     if (!txns.length) {
-      txnCard.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:0.875rem;">No transactions for this property in ' + year + '.</div>';
+      txnCard.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:0.875rem;">No matching transactions for ' + year + '.</div>';
       return;
     }
     txnCard.style.padding = '0';
@@ -4351,11 +4411,51 @@
     renderTransactionTable();
   }
 
+  /* ── RECURRING BILL DUE-STATUS HELPER ───────────────────────────
+     Single source of truth used by both the Bills tab and the
+     dashboard alert banners. A bill's "template" is simply its most
+     recent logged transaction for a given property+category+frequency;
+     status is computed from how long it's been since that date vs.
+     the expected cadence, with a configurable lead window so bills
+     surface as "due soon" a few days ahead of the hard due date
+     rather than only flashing red on the day itself.
+     Returns { status: 'ok' | 'soon' | 'due', daysUntilDue } */
+  const RECURRING_BILL_LEAD_DAYS = 5;
+
+  function getRecurringBillStatus(t) {
+    if (!t || !t.date) return { status: 'ok', daysUntilDue: null };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const last = new Date(t.date + 'T12:00:00');
+    const freq = t.frequency || 'monthly';
+    const cycleMs = freq === 'annually' ? 365*86400000 : freq === 'quarterly' ? 91*86400000 : 31*86400000;
+    const nextDue = new Date(last.getTime() + cycleMs);
+    const daysUntilDue = Math.ceil((nextDue - today) / 86400000);
+    if (daysUntilDue <= 0) return { status: 'due', daysUntilDue };
+    if (daysUntilDue <= RECURRING_BILL_LEAD_DAYS) return { status: 'soon', daysUntilDue };
+    return { status: 'ok', daysUntilDue };
+  }
+
+  /* For each property (+ unassigned), collapse recurring expense transactions
+     down to one "template" per unique property+category+frequency combo —
+     the most recently logged one — annotated with its due status. Shared by
+     renderBillsView() and computeAlerts() so both reflect identical logic. */
+  function getRecurringBillTemplates() {
+    const bills = activeRecords('transactions').filter(t => t.isRecurring && t.type === 'expense');
+    const billKey = t => `${t.propertyId||''}|${t.category||''}|${t.frequency||'monthly'}`;
+    const templateMap = {};
+    [...bills].sort((a,b) => new Date(b.date||0) - new Date(a.date||0)).forEach(t => {
+      const k = billKey(t);
+      if (!templateMap[k]) templateMap[k] = t;
+    });
+    return Object.values(templateMap);
+  }
+
   function renderBillsView(body) {
     const props = activeRecords('properties');
-    const bills = activeRecords('transactions').filter(t => t.isRecurring && t.type === 'expense');
+    const templates = getRecurringBillTemplates();
 
-    if (!bills.length) {
+    if (!templates.length) {
       body.innerHTML = `
         <div style="padding:40px 24px;text-align:center;color:var(--muted);">
           <div style="font-size:2rem;margin-bottom:10px;">🔁</div>
@@ -4365,20 +4465,6 @@
         </div>`;
       return;
     }
-
-    // For each property (+ unassigned), find the unique recurring bill templates
-    // A "template" = the most recent transaction per unique property+category+frequency combo
-    const today = new Date();
-    today.setHours(0,0,0,0);
-
-    const billKey = t => `${t.propertyId||''}|${t.category||''}|${t.frequency||'monthly'}`;
-    const templateMap = {};
-    // Sort newest first so first-found = most recent per key
-    [...bills].sort((a,b) => new Date(b.date||0) - new Date(a.date||0)).forEach(t => {
-      const k = billKey(t);
-      if (!templateMap[k]) templateMap[k] = t;
-    });
-    const templates = Object.values(templateMap);
 
     // Group by property
     const byProp = {};
@@ -4392,13 +4478,7 @@
     const freqLabel = f => f === 'annually' ? 'Annual' : f === 'quarterly' ? 'Quarterly' : 'Monthly';
     const freqColor = f => f === 'annually' ? 'var(--navy)' : f === 'quarterly' ? 'var(--amber)' : 'var(--green)';
 
-    const isDue = t => {
-      if (!t.date) return false;
-      const last = new Date(t.date + 'T12:00:00');
-      const freq = t.frequency || 'monthly';
-      const ms = freq === 'annually' ? 365*86400000 : freq === 'quarterly' ? 91*86400000 : 31*86400000;
-      return (today - last) >= ms;
-    };
+    const isDue = t => getRecurringBillStatus(t).status === 'due';
 
     const lastLoggedStr = t => {
       if (!t.date) return 'Never logged';
@@ -4449,10 +4529,14 @@
           <div class="card" style="border-radius:0 0 var(--radius-md) var(--radius-md);padding:0;overflow:hidden;">`;
 
       propBills.forEach((t, i) => {
-        const due = isDue(t);
+        const billStatus = getRecurringBillStatus(t);
+        const due = billStatus.status === 'due';
+        const soon = billStatus.status === 'soon';
         const border = i < propBills.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
         const dueBadge = due
           ? `<span style="font-size:0.7rem;font-weight:700;background:#FFF3CD;color:#856404;padding:2px 7px;border-radius:99px;margin-left:6px;">Due</span>`
+          : soon
+          ? `<span style="font-size:0.7rem;font-weight:700;background:#E7F0FF;color:var(--navy);padding:2px 7px;border-radius:99px;margin-left:6px;">Due in ${billStatus.daysUntilDue}d</span>`
           : '';
         html += `
           <div style="${border}padding:12px 14px;display:flex;justify-content:space-between;align-items:center;">
@@ -6579,6 +6663,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     renderTransactionLists();
     renderFinancesOverview();
     renderDashboard();
+    renderAlerts();
     closeModal(modalId);
     EDIT.transaction = null;
 
@@ -7262,6 +7347,24 @@ Respond ONLY in this JSON format, no markdown, no preamble:
           });
         }
       }
+    });
+
+    // Recurring bill alerts — due or due-soon (uses shared getRecurringBillStatus logic
+    // so this always matches what's shown in the Bills tab itself)
+    getRecurringBillTemplates().forEach(t => {
+      const billStatus = getRecurringBillStatus(t);
+      if (billStatus.status === 'ok') return;
+      const prop = props.find(p => p.id === t.propertyId);
+      const propLabel = prop ? (prop.name || prop.address) : 'Unassigned';
+      const amtStr = '$' + parseFloat(t.amount||0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+      alerts.push({
+        id:   'bill-' + t.id,
+        icon: billStatus.status === 'due' ? '⚡' : '🔁',
+        text: billStatus.status === 'due'
+          ? `${t.category||'Bill'} (${propLabel}) — ${amtStr} is due`
+          : `${t.category||'Bill'} (${propLabel}) — ${amtStr} due in ${billStatus.daysUntilDue} day${billStatus.daysUntilDue!==1?'s':''}`,
+        onClick: `logBill('${t.id}')`,
+      });
     });
 
     return alerts;
@@ -10086,9 +10189,11 @@ Answer questions about their properties, finances, tenants, and operations. You 
       const div = document.createElement('div');
       div.className = 'alert-banner';
       div.id = 'alert-' + a.id;
+      const clickableStyle = a.onClick ? ' style="cursor:pointer;"' : '';
+      const clickHandler = a.onClick ? ` onclick="${a.onClick.replace(/"/g,'&quot;')}"` : '';
       div.innerHTML = `
         <span class="alert-icon">${a.icon}</span>
-        <span class="alert-text">${a.text}</span>
+        <span class="alert-text"${clickableStyle}${clickHandler}>${a.text}</span>
         <button class="alert-close" onclick="dismissAlert('${a.id}')">✕</button>
       `;
       container.appendChild(div);
@@ -14164,7 +14269,7 @@ function lbShowShareResult(url, tenantName) {
 
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 var DK_KEY        = 'hml_devlog';        // localStorage key — isolated from app data
-var DK_APP_VER    = 'Homemade Lane v4.2.4';
+var DK_APP_VER    = 'Homemade Lane v4.2.5';
 // Single source of truth — badge reads this at init; update only DK_APP_VER for future releases
 (function(){ var b=document.getElementById('hml-build-ref'); if(b) b.textContent='v'+DK_APP_VER.replace('Homemade Lane v',''); })();
 var DK_MAX_RECENT = 3;                   // entries shown in Log tab preview
