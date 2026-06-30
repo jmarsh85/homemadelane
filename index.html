@@ -2,8 +2,8 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.2.3                                             ║
-  ║  Date: 2026-06-29                                           ║
+  ║  Version: 4.2.1                                             ║
+  ║  Date: 2026-06-14                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
   ║                                                             ║
@@ -1994,6 +1994,18 @@
             <span id="ai-test-status" style="font-size:0.75rem;"></span>
           </div>
           <div style="margin-top:8px;font-size:0.75rem;color:var(--muted);">Key stored locally on device only — never transmitted except to Anthropic.</div>
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+            <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:8px;">AI Model</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select id="settings-ai-model-select" onchange="saveAiModelSelection()"
+                style="flex:1;font-family:var(--font-body);font-size:0.875rem;padding:9px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none;">
+                <option value="">— Refresh to load models —</option>
+              </select>
+              <button class="btn btn-outline btn-sm" onclick="refreshAiModelList()" id="ai-model-refresh-btn">Refresh</button>
+            </div>
+            <div id="ai-model-status" style="margin-top:8px;font-size:0.75rem;color:var(--muted);"></div>
+            <div style="margin-top:6px;font-size:0.75rem;color:var(--muted);">If AI features stop working, the selected model may have been retired by Anthropic — tap Refresh and pick a current one.</div>
+          </div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;cursor:pointer;" onclick="openAiDialog()">
           <div>
@@ -4587,6 +4599,11 @@
     if (keyRow) keyRow.style.display = enabled ? '' : 'none';
     const keyInp = document.getElementById('settings-ai-apikey');
     if (keyInp && localStorage.getItem('hml_lb_apikey')) keyInp.value = '••••••••••••••••';
+    // Render any cached model list (avoids needing a fresh API call on every settings visit)
+    try {
+      const cached = JSON.parse(localStorage.getItem('hml_ai_model_cache') || 'null');
+      if (cached && cached.length) _renderAiModelSelect(cached);
+    } catch (e) { /* ignore malformed cache */ }
     // Show/hide the AI button on the expense form based on enabled + key present
     syncAiButton();
   }
@@ -4620,6 +4637,97 @@
     showToast('✅ API key saved');
   }
 
+  /* ── AI MODEL SELECTION ──────────────────────────────────────────
+     Centralized model lookup used by every AI call site in the app.
+     Falls back to a safe default if the user hasn't picked one yet
+     (e.g. fresh install) — but the whole point of this picker is so a
+     model retirement never strands the user again: just hit Refresh. */
+  const AI_MODEL_KEY = 'hml_ai_model';
+  const AI_MODEL_FALLBACK = 'claude-sonnet-4-6';
+
+  function getAiModel() {
+    return localStorage.getItem(AI_MODEL_KEY) || AI_MODEL_FALLBACK;
+  }
+
+  function _renderAiModelSelect(models, selectedId) {
+    const sel = document.getElementById('settings-ai-model-select');
+    if (!sel) return;
+    if (!models || !models.length) {
+      sel.innerHTML = '<option value="">— Refresh to load models —</option>';
+      return;
+    }
+    sel.innerHTML = models.map(function(m) {
+      const label = m.display_name || m.id;
+      return '<option value="' + m.id + '">' + label + '</option>';
+    }).join('');
+    const want = selectedId || getAiModel();
+    const match = Array.from(sel.options).find(function(o) { return o.value === want; });
+    if (match) sel.value = want;
+  }
+
+  function refreshAiModelList() {
+    const apiKey = localStorage.getItem('hml_lb_apikey') || '';
+    const statusEl = document.getElementById('ai-model-status');
+    const btn = document.getElementById('ai-model-refresh-btn');
+    if (!apiKey) {
+      if (statusEl) { statusEl.textContent = '⚠️ Add and save your API key first'; statusEl.style.color = 'var(--amber)'; }
+      return;
+    }
+    if (window.location.protocol === 'file:') {
+      if (statusEl) { statusEl.textContent = '⚠️ Open via GitHub Pages URL to refresh — file:// blocks API calls'; statusEl.style.color = 'var(--amber)'; }
+      return;
+    }
+    if (btn) { btn.textContent = 'Loading…'; btn.disabled = true; }
+    if (statusEl) { statusEl.textContent = ''; }
+    fetch('https://api.anthropic.com/v1/models?limit=100', {
+      method: 'GET',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (btn) { btn.textContent = 'Refresh'; btn.disabled = false; }
+      if (data.error) {
+        if (statusEl) { statusEl.textContent = '✗ ' + (data.error.message || data.error.type || 'API error'); statusEl.style.color = 'var(--red)'; }
+        return;
+      }
+      const models = (data.data || []).filter(function(m) { return /^claude/.test(m.id); });
+      if (!models.length) {
+        if (statusEl) { statusEl.textContent = '⚠️ No models returned'; statusEl.style.color = 'var(--amber)'; }
+        return;
+      }
+      localStorage.setItem('hml_ai_model_cache', JSON.stringify(models));
+      // If the currently saved model no longer appears in the live list, it's been retired —
+      // fall back to the most recent one returned (API lists newest first) and tell the user.
+      const current = getAiModel();
+      const stillValid = models.some(function(m) { return m.id === current; });
+      let selected = current;
+      if (!stillValid) {
+        selected = models[0].id;
+        localStorage.setItem(AI_MODEL_KEY, selected);
+      }
+      _renderAiModelSelect(models, selected);
+      if (statusEl) {
+        statusEl.textContent = stillValid
+          ? '✓ ' + models.length + ' models loaded'
+          : '⚠️ Previous model was retired — switched to ' + (models[0].display_name || selected);
+        statusEl.style.color = stillValid ? 'var(--green)' : 'var(--amber)';
+      }
+      showToast(stillValid ? '✅ Model list refreshed' : '✨ Switched to current model');
+    })
+    .catch(function(err) {
+      if (btn) { btn.textContent = 'Refresh'; btn.disabled = false; }
+      if (statusEl) { statusEl.textContent = '✗ Network error — check connection'; statusEl.style.color = 'var(--red)'; }
+    });
+  }
+
+  function saveAiModelSelection() {
+    const sel = document.getElementById('settings-ai-model-select');
+    const val = sel?.value;
+    if (!val) return;
+    localStorage.setItem(AI_MODEL_KEY, val);
+    showToast('✅ AI model set to ' + (sel.options[sel.selectedIndex]?.text || val));
+  }
+
   function testAiApiKey() {
     const apiKey = localStorage.getItem('hml_lb_apikey') || '';
     const statusEl = document.getElementById('ai-test-status');
@@ -4638,7 +4746,7 @@
     fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type':'application/json', 'x-api-key':apiKey, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:10, messages:[{role:'user',content:'ping'}] })
+      body: JSON.stringify({ model:getAiModel(), max_tokens:10, messages:[{role:'user',content:'ping'}] })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -4702,7 +4810,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type':'application/json', 'x-api-key':apiKey, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:300, messages:[{role:'user',content:prompt}] })
+      body: JSON.stringify({ model:getAiModel(), max_tokens:300, messages:[{role:'user',content:prompt}] })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -4762,7 +4870,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     var desc    = document.getElementById('modal-expense')?.querySelector('[data-field="description"]')?.value || '';
     var date    = document.getElementById('modal-expense')?.querySelector('[data-field="date"]')?.value || '';
     var catSel  = document.getElementById('expense-category-select');
-    var cat     = catSel ? (catSel.options[catSel.selectedIndex]?.text || '') : '';
+    var cat     = (catSel && catSel.value && catSel.value !== '__new') ? catSel.value : '';
 
     var contextLines = [
       prop    ? '• Property: ' + prop.name + (prop.state ? ' (' + prop.state + ')' : '') : '',
@@ -4821,7 +4929,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
         'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: getAiModel(),
         max_tokens: 600,
         system: systemPrompt,
         messages: _aiChatHistory
@@ -4933,9 +5041,13 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     var catSel = document.getElementById('expense-category-select');
     if (catSel) {
       var cats = getCategories('e').filter(function(c) { return c !== 'Rent received'; });
-      catSel.innerHTML = cats.map(function(c) {
-        return '<option value="' + c.replace(/"/g,'&quot;') + '">' + c + '</option>';
-      }).join('') + '<option value="__new">+ Add new category\u2026</option>';
+      // Leading blank option so nothing is preselected — matches how vendor/description
+      // start empty until the user actually picks something
+      catSel.innerHTML = '<option value="" disabled ' + (currentCat ? '' : 'selected') + '>— Select category —</option>'
+        + cats.map(function(c) {
+            return '<option value="' + c.replace(/"/g,'&quot;') + '">' + c + '</option>';
+          }).join('')
+        + '<option value="__new">+ Add new category\u2026</option>';
       catSel.onchange = function() {
         if (this.value === '__new') { closeModal('modal-expense'); openModal('modal-categories'); }
         else { _applySmartPopulate('category', this.value); }
@@ -9877,7 +9989,7 @@ Answer questions about their properties, finances, tenants, and operations. You 
             'anthropic-dangerous-direct-browser-access': 'true',
           },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
+            model: getAiModel(),
             max_tokens: 1024,
             system: systemPrompt,
             messages: history,
@@ -10627,6 +10739,7 @@ function lbBridge() {
   if (typeof genId         === 'function' && !window.genId)         window.genId         = genId;
   if (typeof now           === 'function' && !window.now)           window.now           = now;
   if (typeof getOwnerProfile === 'function' && !window.getOwnerProfile) window.getOwnerProfile = getOwnerProfile;
+  if (typeof getAiModel    === 'function' && !window.getAiModel)    window.getAiModel    = getAiModel;
 
   // Safe upsert wrapper: ensures collection exists on real DB before delegating
   if (typeof upsert === 'function' && typeof DB !== 'undefined') {
@@ -11747,7 +11860,7 @@ function lbCallAI(id, prompt, mode) {
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model:      'claude-sonnet-4-20250514',
+      model:      (typeof window.getAiModel === 'function') ? window.getAiModel() : 'claude-sonnet-4-6',
       max_tokens: 1000,
       messages:   [{ role: 'user', content: prompt }],
     })
@@ -14051,7 +14164,7 @@ function lbShowShareResult(url, tenantName) {
 
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 var DK_KEY        = 'hml_devlog';        // localStorage key — isolated from app data
-var DK_APP_VER    = 'Homemade Lane v4.2.3';
+var DK_APP_VER    = 'Homemade Lane v4.2.4';
 // Single source of truth — badge reads this at init; update only DK_APP_VER for future releases
 (function(){ var b=document.getElementById('hml-build-ref'); if(b) b.textContent='v'+DK_APP_VER.replace('Homemade Lane v',''); })();
 var DK_MAX_RECENT = 3;                   // entries shown in Log tab preview
