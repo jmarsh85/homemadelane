@@ -2,8 +2,8 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.2.2                                             ║
-  ║  Date: 2026-06-29                                           ║
+  ║  Version: 4.2.1                                             ║
+  ║  Date: 2026-06-14                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
   ║                                                             ║
@@ -2401,10 +2401,10 @@
           <div class="field"><label>Amount</label><input data-field="amount" type="number" placeholder="$0.00" inputmode="decimal" /></div>
           <div class="field"><label>Date</label><input data-field="date" type="date" /></div>
         </div>
-        <div class="field"><label>Vendor / Payee</label><input data-field="vendor" id="expense-vendor-input" type="text" placeholder="e.g. Home Depot, Mike's Plumbing" list="expense-vendor-list" autocomplete="off" /><datalist id="expense-vendor-list"></datalist></div>
+        <div class="field"><label>Vendor / Payee</label><input data-field="vendor" id="expense-vendor-input" type="text" placeholder="e.g. Home Depot, Mike's Plumbing" list="expense-vendor-list" autocomplete="off" onchange="_applySmartPopulate('vendor', this.value)" /><datalist id="expense-vendor-list"></datalist></div>
         <div class="field"><label>Description</label>
           <div style="display:flex;gap:8px;align-items:center;">
-            <input data-field="description" id="expense-desc-input" type="text" placeholder="Brief description" style="flex:1;" list="expense-desc-list" autocomplete="off" /><datalist id="expense-desc-list"></datalist>
+            <input data-field="description" id="expense-desc-input" type="text" placeholder="Brief description" style="flex:1;" list="expense-desc-list" autocomplete="off" onchange="_applySmartPopulate('description', this.value)" /><datalist id="expense-desc-list"></datalist>
             <button type="button" id="expense-ai-btn" onclick="openExpenseAiChat()" title="AI expense assistant" style="display:none;flex-shrink:0;padding:7px 11px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);font-size:0.8125rem;cursor:pointer;white-space:nowrap;">✨ AI</button>
             <button type="button" id="expense-ai-hint" onclick="navigate('settings')" title="Enable AI in Settings" style="display:none;flex-shrink:0;padding:7px 10px;background:var(--surface);color:var(--muted);border:1.5px dashed var(--border);border-radius:var(--radius-sm);font-size:0.75rem;cursor:pointer;white-space:nowrap;">✨ AI ›</button>
           </div>
@@ -4865,15 +4865,81 @@ Respond ONLY in this JSON format, no markdown, no preamble:
 
   /* ── EXPENSE AUTOCOMPLETE + CATEGORY REBUILD ─────────────────── */
 
+  /* ── SMART POPULATE ────────────────────────────────────────────
+     When the user confirms a value for category, vendor, or description,
+     look up the most recent matching expense (scoped to the selected
+     property if one is set) and fill in any *currently empty* sibling
+     fields (category/vendor/description) from that match. Never
+     overwrites a field that already has a value. */
+  function _applySmartPopulate(triggerField, triggerValue) {
+    var val = (triggerValue || '').trim();
+    if (!val || val === '__new') return;
+
+    var modal = document.getElementById('modal-expense');
+    if (!modal) return;
+
+    var propSel   = document.getElementById('expense-property-select');
+    var propId    = propSel ? propSel.value : '';
+    var catField  = document.getElementById('expense-category-select');
+    var vendField = document.getElementById('expense-vendor-input');
+    var descField = document.getElementById('expense-desc-input');
+
+    // Build candidate pool: expenses only, most recent first
+    var pool = activeRecords('transactions')
+      .filter(function(t) { return t.type === 'expense'; })
+      .sort(function(a, b) { return (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || ''); });
+
+    function matches(t) {
+      if (triggerField === 'category')    return (t.category || '').toLowerCase() === val.toLowerCase();
+      if (triggerField === 'vendor')      return (t.vendor || '').toLowerCase() === val.toLowerCase();
+      if (triggerField === 'description') return (t.description || '').toLowerCase() === val.toLowerCase();
+      return false;
+    }
+
+    // First pass: scoped to selected property (if any)
+    var match = null;
+    if (propId) {
+      match = pool.find(function(t) { return t.propertyId === propId && matches(t); });
+    }
+    // Fallback: most recent matching record overall
+    if (!match) {
+      match = pool.find(matches);
+    }
+    if (!match) return;
+
+    var filled = [];
+
+    if (triggerField !== 'category' && catField && !catField.value) {
+      var opt = Array.from(catField.options).find(function(o) { return o.value === match.category; });
+      if (opt) { catField.value = match.category; filled.push('category'); }
+    }
+    if (triggerField !== 'vendor' && vendField && !vendField.value && match.vendor) {
+      vendField.value = match.vendor;
+      filled.push('vendor');
+    }
+    if (triggerField !== 'description' && descField && !descField.value && match.description) {
+      descField.value = match.description;
+      filled.push('description');
+    }
+
+    if (filled.length) {
+      showToast('✨ Auto-filled ' + filled.join(' & ') + ' from last similar expense');
+    }
+  }
+
   function _populateExpenseFormAids(currentCat) {
     // Rebuild category select from live getCategories() so custom cats appear
+    // Exclude 'Rent received' — that's an income-only category, not a valid expense category
     var catSel = document.getElementById('expense-category-select');
     if (catSel) {
-      var cats = getCategories('e');
+      var cats = getCategories('e').filter(function(c) { return c !== 'Rent received'; });
       catSel.innerHTML = cats.map(function(c) {
         return '<option value="' + c.replace(/"/g,'&quot;') + '">' + c + '</option>';
       }).join('') + '<option value="__new">+ Add new category\u2026</option>';
-      catSel.onchange = function() { if (this.value === '__new') { closeModal('modal-expense'); openModal('modal-categories'); } };
+      catSel.onchange = function() {
+        if (this.value === '__new') { closeModal('modal-expense'); openModal('modal-categories'); }
+        else { _applySmartPopulate('category', this.value); }
+      };
       // Restore selection
       if (currentCat) {
         var match = Array.from(catSel.options).find(function(o){ return o.value === currentCat; });
@@ -13985,7 +14051,7 @@ function lbShowShareResult(url, tenantName) {
 
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 var DK_KEY        = 'hml_devlog';        // localStorage key — isolated from app data
-var DK_APP_VER    = 'Homemade Lane v4.2.2';
+var DK_APP_VER    = 'Homemade Lane v4.2.3';
 // Single source of truth — badge reads this at init; update only DK_APP_VER for future releases
 (function(){ var b=document.getElementById('hml-build-ref'); if(b) b.textContent='v'+DK_APP_VER.replace('Homemade Lane v',''); })();
 var DK_MAX_RECENT = 3;                   // entries shown in Log tab preview
