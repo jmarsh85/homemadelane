@@ -2387,7 +2387,7 @@
         </div>
         <div class="field">
           <label>Category</label>
-          <select data-field="category" onchange="if(this.value==='__new'){closeModal('modal-expense');openModal('modal-categories');}">
+          <select data-field="category" id="expense-category-select" onchange="if(this.value==='__new'){closeModal('modal-expense');openModal('modal-categories');}">
             <option>Repairs</option><option>Supplies</option><option>Insurance</option>
             <option>Utilities</option><option>Management fees</option>
             <option>Cleaning &amp; maintenance</option><option>Legal &amp; professional fees</option>
@@ -2401,11 +2401,11 @@
           <div class="field"><label>Amount</label><input data-field="amount" type="number" placeholder="$0.00" inputmode="decimal" /></div>
           <div class="field"><label>Date</label><input data-field="date" type="date" /></div>
         </div>
-        <div class="field"><label>Vendor / Payee</label><input data-field="vendor" type="text" placeholder="e.g. Home Depot, Mike's Plumbing" /></div>
+        <div class="field"><label>Vendor / Payee</label><input data-field="vendor" id="expense-vendor-input" type="text" placeholder="e.g. Home Depot, Mike's Plumbing" list="expense-vendor-list" autocomplete="off" /><datalist id="expense-vendor-list"></datalist></div>
         <div class="field"><label>Description</label>
           <div style="display:flex;gap:8px;align-items:center;">
-            <input data-field="description" type="text" placeholder="Brief description" style="flex:1;" />
-            <button type="button" id="expense-ai-btn" onclick="txnAiClassify()" title="AI classification assist" style="display:none;flex-shrink:0;padding:7px 11px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);font-size:0.8125rem;cursor:pointer;white-space:nowrap;">✨ AI</button>
+            <input data-field="description" id="expense-desc-input" type="text" placeholder="Brief description" style="flex:1;" list="expense-desc-list" autocomplete="off" /><datalist id="expense-desc-list"></datalist>
+            <button type="button" id="expense-ai-btn" onclick="openExpenseAiChat()" title="AI expense assistant" style="display:none;flex-shrink:0;padding:7px 11px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);font-size:0.8125rem;cursor:pointer;white-space:nowrap;">✨ AI</button>
             <button type="button" id="expense-ai-hint" onclick="navigate('settings')" title="Enable AI in Settings" style="display:none;flex-shrink:0;padding:7px 10px;background:var(--surface);color:var(--muted);border:1.5px dashed var(--border);border-radius:var(--radius-sm);font-size:0.75rem;cursor:pointer;white-space:nowrap;">✨ AI ›</button>
           </div>
         </div>
@@ -4745,6 +4745,168 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     });
   }
 
+
+  /* ── AI EXPENSE CHAT ─────────────────────────────────────────── */
+  var _aiChatHistory = [];
+
+  function openExpenseAiChat() {
+    var apiKey = localStorage.getItem('hml_lb_apikey') || '';
+    if (!apiKey || localStorage.getItem('hml_ai_enabled') !== '1') {
+      showToast('⚠️ Enable AI Features and add your API key in Settings');
+      return;
+    }
+    var propId  = document.getElementById('expense-property-select')?.value;
+    var prop    = propId ? activeRecords('properties').find(function(p){ return p.id === propId; }) : null;
+    var amount  = document.getElementById('modal-expense')?.querySelector('[data-field="amount"]')?.value || '';
+    var vendor  = document.getElementById('modal-expense')?.querySelector('[data-field="vendor"]')?.value || '';
+    var desc    = document.getElementById('modal-expense')?.querySelector('[data-field="description"]')?.value || '';
+    var date    = document.getElementById('modal-expense')?.querySelector('[data-field="date"]')?.value || '';
+    var catSel  = document.getElementById('expense-category-select');
+    var cat     = catSel ? (catSel.options[catSel.selectedIndex]?.text || '') : '';
+
+    var contextLines = [
+      prop    ? '• Property: ' + prop.name + (prop.state ? ' (' + prop.state + ')' : '') : '',
+      amount  ? '• Amount: $' + amount : '',
+      date    ? '• Date: ' + date : '',
+      cat     ? '• Category: ' + cat : '',
+      vendor  ? '• Vendor/Payee: ' + vendor : '',
+      desc    ? '• Description: ' + desc : ''
+    ].filter(Boolean).join('\n');
+
+    var systemPrompt = 'You are an expert US property management tax assistant for a landlord tracking expenses for Schedule E (rental) and Schedule C (resale). Answer questions about expense categorisation, deductibility, and IRS rules concisely. When suggesting a category use one of: Repairs, Supplies, Insurance, Utilities, Management fees, Cleaning & maintenance, Legal & professional fees, Advertising, Mortgage interest, Property taxes, Auto & travel, Depreciation, Other.';
+
+    var seedMessage = contextLines
+      ? 'Here is the expense I\'m working on:\n' + contextLines + '\n\nCan you help me categorise this and flag any deductibility considerations?'
+      : 'I need help categorising an expense. What information should I provide?';
+
+    _aiChatHistory = [];
+    var messagesEl = document.getElementById('expense-ai-chat-messages');
+    if (messagesEl) messagesEl.innerHTML = '';
+    var inputEl = document.getElementById('expense-ai-chat-input');
+    if (inputEl) inputEl.value = '';
+
+    _renderAiChatBubble('user', seedMessage);
+    _aiChatHistory.push({ role: 'user', content: seedMessage });
+    openModal('modal-expense-ai-chat');
+    _callExpenseAiApi(systemPrompt);
+    var chatModal = document.getElementById('modal-expense-ai-chat');
+    if (chatModal) chatModal.dataset.systemPrompt = systemPrompt;
+  }
+
+  function sendExpenseAiMessage() {
+    var inputEl  = document.getElementById('expense-ai-chat-input');
+    var userText = (inputEl?.value || '').trim();
+    if (!userText) return;
+    if (inputEl) inputEl.value = '';
+    _renderAiChatBubble('user', userText);
+    _aiChatHistory.push({ role: 'user', content: userText });
+    var systemPrompt = document.getElementById('modal-expense-ai-chat')?.dataset.systemPrompt || '';
+    _callExpenseAiApi(systemPrompt);
+  }
+
+  function _callExpenseAiApi(systemPrompt) {
+    var apiKey  = localStorage.getItem('hml_lb_apikey') || '';
+    var sendBtn = document.getElementById('expense-ai-chat-send');
+    var inputEl = document.getElementById('expense-ai-chat-input');
+    if (sendBtn) { sendBtn.textContent = '…'; sendBtn.disabled = true; }
+    if (inputEl) inputEl.disabled = true;
+    var typingId = 'ai-typing-' + Date.now();
+    _renderAiChatBubble('assistant', '…', typingId);
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 600,
+        system: systemPrompt,
+        messages: _aiChatHistory
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var typingEl = document.getElementById(typingId);
+      if (typingEl) typingEl.remove();
+      if (sendBtn) { sendBtn.textContent = 'Send'; sendBtn.disabled = false; }
+      if (inputEl) { inputEl.disabled = false; inputEl.focus(); }
+      if (data.error) {
+        _renderAiChatBubble('assistant', '⚠️ API error: ' + (data.error.message || data.error.type || 'unknown'));
+        return;
+      }
+      var replyText = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text.trim() : '(no response)';
+      _renderAiChatBubble('assistant', replyText);
+      _aiChatHistory.push({ role: 'assistant', content: replyText });
+    })
+    .catch(function(err) {
+      var typingEl = document.getElementById(typingId);
+      if (typingEl) typingEl.remove();
+      if (sendBtn) { sendBtn.textContent = 'Send'; sendBtn.disabled = false; }
+      if (inputEl) inputEl.disabled = false;
+      _renderAiChatBubble('assistant', '⚠️ Request failed: ' + (err.message || 'network error'));
+    });
+  }
+
+  function _renderAiChatBubble(role, text, id) {
+    var container = document.getElementById('expense-ai-chat-messages');
+    if (!container) return;
+    var isUser = role === 'user';
+    var bubble = document.createElement('div');
+    if (id) bubble.id = id;
+    bubble.style.cssText = 'max-width:85%;padding:9px 13px;border-radius:14px;font-size:0.875rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;'
+      + (isUser ? 'align-self:flex-end;background:var(--navy);color:#fff;' : 'align-self:flex-start;background:var(--surface);color:var(--text);border:1.5px solid var(--border);');
+    bubble.textContent = text;
+    container.appendChild(bubble);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  /* ── EXPENSE AUTOCOMPLETE + CATEGORY REBUILD ─────────────────── */
+
+  function _populateExpenseFormAids(currentCat) {
+    // Rebuild category select from live getCategories() so custom cats appear
+    var catSel = document.getElementById('expense-category-select');
+    if (catSel) {
+      var cats = getCategories('e');
+      catSel.innerHTML = cats.map(function(c) {
+        return '<option value="' + c.replace(/"/g,'&quot;') + '">' + c + '</option>';
+      }).join('') + '<option value="__new">+ Add new category\u2026</option>';
+      catSel.onchange = function() { if (this.value === '__new') { closeModal('modal-expense'); openModal('modal-categories'); } };
+      // Restore selection
+      if (currentCat) {
+        var match = Array.from(catSel.options).find(function(o){ return o.value === currentCat; });
+        if (match) catSel.value = currentCat;
+      }
+    }
+
+    // Vendor datalist from historical transactions
+    var vendorList = document.getElementById('expense-vendor-list');
+    if (vendorList) {
+      var vendors = []; var seenV = {};
+      activeRecords('transactions').forEach(function(t) {
+        var v = (t.vendor || '').trim();
+        if (v && !seenV[v.toLowerCase()]) { seenV[v.toLowerCase()] = 1; vendors.push(v); }
+      });
+      vendors.sort();
+      vendorList.innerHTML = vendors.map(function(v){ return '<option value="' + v.replace(/"/g,'&quot;') + '">'; }).join('');
+    }
+
+    // Description datalist from historical transactions
+    var descList = document.getElementById('expense-desc-list');
+    if (descList) {
+      var descs = []; var seenD = {};
+      activeRecords('transactions').forEach(function(t) {
+        var d = (t.description || '').trim();
+        if (d && !seenD[d.toLowerCase()]) { seenD[d.toLowerCase()] = 1; descs.push(d); }
+      });
+      descs.sort();
+      descList.innerHTML = descs.map(function(d){ return '<option value="' + d.replace(/"/g,'&quot;') + '">'; }).join('');
+    }
+  }
+
+
   function toggleRecurringFields() {
     const chk    = document.getElementById('expense-is-recurring');
     const fields = document.getElementById('expense-recurring-fields');
@@ -5303,7 +5465,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     saveCategories(type, cats);
     if (input) input.value = '';
     showToast('✅ Category added');
-    setTimeout(() => renderCategories(), 50);
+    setTimeout(() => { renderCategories(); _populateExpenseFormAids(); }, 50);
   }
 
   function deleteCategory(type, idx) {
@@ -5311,6 +5473,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     cats.splice(idx, 1);
     saveCategories(type, cats);
     renderCategories();
+    _populateExpenseFormAids();
   }
 
   /* ── NAVIGATION ─────────────────────────────────────────── */
@@ -6171,6 +6334,17 @@ Respond ONLY in this JSON format, no markdown, no preamble:
 
     // Payment method + receipt + AI chip state for expense modal
     if (modalId === 'modal-expense') {
+      // Rebuild category select (fixes custom categories bug) + populate autocomplete datalists
+      const _currentCat = record?.category || '';
+      _populateExpenseFormAids(_currentCat);
+      // Re-apply category selection after rebuild
+      if (_currentCat) {
+        const _catSel = document.getElementById('expense-category-select');
+        if (_catSel) {
+          const _opt = Array.from(_catSel.options).find(function(o){ return o.value === _currentCat; });
+          if (_opt) _catSel.value = _currentCat;
+        }
+      }
       populatePaymentMethodSelect(record?.paymentMethod || '');
       syncAiButton();
       const paidBySel = document.getElementById('expense-paid-by');
@@ -11838,7 +12012,7 @@ window.lbTestExecute = function() {
     setTimeout(function() {
       if (!LB.agreementId) { toastFn('⚠️ Draft save failed — try Save Draft manually first'); return; }
       _lbForceExecute(upsertFn, getCol, toastFn);
-    }, 300);
+    }, 2300); // wait for lbSaveDraft 2s button animation to complete
   } else {
     _lbForceExecute(upsertFn, getCol, toastFn);
   }
@@ -13021,6 +13195,7 @@ window.lbShareLease = function() {
 };
 
 window.lbShareLeaseConfirmed = function() {
+  lbBridge(); // ensure window.lbToast and window.lbGetCollection are set
   var o   = document.getElementById('lb-share-preflight');
   var btn = o ? o.querySelector('button.btn-primary') : null;
   if (btn) { btn.textContent = '\u23f3 Creating link\u2026'; btn.disabled = true; }
@@ -13810,7 +13985,7 @@ function lbShowShareResult(url, tenantName) {
 
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 var DK_KEY        = 'hml_devlog';        // localStorage key — isolated from app data
-var DK_APP_VER    = 'Homemade Lane v4.2.1';
+var DK_APP_VER    = 'Homemade Lane v4.2.2';
 // Single source of truth — badge reads this at init; update only DK_APP_VER for future releases
 (function(){ var b=document.getElementById('hml-build-ref'); if(b) b.textContent='v'+DK_APP_VER.replace('Homemade Lane v',''); })();
 var DK_MAX_RECENT = 3;                   // entries shown in Log tab preview
@@ -15131,6 +15306,25 @@ window.dkTogglePanel    = dkTogglePanel;
     <div style="flex-shrink:0;padding:12px 20px 20px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;">
       <button class="btn btn-primary btn-full" ontouchstart="" onclick="closeModal('modal-categories')">Done</button>
       <button class="btn btn-outline btn-full" ontouchstart="" onclick="closeModal('modal-categories')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Expense AI Chat Modal — body-level for iOS reliability -->
+<div class="modal-overlay" id="modal-expense-ai-chat" onclick="overlayClose(event,'modal-expense-ai-chat')">
+  <div class="modal-sheet" style="display:flex;flex-direction:column;max-height:88vh;">
+    <div class="modal-handle"></div>
+    <div class="modal-header" style="flex-shrink:0;">
+      <div class="modal-title">✨ AI Expense Assistant</div>
+      <button class="modal-close" onclick="closeModal('modal-expense-ai-chat')">✕</button>
+    </div>
+    <div id="expense-ai-chat-messages" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 20px;display:flex;flex-direction:column;gap:10px;"></div>
+    <div style="flex-shrink:0;padding:10px 16px 20px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;">
+      <textarea id="expense-ai-chat-input" rows="2" placeholder="Ask about this expense…"
+        style="flex:1;font-family:var(--font-body);font-size:0.875rem;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);resize:none;outline:none;"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendExpenseAiMessage();}"></textarea>
+      <button id="expense-ai-chat-send" onclick="sendExpenseAiMessage()"
+        style="flex-shrink:0;padding:10px 14px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);font-size:0.875rem;font-weight:700;cursor:pointer;">Send</button>
     </div>
   </div>
 </div>
