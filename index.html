@@ -2,8 +2,8 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.2.6                                             ║
-  ║  Date: 2026-06-29                                           ║
+  ║  Version: 4.2.1                                             ║
+  ║  Date: 2026-06-14                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
   ║                                                             ║
@@ -6562,6 +6562,48 @@ Respond ONLY in this JSON format, no markdown, no preamble:
         const amtEl = document.getElementById('income-amount');
         if (amtEl) amtEl._userEdited = false;
         _clearProrateHint();
+
+        // ── Smart auto-populate for new income entry ──────────────────
+        // Determine target property: currentProperty or first in list
+        const _targetPropId = currentProperty?.id || '';
+        if (_targetPropId) {
+          // 1. Auto-select the active lease matching this property
+          const _activeLease = activeRecords('leases').find(l =>
+            (l.status === 'active' || l.status === 'extended') && l.propertyId === _targetPropId
+          );
+          if (_activeLease && leaseSel) {
+            const _fmtS = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '?';
+            const _fmtL = d => d ? new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}) : '?';
+            const _lName = `${_activeLease.firstName||''} ${_activeLease.lastName||''}`.trim() || _activeLease.id;
+            const _lVal  = `${_lName} – ${_fmtL(_activeLease.startDate)}–${_fmtL(_activeLease.endDate)}`;
+            // Find and select matching option
+            const _lOpt  = [...leaseSel.options].find(o => o.value === _lVal);
+            if (_lOpt) leaseSel.value = _lVal;
+          }
+
+          // 2-4. Find most recent income transaction for this property and repeat values
+          const _lastIncome = activeRecords('transactions')
+            .filter(t => t.type === 'income' && (t.propertyId === _targetPropId || t.property === currentProperty?.name))
+            .sort((a, b) => (b.updatedAt || b.date || '').localeCompare(a.updatedAt || a.date || ''))
+            [0];
+          if (_lastIncome) {
+            // 2. Amount
+            if (_lastIncome.amount && amtEl) {
+              amtEl.value = _lastIncome.amount;
+              amtEl._userEdited = true; // marks as user-set so prorate hint shows ↻ Recalculate instead of overwriting
+            }
+            // 3. Payment method
+            if (_lastIncome.paymentMethod) {
+              populatePaymentMethodSelect_income(_lastIncome.paymentMethod);
+            }
+            // 4. Received by
+            const _recvSel = document.getElementById('income-received-by');
+            if (_recvSel && _lastIncome.receivedBy) {
+              _recvSel.value = _lastIncome.receivedBy;
+            }
+          }
+        }
+        // ─────────────────────────────────────────────────────────────
       } else {
         const catEl = document.querySelector(`#${modalId} [data-field="category"]`);
         if (catEl) catEl.selectedIndex = 0;
