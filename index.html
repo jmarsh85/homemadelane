@@ -2,8 +2,8 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.2.1                                             ║
-  ║  Date: 2026-06-14                                           ║
+  ║  Version: 4.3.5                                             ║
+  ║  Date: 2026-07-19                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
   ║                                                             ║
@@ -2331,7 +2331,7 @@
               <label style="margin-bottom:0;">Amount</label>
               <span id="income-recalc-link" onclick="onIncomeLeasePicked(true)" style="display:none;font-size:0.7rem;font-weight:600;color:var(--amber);cursor:pointer;text-decoration:underline;text-underline-offset:2px;">↻ Recalculate</span>
             </div>
-            <input data-field="amount" id="income-amount" type="number" placeholder="$0.00" inputmode="decimal" oninput="this._userEdited=true;_updateRecalcLink();" />
+            <input data-field="amount" id="income-amount" type="text" placeholder="$0.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this);this._userEdited=true;_updateRecalcLink();" />
           </div>
           <div class="field">
             <label>Date</label>
@@ -2410,7 +2410,7 @@
           </select>
         </div>
         <div class="field-row">
-          <div class="field"><label>Amount</label><input data-field="amount" type="number" placeholder="$0.00" inputmode="decimal" /></div>
+          <div class="field"><label>Amount</label><input data-field="amount" id="expense-amount" type="text" placeholder="$0.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>
           <div class="field"><label>Date</label><input data-field="date" type="date" /></div>
         </div>
         <div class="field"><label>Vendor / Payee</label><input data-field="vendor" id="expense-vendor-input" type="text" placeholder="e.g. Home Depot, Mike's Plumbing" list="expense-vendor-list" autocomplete="off" onchange="_applySmartPopulate('vendor', this.value)" /><datalist id="expense-vendor-list"></datalist></div>
@@ -2563,7 +2563,7 @@
         </div>
         <div class="field"><label>Source / Where Purchased</label><input data-field="source" type="text" placeholder="e.g. Goodwill, Estate sale, FB Marketplace" /></div>
         <div class="field-row">
-          <div class="field"><label>Cost Paid</label><input data-field="cost" type="number" placeholder="$0.00" inputmode="decimal" /></div>
+          <div class="field"><label>Cost Paid</label><input data-field="cost" type="text" placeholder="$0.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>
           <div class="field"><label>Date</label><input data-field="date" type="date" /></div>
         </div>
         <div class="field">
@@ -2627,12 +2627,12 @@
           </select>
         </div>
         <div class="field-row">
-          <div class="field"><label>Sale Price</label><input data-field="salePrice" type="number" placeholder="$0.00" inputmode="decimal" /></div>
+          <div class="field"><label>Sale Price</label><input data-field="salePrice" type="text" placeholder="$0.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>
           <div class="field"><label>Date Sold</label><input data-field="saleDate" type="date" /></div>
         </div>
         <div class="field-row">
-          <div class="field"><label>Platform Fees</label><input data-field="platformFees" type="number" placeholder="$0.00" inputmode="decimal" /></div>
-          <div class="field"><label>Shipping Cost</label><input data-field="shipping" type="number" placeholder="$0.00" inputmode="decimal" /></div>
+          <div class="field"><label>Platform Fees</label><input data-field="platformFees" type="text" placeholder="$0.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>
+          <div class="field"><label>Shipping Cost</label><input data-field="shipping" type="text" placeholder="$0.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>
         </div>
         <div style="background:var(--surface); border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:16px;">
           <div style="font-size:0.75rem; color:var(--muted); margin-bottom:4px;">Estimated Net Profit</div>
@@ -2683,7 +2683,7 @@
         </div>
         <div class="field">
           <label>Monthly Rent</label>
-          <input data-field="monthlyRent" type="number" placeholder="$950" value="950" inputmode="decimal" />
+          <input data-field="monthlyRent" type="text" placeholder="$950" value="950.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" />
         </div>
         <div class="field">
           <label>Extension Reason</label>
@@ -2743,7 +2743,7 @@
             <option>Other</option>
           </select>
         </div>
-        <div class="field"><label>Security Deposit Returned ($)</label><input data-field="depositReturned" type="number" placeholder="500" inputmode="decimal" /></div>
+        <div class="field"><label>Security Deposit Returned ($)</label><input data-field="depositReturned" type="text" placeholder="500.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>
         <div class="field"><label>Notes</label><textarea data-field="notes" placeholder="Move-out condition, deductions, etc."></textarea></div>
         <div style="display:flex; gap:10px;">
           <button class="btn btn-outline" style="flex:1;" onclick="closeModal('modal-end-lease')">Cancel</button>
@@ -2803,12 +2803,12 @@
           <div class="field"><label>End Date</label><input data-field="endDate" type="date" /></div>
         </div>
         <div class="field-row">
-          <div class="field"><label>Monthly Rent ($)</label><input data-field="monthlyRent" type="number" placeholder="950" inputmode="decimal" /></div>
+          <div class="field"><label>Monthly Rent ($)</label><input data-field="monthlyRent" type="text" placeholder="950.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>
         <div class="field-row">
-          <div class="field"><label>Security Deposit ($)</label><input data-field="securityDeposit" type="number" placeholder="500" inputmode="decimal" /></div>
-          <div class="field"><label>Pet Deposit ($)</label><input data-field="petDeposit" type="number" placeholder="300" inputmode="decimal" /></div>
+          <div class="field"><label>Security Deposit ($)</label><input data-field="securityDeposit" type="text" placeholder="500.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>
+          <div class="field"><label>Pet Deposit ($)</label><input data-field="petDeposit" type="text" placeholder="300.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>
         </div>
-        <div class="field"><label>Cleaning Deposit ($) <span id="lease-cleaning-refund-label" style="font-size:0.7rem;font-weight:600;padding:1px 6px;border-radius:4px;background:var(--surface);color:var(--muted);">refundable</span></label><input data-field="cleaningDeposit" type="number" placeholder="0" inputmode="decimal" /></div>
+        <div class="field"><label>Cleaning Deposit ($) <span id="lease-cleaning-refund-label" style="font-size:0.7rem;font-weight:600;padding:1px 6px;border-radius:4px;background:var(--surface);color:var(--muted);">refundable</span></label><input data-field="cleaningDeposit" type="text" placeholder="0.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>
         <div class="field">
           <label>Source Platform</label>
           <select data-field="platform" onchange="if(this.value==='__new'){promptNewPlatform();}">
@@ -2910,7 +2910,7 @@
           </select>
         </div>
         <div class="field-row">
-          <div class="field"><label>Asking Price</label><input data-field="askingPrice" type="number" placeholder="$0.00" inputmode="decimal" /></div>
+          <div class="field"><label>Asking Price</label><input data-field="askingPrice" type="text" placeholder="$0.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>
           <div class="field"><label>Date Listed</label><input data-field="listedDate" type="date" /></div>
         </div>
         <div class="field"><label>Listing URL (optional)</label><input data-field="listingUrl" type="url" placeholder="https://" /></div>
@@ -5057,6 +5057,30 @@ Respond ONLY in this JSON format, no markdown, no preamble:
 
   /* ── EXPENSE AUTOCOMPLETE + CATEGORY REBUILD ─────────────────── */
 
+  /* ── CENTS-FIRST CURRENCY INPUT ──────────────────────────────────
+     Formats a text input like a POS terminal: digits fill in from the
+     right, so typing "301" displays "3.01". Backspace removes the last
+     digit (shifts right → divides by 10). The field's .value is always
+     left as a plain "D.DD" string that parseFloat() reads correctly,
+     so no other code (saveTransaction, fGet, etc.) needs to change. */
+  function _formatCentsInput(el) {
+    // Strip everything except digits to get the raw "cents" typed so far
+    var digits = (el.value || '').replace(/[^0-9]/g, '');
+    // Cap length to avoid runaway values (999,999,999.99 max)
+    if (digits.length > 11) digits = digits.slice(0, 11);
+    // Strip leading zeros (but keep at least one digit for the cents place)
+    digits = digits.replace(/^0+(?=\d)/, '');
+    if (!digits) {
+      el.value = '';
+      return;
+    }
+    // Pad so we always have at least a ones + cents place
+    while (digits.length < 3) digits = '0' + digits;
+    var whole = digits.slice(0, -2).replace(/^0+(?=\d)/, '') || '0';
+    var cents = digits.slice(-2);
+    el.value = whole + '.' + cents;
+  }
+
   /* ── SMART POPULATE ────────────────────────────────────────────
      When the user confirms a value for category, vendor, or description,
      look up the most recent matching expense (scoped to the selected
@@ -5959,11 +5983,11 @@ Respond ONLY in this JSON format, no markdown, no preamble:
 
           <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:16px 0 12px;">Rates &amp; Deposits</div>
           <div class="field-row">
-            <div class="field"><label>Monthly Rate ($)</label><input id="pf-monthlyRate" type="number" placeholder="950" inputmode="decimal" value="${r.monthlyRate||''}" /></div>
-            <div class="field"><label>Security Deposit ($)</label><input id="pf-securityDeposit" type="number" placeholder="500" inputmode="decimal" value="${r.securityDeposit||''}" /></div>
+            <div class="field"><label>Monthly Rate ($)</label><input id="pf-monthlyRate" type="text" placeholder="950.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" value="${r.monthlyRate||''}" /></div>
+            <div class="field"><label>Security Deposit ($)</label><input id="pf-securityDeposit" type="text" placeholder="500.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" value="${r.securityDeposit||''}" /></div>
           </div>
           <div class="field-row">
-            <div class="field"><label>Pet Deposit ($)</label><input id="pf-petDeposit" type="number" placeholder="300" inputmode="decimal" value="${r.petDeposit||''}" /></div>
+            <div class="field"><label>Pet Deposit ($)</label><input id="pf-petDeposit" type="text" placeholder="300.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" value="${r.petDeposit||''}" /></div>
             <div class="field"><label>Pets Allowed</label>
               <select id="pf-petsAllowed">
                 <option ${(r.petsAllowed||'Yes')==='Yes'?'selected':''}>Yes</option>
@@ -6237,11 +6261,11 @@ Respond ONLY in this JSON format, no markdown, no preamble:
           </div>
           <div class="field" style="margin:0;">
             <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Monthly Rate ($)</label>
-            <input id="pi-monthlyRate" type="number" inputmode="decimal" value="${record.monthlyRate||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+            <input id="pi-monthlyRate" type="text" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" value="${record.monthlyRate||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
           </div>
           <div class="field" style="margin:0;">
             <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Security Deposit ($)</label>
-            <input id="pi-securityDeposit" type="number" inputmode="decimal" value="${record.securityDeposit||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+            <input id="pi-securityDeposit" type="text" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" value="${record.securityDeposit||''}" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
           </div>
           <div class="field" style="margin:0;">
             <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;">Pets Allowed</label>
@@ -6295,7 +6319,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
         <div style="padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div>
             <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;display:block;margin-bottom:4px;">Cleaning Fee ($)</label>
-            <input id="pi-cleaningFee" type="number" inputmode="decimal" value="${record.cleaningFee||''}" placeholder="0" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+            <input id="pi-cleaningFee" type="text" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" value="${record.cleaningFee||''}" placeholder="0.00" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
             <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:0.8125rem;cursor:pointer;">
               <input type="checkbox" id="pi-cleaningRefundable" ${record.cleaningFeeRefundable?'checked':''} style="accent-color:var(--navy);width:15px;height:15px;" />
               Refundable
@@ -6303,7 +6327,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
           </div>
           <div>
             <label style="font-size:0.6875rem;color:var(--muted);font-weight:600;display:block;margin-bottom:4px;">Pet Deposit ($)</label>
-            <input id="pi-petDeposit2" type="number" inputmode="decimal" value="${record.petDeposit||''}" placeholder="0" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
+            <input id="pi-petDeposit2" type="text" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" value="${record.petDeposit||''}" placeholder="0.00" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);" />
             <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:0.8125rem;cursor:pointer;">
               <input type="checkbox" id="pi-petRefundable" ${record.petDepositRefundable?'checked':''} style="accent-color:var(--navy);width:15px;height:15px;" />
               Refundable
@@ -6700,7 +6724,8 @@ Respond ONLY in this JSON format, no markdown, no preamble:
                      : (EDIT.transaction?.frequency || null),
       createdAt:   EDIT.transaction?.createdAt || now(),
     };
-    if (!record.amount) { alert('Amount is required.'); return; }
+    const amountStr = fGet(modalId, 'amount');
+    if (amountStr === '' || amountStr === null || amountStr === undefined || isNaN(parseFloat(amountStr))) { alert('Amount is required.'); return; }
     upsert('transactions', record);
     renderTransactionLists();
     renderFinancesOverview();
@@ -6727,6 +6752,9 @@ Respond ONLY in this JSON format, no markdown, no preamble:
             estimatedCost: record.amount,
             status:        'closed',
             priority:      'low',
+            // Link back to the transaction that was just saved so closing/saving
+            // this service request does not auto-post a second, duplicate expense.
+            _linkedTransactionId: record.id,
           });
         }
       }, 300);
@@ -8910,7 +8938,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       +'<div class="field"><label>Date</label>'
       +'<input id="maint-date" type="date" value="'+(d.date||today)+'" /></div>'
       +'<div class="field"><label>Cost ($, optional)</label>'
-      +'<input id="maint-cost" type="number" placeholder="0.00" inputmode="decimal" value="'+(d.cost||'')+'" /></div>'
+      +'<input id="maint-cost" type="text" placeholder="0.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" value="'+(d.cost||'')+'" /></div>'
       +'<div id="maint-mileage-row" class="field"><label>Mileage (oil changes)</label>'
       +'<input id="maint-mileage" type="number" placeholder="Current odometer reading" inputmode="numeric" value="'+(d.mileage||'')+'" /></div>'
       +'<div class="field"><label>Notes (optional)</label>'
@@ -9152,7 +9180,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
             </div>
             <div class="field">
               <label>Purchase Price ($)</label>
-              <input id="v-purchase-price" type="number" placeholder="0" value="${r.purchasePrice||''}" inputmode="decimal" />
+              <input id="v-purchase-price" type="text" placeholder="0.00" value="${r.purchasePrice||''}" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" />
             </div>
           </div>
 
@@ -9209,7 +9237,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
             </div>
             <div class="field">
               <label>Monthly Premium ($)</label>
-              <input id="v-premium" type="number" placeholder="0" value="${r.monthlyPremium||''}" inputmode="decimal" />
+              <input id="v-premium" type="text" placeholder="0.00" value="${r.monthlyPremium||''}" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" />
             </div>
           </div>
 
@@ -9341,9 +9369,13 @@ Respond ONLY in this JSON format, no markdown, no preamble:
   }
 
   function postSRToTransactions(id) {
-    // Manual override — post a closed SR to transactions (or re-post if needed)
+    // Manual override — post a closed SR to transactions
     const sr = activeRecords('serviceRequests').find(x => x.id === id);
     if (!sr) return;
+    // Guard against duplicate posting (e.g. a rapid double-tap before the row re-renders
+    // and hides the Post button)
+    const alreadyPosted = activeRecords('transactions').some(t => t.serviceRequestId === sr.id);
+    if (alreadyPosted) { showToast('Already posted to transactions'); renderServiceRequests(); return; }
     const costAmt = sr.actualCost || sr.estimatedCost;
     if (!costAmt) { showToast('⚠️ No cost on this request — edit it first'); return; }
     const prop = sr.propertyId ? activeRecords('properties').find(p => p.id === sr.propertyId) : null;
@@ -9450,10 +9482,11 @@ Respond ONLY in this JSON format, no markdown, no preamble:
           </div>
           <div class="field"><label>Assigned To (optional)</label><input id="sr-assigned" type="text" placeholder="Contractor, handyman name…" value="${r.assignedTo||''}" /></div>
           <div class="field-row">
-            <div class="field"><label>Estimated Cost ($)</label><input id="sr-cost" type="number" placeholder="0.00" value="${r.estimatedCost||''}" inputmode="decimal" /></div>
-            <div class="field"><label>Actual Cost ($)</label><input id="sr-actual-cost" type="number" placeholder="0.00" value="${r.actualCost||''}" inputmode="decimal" /></div>
+            <div class="field"><label>Estimated Cost ($)</label><input id="sr-cost" type="text" placeholder="0.00" value="${r.estimatedCost||''}" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>
+            <div class="field"><label>Actual Cost ($)</label><input id="sr-actual-cost" type="text" placeholder="0.00" value="${r.actualCost||''}" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>
           </div>
           <div class="field"><label>Notes</label><textarea id="sr-notes" placeholder="Additional notes…" style="min-height:50px;">${r.notes||''}</textarea></div>
+          <input type="hidden" id="sr-linked-txn-id" value="${r._linkedTransactionId||r.linkedTransactionId||''}" />
           <div style="display:flex;gap:10px;margin-top:4px;">
             <button class="btn btn-outline" style="flex:1;" onclick="closeDynModal('hml-sr-modal')">Cancel</button>
             <button class="btn btn-primary" style="flex:2;" onclick="saveServiceRequest('${r.id||''}')">Save Request</button>
@@ -9472,6 +9505,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     const newStatus    = document.getElementById('sr-status')?.value || 'open';
     const wasOpen      = existingRec ? existingRec.status !== 'closed' : true;
     const justClosed   = wasOpen && newStatus === 'closed';
+    const linkedTxnId  = document.getElementById('sr-linked-txn-id')?.value || existingRec?.linkedTransactionId || null;
     const record = {
       id:            existingId || genId(),
       propertyId:    propId || '',
@@ -9485,9 +9519,25 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       notes:         document.getElementById('sr-notes')?.value || '',
       createdAt:     existingRec?.createdAt || now(),
       closedAt:      newStatus === 'closed' ? (existingRec?.closedAt || now()) : null,
+      linkedTransactionId: linkedTxnId || null,
     };
     upsert('serviceRequests', record);
     closeDynModal('hml-sr-modal');
+
+    // If this SR was created from an already-saved expense, tag that transaction with this
+    // SR's id (so it shows as "Posted" / linked) instead of creating a duplicate transaction.
+    if (record.linkedTransactionId) {
+      const linkedTxn = DB.transactions?.find(t => t.id === record.linkedTransactionId);
+      if (linkedTxn && !linkedTxn.serviceRequestId) {
+        upsert('transactions', { ...linkedTxn, serviceRequestId: record.id });
+      }
+      renderTransactionLists();
+      renderFinancesOverview();
+      renderDashboard();
+      renderServiceRequests();
+      showToast('✅ Service request saved');
+      return;
+    }
 
     // If status was just set to closed via the form dropdown, auto-post if cost & not already posted
     if (justClosed) {
@@ -13249,8 +13299,8 @@ window.openLeaseBuilder = function() {
             '<div class="field"><label>Late After (days)</label><input id="lb-late-days" type="number" placeholder="7" min="1" /></div>',
           '</div>',
           '<div class="field field-row">',
-            '<div class="field"><label>Late Fee ($)</label><input id="lb-late-fee" type="number" placeholder="100" min="0" /></div>',
-            '<div class="field"><label>NSF Fee ($) <span style="font-size:0.65rem;font-weight:400;color:var(--muted);">returned payment</span></label><input id="lb-nsf-fee" type="number" placeholder="50" min="0" /></div>',
+            '<div class="field"><label>Late Fee ($)</label><input id="lb-late-fee" type="text" placeholder="100.00" min="0" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>',
+            '<div class="field"><label>NSF Fee ($) <span style="font-size:0.65rem;font-weight:400;color:var(--muted);">returned payment</span></label><input id="lb-nsf-fee" type="text" placeholder="50.00" min="0" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>',
           '</div>',
           '<div class="lb-section-head">Payment Address</div>',
           '<div class="field"><label>Street</label><input id="lb-pay-street" type="text" placeholder="306 E Halifax St" /></div>',
@@ -13263,7 +13313,7 @@ window.openLeaseBuilder = function() {
 
           '<div class="lb-section-head">Early Termination</div>',
           '<div class="field field-row">',
-            '<div class="field"><label>Early Term Fee ($)</label><input id="lb-early-fee" type="number" placeholder="800" min="0" inputmode="decimal" /></div>',
+            '<div class="field"><label>Early Term Fee ($)</label><input id="lb-early-fee" type="text" placeholder="800.00" min="0" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>',
             '<div class="field"><label>Notice Required (days)</label><input id="lb-early-notice" type="number" placeholder="60" min="0" /></div>',
           '</div>',
 
