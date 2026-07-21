@@ -2,8 +2,8 @@
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  Homemade Lane — Property & Resale Tracker                  ║
-  ║  Version: 4.3.6                                             ║
-  ║  Date: 2026-07-19                                           ║
+  ║  Version: 4.2.1                                             ║
+  ║  Date: 2026-06-14                                           ║
   ║  Author: jmarsh85                                           ║
   ║  Repo: github.com/jmarsh85/homemadelane                     ║
   ║                                                             ║
@@ -8727,11 +8727,14 @@ Respond ONLY in this JSON format, no markdown, no preamble:
         ? v.currentMileage - v.lastOilChangeMileage : null;
       const oilDue = milesSinceOil !== null ? milesSinceOil >= interval : true;
       const oilMilesLeft = milesSinceOil !== null ? interval - milesSinceOil : null;
-      const oilStatus = milesSinceOil === null
-        ? { text: 'Oil change not logged', color: 'var(--muted)' }
-        : oilDue
-        ? { text: `🛢 Oil overdue — ${milesSinceOil.toLocaleString()} mi since last`, color: 'var(--red)' }
-        : { text: `🛢 Oil OK — ${oilMilesLeft.toLocaleString()} mi remaining`, color: 'var(--green)' };
+      const hasOilRecord = !!(v.lastOilChangeDate || v.lastOilChangeMileage);
+      const oilStatus = milesSinceOil !== null
+        ? (oilDue
+          ? { text: `🛢 Oil overdue — ${milesSinceOil.toLocaleString()} mi since last`, color: 'var(--red)' }
+          : { text: `🛢 Oil OK — ${oilMilesLeft.toLocaleString()} mi remaining`, color: 'var(--green)' })
+        : hasOilRecord
+        ? { text: `🛢 Oil changed ${fmt(v.lastOilChangeDate)} — mileage unknown`, color: 'var(--muted)' }
+        : { text: 'Oil change not logged', color: 'var(--muted)' };
       const regDays  = daysUntil(v.registrationExpiry);
       const insDays  = daysUntil(v.insuranceExpiry);
       const regAlert = regDays !== null && regDays <= 30;
@@ -9042,6 +9045,13 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     if (cb) cb({ v: record.id, label: emoji+' '+label, forVehicle: forVehicle });
   }
 
+  function addMonthsToDateStr(dateStr, months) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T12:00:00');
+    d.setMonth(d.getMonth() + months);
+    return d.toISOString().slice(0, 10);
+  }
+
   function saveMaintenanceLog() {
     const editId  = document.getElementById('maint-edit-id') ? document.getElementById('maint-edit-id').value : '';
     const type    = document.getElementById('maint-type') ? document.getElementById('maint-type').value : 'other';
@@ -9070,9 +9080,20 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       record.vehicleId   = vehSel ? vehSel.value : '';
       record.vehicleName = (vehSel && vehSel.options[vehSel.selectedIndex]) ? vehSel.options[vehSel.selectedIndex].dataset.name : '';
       record.mileage     = mileage ? parseInt(mileage) : null;
-      if (record.vehicleId && record.mileage) {
+      if (record.vehicleId) {
         const v = activeRecords('vehicles').find(x => x.id === record.vehicleId);
-        if (v) upsert('vehicles', Object.assign({}, v, { currentMileage: record.mileage }));
+        if (v) {
+          const vUpdates = {};
+          if (record.mileage) vUpdates.currentMileage = record.mileage;
+          if (type === 'oil-change') {
+            if (record.mileage) vUpdates.lastOilChangeMileage = record.mileage;
+            if (date) {
+              vUpdates.lastOilChangeDate = date;
+              vUpdates.nextServiceDate = addMonthsToDateStr(date, 4);
+            }
+          }
+          if (Object.keys(vUpdates).length) upsert('vehicles', Object.assign({}, v, vUpdates));
+        }
       }
     } else {
       record.locationId   = locSel ? locSel.value : '';
@@ -14361,7 +14382,7 @@ function lbShowShareResult(url, tenantName) {
 
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 var DK_KEY        = 'hml_devlog';        // localStorage key — isolated from app data
-var DK_APP_VER    = 'Homemade Lane v4.2.5';
+var DK_APP_VER    = 'Homemade Lane v4.2.6';
 // Single source of truth — badge reads this at init; update only DK_APP_VER for future releases
 (function(){ var b=document.getElementById('hml-build-ref'); if(b) b.textContent='v'+DK_APP_VER.replace('Homemade Lane v',''); })();
 var DK_MAX_RECENT = 3;                   // entries shown in Log tab preview
