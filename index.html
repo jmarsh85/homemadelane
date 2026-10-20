@@ -2295,7 +2295,6 @@
             </optgroup>
             <optgroup label="Deposits">
               <option value="Security deposit received">Security Deposit Received</option>
-              <option value="Security deposit returned">Security Deposit Returned</option>
               <option value="Pet deposit received">Pet Deposit Received</option>
             </optgroup>
             <optgroup label="Other">
@@ -2949,6 +2948,14 @@
 
   const SCHEMA_VERSION = 4;
 
+  // Local calendar date (YYYY-MM-DD). toISOString() is UTC, which rolls to tomorrow
+  // after 5pm in Arizona / 8pm in Virginia — never use it for "today" defaults.
+  function localToday() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  window.localToday = localToday;
+
   /* ── ID + TIMESTAMP HELPERS ─────────────────────────────── */
   function genId() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -3284,7 +3291,7 @@
 
     const json     = JSON.stringify(payload, null, 2);
     const sizeMB   = (new Blob([json]).size / (1024 * 1024)).toFixed(2);
-    const filename = `${getAppName().toLowerCase().replace(/\s+/g,"-")}-${new Date().toISOString().slice(0,10)}.json`;
+    const filename = `${getAppName().toLowerCase().replace(/\s+/g,"-")}-${localToday()}.json`;
     const blob     = new Blob([json], { type: 'application/json' });
 
     saveFileAs(filename, blob, 'application/json').then(result => {
@@ -4095,7 +4102,7 @@
     const leaseDiv = document.getElementById('income-lease-field');
     const hint     = document.getElementById('income-lease-hint');
     if (!catSel || !leaseDiv) return;
-    const rentCats = ['rent received','late fee','pet fee income','parking fee','storage fee','laundry income','application fee','security deposit received','security deposit returned','pet deposit received'];
+    const rentCats = ['rent received','late fee','pet fee income','parking fee','storage fee','laundry income','application fee','security deposit received','pet deposit received'];
     const isRentType = rentCats.includes((catSel.value||'').toLowerCase());
     leaseDiv.style.display = ''; // always show
     if (hint) hint.style.display = isRentType ? 'none' : '';
@@ -4136,7 +4143,7 @@
     if (catSel.value !== 'Rent received' || !lease.monthlyRent) return;
 
     const rent    = parseFloat(lease.monthlyRent);
-    const dateVal = dateEl?.value || new Date().toISOString().split('T')[0];
+    const dateVal = dateEl?.value || localToday();
     const result  = _incomeProrateCalc(lease, dateVal, rent);
 
     // Auto-fill amount only when: new entry with no user-typed value, OR force=true (recalculate tapped)
@@ -4272,7 +4279,7 @@
     if (!original) return;
     const copy = Object.assign({}, original, {
       id:        genId(),
-      date:      new Date().toISOString().split('T')[0], // default to today — user edits in form
+      date:      localToday(), // default to today — user edits in form
       createdAt: now(),
       updatedAt: now(),
       description: original.description ? original.description + ' (copy)' : 'Copy',
@@ -4316,7 +4323,7 @@
       propertyId:    propRec?.id   || EDIT.transaction?.propertyId || '',
       property:      propRec?.name || propVal || EDIT.transaction?.property || '',
       amount,
-      date:          fGet('modal-rent', 'date') || new Date().toISOString().split('T')[0],
+      date:          fGet('modal-rent', 'date') || localToday(),
       category,
       description:   notes,
       vendor:        '',
@@ -4382,7 +4389,7 @@
   }
   function bulkExportSelected() {
     const rows=getTxnData().filter(t=>TXN_STATE.selected.has(t.id));
-    downloadCSV(`${getAppName().toLowerCase().replace(/\s+/g,"-")}-selected-${new Date().toISOString().slice(0,10)}.csv`,toCSV(rows,['date','type','category','amount','description','property','vendor']));
+    downloadCSV(`${getAppName().toLowerCase().replace(/\s+/g,"-")}-selected-${localToday()}.csv`,toCSV(rows,['date','type','category','amount','description','property','vendor']));
   }
 
   /* ── FINANCES TABS ──────────────────────────────────────────── */
@@ -5206,7 +5213,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     openTransactionForm('modal-expense', {
       ...tmpl,
       id: null,           // new record
-      date: new Date().toISOString().split('T')[0],
+      date: localToday(),
       createdAt: null,
     });
     // Restore recurring state on the newly opened modal
@@ -5270,7 +5277,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
   /* ── TABLE CSV EXPORT (Settings) ────────────────────────────── */
   function exportTableCSV(collection) {
     const appSlug = getAppName().toLowerCase().replace(/\s+/g, '-');
-    const date    = new Date().toISOString().slice(0, 10);
+    const date    = localToday();
     const records = activeRecords(collection);
 
     // Per-collection field maps: [csvHeader, recordKey]
@@ -5365,6 +5372,30 @@ Respond ONLY in this JSON format, no markdown, no preamble:
 
   /* ── AMENITIES MANAGER ──────────────────────────────────────── */
   /* ── AMENITIES — MULTI-SELECT CHIP SYSTEM ───────────────────── */
+
+  // Canonical appliance / included-item list — shared with Lease Builder (B1) via window
+  const HML_APPLIANCES = ['Stove/Oven','Refrigerator','Dishwasher','Microwave','Washer','Dryer',
+    'Garbage Disposal','Freezer','Range Hood','Ice Maker'];
+  window.HML_APPLIANCES = HML_APPLIANCES;
+  // Normalize an appliance list: split combined 'Washer/Dryer' into Washer + Dryer, dedupe case-insensitively
+  function hmlNormAppliances(list) {
+    const out = [];
+    (list || []).forEach(a => {
+      const t = String(a || '').trim(); if (!t) return;
+      const parts = /^washer\s*[\/&]\s*dryer$/i.test(t) ? ['Washer','Dryer'] : [t];
+      parts.forEach(x => { if (!out.some(o => o.toLowerCase() === x.toLowerCase())) out.push(x); });
+    });
+    return out;
+  }
+  window.hmlNormAppliances = hmlNormAppliances;
+  // Property appliances: stored list, else inferred from amenities (first-time seed)
+  function hmlPropAppliances(p) {
+    if (!p) return [];
+    if (Array.isArray(p.appliances)) return hmlNormAppliances(p.appliances);
+    const kw = ['stove','oven','refrigerator','fridge','washer','dryer','dishwasher','microwave','freezer','range','disposal','ice maker','hood'];
+    return hmlNormAppliances((p.amenities || []).filter(a => kw.some(k => a.toLowerCase().indexOf(k) >= 0)));
+  }
+  window.hmlPropAppliances = hmlPropAppliances;
 
   // Master list of preset amenities always shown in the grid
   const AMENITY_PRESETS = [
@@ -5707,7 +5738,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     'Rent received','Advertising','Auto & travel','Cleaning & maintenance',
     'Insurance','Legal & professional fees','Management fees',
     'Mortgage interest','Other interest','Repairs','Supplies',
-    'Property taxes','Utilities','Depreciation','Other'
+    'Property taxes','Utilities','Depreciation','Other','Deposits Returned'
   ];
   const DEFAULT_CATS_C = [
     'Gross receipts','Acquisition costs','Platform fees',
@@ -5908,7 +5939,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     el.classList.add('open');
     document.body.style.overflow = 'hidden';
     el.querySelectorAll('input[type="date"]').forEach(inp => {
-      if (!inp.value) inp.value = new Date().toISOString().split('T')[0];
+      if (!inp.value) inp.value = localToday();
     });
   }
 
@@ -6216,6 +6247,11 @@ Respond ONLY in this JSON format, no markdown, no preamble:
                            'Hot tub','Smart TV','Cable/Streaming','Dishwasher','Garage',
                            'Backyard','Pet area','EV charger','Security system','Gym access'];
     const curAmenities  = record.amenities || [];
+    const curAppliances = hmlPropAppliances(record);
+    const ld            = record.leaseDefaults || {};
+    const _piIn = 'width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.875rem;background:var(--surface);color:var(--text);';
+    const _piLb = 'font-size:0.6875rem;color:var(--muted);font-weight:600;';
+    const _piF  = (id, label, val, ph, mode, cents) => `<div class="field" style="margin:0;"><label style="${_piLb}">${label}</label><input id="${id}" type="text" inputmode="${mode||'text'}" autocomplete="off" ${cents?'oninput="_formatCentsInput(this)"':''} value="${escAttr(val||'')}" placeholder="${ph||''}" style="${_piIn}" /></div>`;
 
     tab.innerHTML = `
       <!-- ADDRESS CARD -->
@@ -6364,6 +6400,40 @@ Respond ONLY in this JSON format, no markdown, no preamble:
         </div>
       </div>
 
+      <!-- APPLIANCES CARD — single source for Lease Builder §15 -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px;">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Appliances / Included Items</div>
+          <div style="font-size:0.7rem;color:var(--muted);margin-top:2px;">Feeds the Appliances section of every lease for this property</div>
+        </div>
+        <div style="padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;" id="pi-appliances-wrap">
+          ${[...new Set([...HML_APPLIANCES, ...curAppliances])].map(a => `<label style="display:flex;align-items:center;gap:5px;font-size:0.875rem;cursor:pointer;"><input type="checkbox" value="${escAttr(a)}" ${curAppliances.some(x=>x.toLowerCase()===a.toLowerCase())?'checked':''} style="accent-color:var(--navy);width:16px;height:16px;" />${a}</label>`).join('')}
+        </div>
+        <div style="padding:0 16px 12px;display:flex;gap:8px;">
+          <input id="pi-appliance-custom" type="text" placeholder="Add item…" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.8125rem;background:var(--surface);color:var(--text);" />
+          <button onclick="piAddAppliance()" style="padding:7px 14px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);font-size:0.8125rem;font-weight:600;cursor:pointer;">Add</button>
+        </div>
+      </div>
+
+      <!-- LEASE TERM DEFAULTS CARD — Lease Builder Step 2 prefill -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">Lease Term Defaults</div>
+          <div style="font-size:0.7rem;color:var(--muted);margin-top:2px;">Prefills Lease Builder · updates automatically with the last values you used</div>
+        </div>
+        <div style="padding:12px 16px 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          ${_piF('pi-ld-dueDay','Rent Due Day',ld.dueDay,'1','numeric')}
+          ${_piF('pi-ld-lateDays','Late After (days)',ld.lateDays,'5','numeric')}
+          ${_piF('pi-ld-lateFee','Late Fee ($)',ld.lateFee,'100.00','decimal',true)}
+          ${_piF('pi-ld-nsfFee','NSF Fee ($)',ld.nsfFee,'50.00','decimal',true)}
+          ${_piF('pi-ld-earlyFee','Early Term. Fee ($)',ld.earlyFee,'800.00','decimal',true)}
+          ${_piF('pi-ld-earlyNotice','Early Term. Notice (days)',ld.earlyNotice,'30','numeric')}
+          ${_piF('pi-ld-petCount','Max Pets',ld.petCount,'2','numeric')}
+          ${_piF('pi-ld-petTypes','Pet Types',ld.petTypes,'Dog')}
+          ${_piF('pi-ld-petWeight','Pet Weight Limit',ld.petWeight,'No weight limit')}
+        </div>
+      </div>
+
       <!-- SAVE BUTTON -->
       <button onclick="savePropertyInline()" style="width:100%;padding:14px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-md);font-family:var(--font-body);font-size:0.9375rem;font-weight:700;cursor:pointer;margin-bottom:8px;">Save Property</button>
     `;
@@ -6400,12 +6470,37 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     inp.value = '';
   }
 
+  function piAddAppliance() {
+    const inp = document.getElementById('pi-appliance-custom');
+    const val = inp?.value.trim();
+    if (!val) return;
+    const wrap = document.getElementById('pi-appliances-wrap');
+    if (!wrap) return;
+    const existing = [...wrap.querySelectorAll('input[type=checkbox]')].map(c => c.value.toLowerCase());
+    if (existing.includes(val.toLowerCase())) { inp.value = ''; return; }
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:0.875rem;cursor:pointer;';
+    lbl.innerHTML = `<input type="checkbox" value="${escAttr(val)}" checked style="accent-color:var(--navy);width:16px;height:16px;" />${val}`;
+    wrap.appendChild(lbl);
+    inp.value = '';
+  }
+  window.piAddAppliance = piAddAppliance;
+
   function savePropertyInline() {
     _rehydrateCurrentProperty();
     if (!currentProperty) { showToast('No property loaded', 2500); return; }
     const g = id => document.getElementById(id);
     const platforms = [...document.querySelectorAll('#pi-platforms-wrap input[type=checkbox]:checked')].map(c => c.value);
     const amenities = [...document.querySelectorAll('#pi-amenities-wrap input[type=checkbox]:checked')].map(c => c.value);
+    const applWrap  = document.getElementById('pi-appliances-wrap');
+    const appliances = applWrap
+      ? hmlNormAppliances([...applWrap.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value))
+      : currentProperty.appliances;
+    const leaseDefaults = Object.assign({}, currentProperty.leaseDefaults || {});
+    ['dueDay','lateDays','lateFee','nsfFee','earlyFee','earlyNotice','petCount','petTypes','petWeight'].forEach(k => {
+      const el = g('pi-ld-' + k);
+      if (el) leaseDefaults[k] = el.value.trim();
+    });
     const record = {
       ...currentProperty,
       address:               g('pi-address')?.value.trim()      || currentProperty.address,
@@ -6429,6 +6524,8 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       maintenanceResp:       g('pi-maintResp')?.value           || '',
       platforms,
       amenities,
+      appliances,
+      leaseDefaults,
       updatedAt: now(),
     };
     if (!record.name) { showToast('Property nickname is required', 2500); return; }
@@ -6456,7 +6553,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       propertyId: lease.propertyId,
       amount:     lease.monthlyRent || '',
       category:   `${name} – ${fmt(lease.startDate)}–${fmt(lease.endDate)}`,
-      date:       new Date().toISOString().split('T')[0],
+      date:       localToday(),
       description: `Rent – ${name}${lease.paymentMethod ? ' via '+lease.paymentMethod : ''}`,
     };
     openTransactionForm('modal-rent', synth);
@@ -6565,7 +6662,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
 
     if (record) {
       fSet(modalId, 'amount',      record.amount || '');
-      fSet(modalId, 'date',        record.date   || new Date().toISOString().split('T')[0]);
+      fSet(modalId, 'date',        record.date   || localToday());
       fSet(modalId, 'description', record.description || '');
       fSet(modalId, 'vendor',      record.vendor || '');
       fSet(modalId, 'category',    record.category || '');
@@ -6633,7 +6730,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
         if (catEl) catEl.selectedIndex = 0;
       }
       // Default date to today
-      fSet(modalId, 'date', new Date().toISOString().split('T')[0]);
+      fSet(modalId, 'date', localToday());
       // Pre-select current property if we're inside a property view
       if (currentProperty) fSet(modalId, 'property', currentProperty.id);
       else fSet(modalId, 'property', '');
@@ -6708,7 +6805,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       propertyId:  propRec?.id   || EDIT.transaction?.propertyId || '',
       property:    propRec?.name || propVal || EDIT.transaction?.property || '',
       amount:      parseFloat(fGet(modalId, 'amount')) || 0,
-      date:        fGet(modalId, 'date') || new Date().toISOString().split('T')[0],
+      date:        fGet(modalId, 'date') || localToday(),
       category:    fGet(modalId, 'category') || (type === 'income' ? 'Rent received' : 'Other'),
       description: fGet(modalId, 'description'),
       vendor:      fGet(modalId, 'vendor'),
@@ -6811,10 +6908,13 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     }
     fSet(m, 'startDate',      r.startDate || '');
     fSet(m, 'endDate',        r.endDate || '');
-    fSet(m, 'monthlyRent',    r.monthlyRent || '');
-    fSet(m, 'securityDeposit',r.securityDeposit || '');
-    fSet(m, 'petDeposit',     r.petDeposit || '');
-    fSet(m, 'cleaningDeposit',r.cleaningDeposit || '');
+    // New lease: prefill rent & deposits from the property record (single source of truth).
+    // Existing leases keep their own negotiated values.
+    const pDef = (!record && currentProperty) ? currentProperty : {};
+    fSet(m, 'monthlyRent',    r.monthlyRent     || pDef.monthlyRate     || '');
+    fSet(m, 'securityDeposit',r.securityDeposit || pDef.securityDeposit || '');
+    fSet(m, 'petDeposit',     r.petDeposit      || pDef.petDeposit      || '');
+    fSet(m, 'cleaningDeposit',r.cleaningDeposit || pDef.cleaningFee     || '');
     fSet(m, 'platform',       r.platform || 'Direct');
     fSet(m, 'bookingId',      r.bookingId || '');
     fSet(m, 'paymentMethod',  r.paymentMethod || '');
@@ -7340,7 +7440,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     const r = record || {};
     fSet(m, 'platform',    r.platform    || 'Poshmark');
     fSet(m, 'askingPrice', r.askingPrice || '');
-    fSet(m, 'listedDate',  r.listedDate  || new Date().toISOString().slice(0,10));
+    fSet(m, 'listedDate',  r.listedDate  || localToday());
     fSet(m, 'listingUrl',  r.listingUrl  || '');
     fSet(m, 'status',      r.status      || 'Active');
     openModal(m);
@@ -8593,6 +8693,21 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     return activeRecords('filterLocations').find(r => r.locationId === locationId && r.type === type) || null;
   }
 
+  // ── Helper: filter size list for a config (v4.2.7) ───────────
+  // New shape: cfg.filters = [{size:'20x30x1', qty:1}, …]. Legacy: free-text filterSize ('20X30X1 & 20X20X1') + filterCount.
+  function normFilterSize(sz) { return String(sz || '').trim().replace(/\s*[xX×]\s*/g, 'x'); }
+  function getFilterList(cfg) {
+    if (!cfg) return [];
+    if (Array.isArray(cfg.filters)) return cfg.filters.filter(f => f && f.size).map(f => ({ size: normFilterSize(f.size), qty: parseInt(f.qty) || 1 }));
+    const sizes = String(cfg.filterSize || '').split(/\s*(?:&|,|;|\/|\n|\band\b)\s*/i).map(normFilterSize).filter(Boolean);
+    if (!sizes.length) return [];
+    const total = parseInt(cfg.filterCount) || sizes.length;
+    if (sizes.length === 1) return [{ size: sizes[0], qty: Math.max(1, total) }];
+    return sizes.map(sz => ({ size: sz, qty: 1 }));
+  }
+  function fmtFilterList(list) { return (list || []).map(f => (f.qty || 1) + '× ' + f.size).join(' · '); }
+  window.getFilterList = getFilterList;
+
   // ── Helper: personal location list ───────────────────────────
   // Primary residence property takes the "home" slot. Falls back to
   // synthetic __personal only when no property is flagged as primary.
@@ -8634,8 +8749,9 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       const statusColor = due ? 'var(--red)' : 'var(--green)';
       const statusText  = due ? (ds ? 'Overdue ('+ds+' days ago)' : 'Not logged') : 'OK — changed '+ds+' days ago';
       const metaParts = [];
-      if (cfg && cfg.filterCount) metaParts.push(cfg.filterCount + ' filter' + (cfg.filterCount > 1 ? 's' : ''));
-      if (cfg && cfg.filterSize)  metaParts.push(cfg.filterSize);
+      const fl = getFilterList(cfg);
+      if (fl.length) metaParts.push(fmtFilterList(fl));
+      else if (cfg && cfg.filterCount) metaParts.push(cfg.filterCount + ' filter' + (cfg.filterCount > 1 ? 's' : ''));
       metaParts.push('Every ' + intervalDays + 'd');
       const meta = metaParts.join(' · ');
       const safeName = p.name.replace(/'/g, "\\'");
@@ -8797,11 +8913,13 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       +props.map(p => '<option value="'+p.id+'" data-name="'+p.name+'"'+(p.id===selLocId?' selected':'')+'>'+p.name+'</option>').join('')
       +'</select></div>'
       +(isHvac
-        ? '<div class="field"><label>Filter Size (e.g. 16x25x1)</label>'
-          +'<input id="fcfg-size" type="text" placeholder="e.g. 20x25x1" value="'+(cfg.filterSize||'')+'" /></div>'
-        : '<input type="hidden" id="fcfg-size" value="" />')
-      +'<div class="field"><label>'+(isHvac ? 'Number of Filters' : 'Number of Units')+'</label>'
-      +'<input id="fcfg-count" type="number" min="1" placeholder="1" inputmode="numeric" value="'+(cfg.filterCount||'')+'" /></div>'
+        ? '<div class="field"><label>Filter Sizes &amp; Quantity</label>'
+          +'<div id="fcfg-sizes"></div>'
+          +'<button type="button" class="btn btn-outline" style="font-size:0.8125rem;padding:7px 12px;margin-top:6px;" onclick="fcfgAddSizeRow(\'\',1)">+ Add size</button></div>'
+          +'<input type="hidden" id="fcfg-size" value="" />'
+        : '<input type="hidden" id="fcfg-size" value="" />'
+          +'<div class="field"><label>Number of Units</label>'
+          +'<input id="fcfg-count" type="number" min="1" placeholder="1" inputmode="numeric" value="'+(cfg.filterCount||'')+'" /></div>')
       +'<div class="field"><label>Clean/Replace Every (days)</label>'
       +'<input id="fcfg-interval" type="number" min="1" placeholder="'+(isHvac?'30':'90')+'" inputmode="numeric" value="'+(cfg.intervalDays||'')+'" />'
       +'<div style="font-size:0.7rem;color:var(--muted);margin-top:4px;">Default: '+(isHvac?'30 days (monthly)':'90 days (quarterly)')+'</div></div>'
@@ -8813,8 +8931,25 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       +'</div>'
       +'</div></div>';
     document.body.appendChild(modal);
+    if (isHvac) {
+      const rows = getFilterList(cfg);
+      (rows.length ? rows : [{ size: '', qty: 1 }]).forEach(f => fcfgAddSizeRow(f.size, f.qty));
+    }
     requestAnimationFrame(() => modal.classList.add('open'));
   }
+
+  function fcfgAddSizeRow(size, qty) {
+    const wrap = document.getElementById('fcfg-sizes');
+    if (!wrap) return;
+    const row = document.createElement('div');
+    row.className = 'fcfg-size-row';
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px;';
+    row.innerHTML = '<input class="fcfg-size-in" type="text" placeholder="e.g. 20x25x1" value="'+escAttr(size||'')+'" style="flex:1;min-width:0;" />'
+      +'<input class="fcfg-qty-in" type="number" min="1" inputmode="numeric" value="'+(parseInt(qty)||1)+'" style="width:64px;flex:0 0 64px;" aria-label="Quantity" />'
+      +'<button type="button" class="btn btn-outline" style="padding:6px 10px;flex:0 0 auto;" onclick="this.parentNode.remove()" aria-label="Remove size">✕</button>';
+    wrap.appendChild(row);
+  }
+  window.fcfgAddSizeRow = fcfgAddSizeRow;
 
   function saveFilterLocationConfig() {
     const locSel   = document.getElementById('fcfg-location');
@@ -8825,7 +8960,16 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     const sizeEl   = document.getElementById('fcfg-size');
     const size     = sizeEl ? sizeEl.value.trim() : '';
     const countEl  = document.getElementById('fcfg-count');
-    const count    = countEl ? (parseInt(countEl.value) || null) : null;
+    let   count    = countEl ? (parseInt(countEl.value) || null) : null;
+    // HVAC: build size list from rows; legacy filterSize/filterCount kept in sync for older readers
+    let filters = null;
+    if (document.getElementById('fcfg-sizes')) {
+      filters = [...document.querySelectorAll('#fcfg-sizes .fcfg-size-row')].map(r => ({
+        size: normFilterSize(r.querySelector('.fcfg-size-in').value),
+        qty:  parseInt(r.querySelector('.fcfg-qty-in').value) || 1,
+      })).filter(f => f.size);
+      count = filters.reduce((n, f) => n + f.qty, 0) || null;
+    }
     const intEl    = document.getElementById('fcfg-interval');
     const interval = intEl ? (parseInt(intEl.value) || (unitType === 'hvac' ? 30 : 90)) : (unitType === 'hvac' ? 30 : 90);
     if (!locId) { showToast('Please select a location'); return; }
@@ -8835,8 +8979,9 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       locationId:   locId,
       locationName: locName,
       type:         unitType,
-      filterSize:   size,
+      filterSize:   filters ? filters.map(f => f.size).join(' & ') : size,
       filterCount:  count,
+      filters:      filters || undefined,
       intervalDays: interval,
       createdAt:    (dup ? dup.createdAt : null) || now(),
     };
@@ -8867,6 +9012,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
         +'<div class="swipe-content" style="padding:13px 16px;'+border+'display:flex;justify-content:space-between;align-items:center;" onclick="toggleSwipe(\''+swId+'\')">'
         +'<div><div style="font-weight:600;font-size:0.875rem;">'+label+'</div>'
         +'<div style="font-size:0.75rem;color:var(--muted);">'+target+' \u00b7 '+fmt(l.date)+'</div>'
+        +(Array.isArray(l.filters) && l.filters.length ? '<div style="font-size:0.75rem;color:var(--muted);">'+escAttr(fmtFilterList(l.filters))+'</div>' : '')
         +(l.notes ? '<div style="font-size:0.75rem;color:var(--muted);">'+l.notes+'</div>' : '')
         +'</div>'
         +(l.cost ? '<div style="font-weight:700;color:var(--navy);">$'+parseFloat(l.cost).toFixed(2)+'</div>' : '')
@@ -8901,7 +9047,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     const isEdit = !!d.id;
     const props = getPersonalLocations();
     const vehicles = activeRecords('vehicles');
-    const today = new Date().toISOString().slice(0,10);
+    const today = localToday();
 
     const existing = document.getElementById('hml-maintenance-modal');
     if (existing) existing.remove();
@@ -8935,11 +9081,17 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       +'<div class="field"><label>Type</label>'
       +'<select id="maint-type" onchange="toggleMaintenanceFields()">'+typeOpts+'</select></div>'
       +'<div id="maint-location-row" class="field"><label>Location / Property</label>'
-      +'<select id="maint-location">'+locOpts+'</select></div>'
+      +'<select id="maint-location" onchange="renderMaintFilterRows()">'+locOpts+'</select></div>'
       +'<div id="maint-vehicle-row" class="field" style="display:none;"><label>Vehicle</label>'
       +'<select id="maint-vehicle">'+vehOpts+'</select></div>'
       +'<div class="field"><label>Date</label>'
       +'<input id="maint-date" type="date" value="'+(d.date||today)+'" /></div>'
+      +'<div id="maint-filters-row" class="field" style="display:none;"><label>Filters Replaced</label>'
+      +'<div id="maint-filters-list"></div>'
+      +'<div style="display:flex;gap:8px;margin-top:6px;">'
+      +'<input id="maint-filter-add" type="text" placeholder="Add a size, e.g. 16x25x1" style="flex:1;min-width:0;" />'
+      +'<button type="button" class="btn btn-outline" style="padding:6px 12px;flex:0 0 auto;" onclick="maintAddFilterRow()">Add</button>'
+      +'</div></div>'
       +'<div class="field"><label>Cost ($, optional)</label>'
       +'<input id="maint-cost" type="text" placeholder="0.00" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" value="'+(d.cost||'')+'" /></div>'
       +'<div id="maint-mileage-row" class="field"><label>Mileage (oil changes)</label>'
@@ -8950,10 +9102,56 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       +'<button class="btn btn-outline" style="flex:1;" onclick="closeDynModal(\'hml-maintenance-modal\')">Cancel</button>'
       +'<button class="btn btn-primary" style="flex:2;" onclick="saveMaintenanceLog()">'+(isEdit ? 'Update Log' : 'Save Log')+'</button>'
       +'</div></div></div>';
+    _maintFiltersPrefill = Array.isArray(d.filters) ? { locationId: d.locationId, list: d.filters } : null;
     document.body.appendChild(modal);
     requestAnimationFrame(() => modal.classList.add('open'));
     toggleMaintenanceFields();
   }
+
+  // ── Air-filter sizes on the log form ─────────────────────────
+  var _maintFiltersPrefill = null; // {locationId, list} when editing a log that has filters
+  function _maintFilterRowHtml(size, qty, checked) {
+    return '<div class="maint-filter-row" style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">'
+      +'<input type="checkbox" class="mf-chk" '+(checked?'checked':'')+' style="accent-color:var(--navy);width:18px;height:18px;flex:0 0 auto;" />'
+      +'<span class="mf-size" style="flex:1;font-size:0.875rem;">'+escAttr(size)+'</span>'
+      +'<span style="font-size:0.7rem;color:var(--muted);">Qty</span>'
+      +'<input type="number" class="mf-qty" min="1" inputmode="numeric" value="'+(parseInt(qty)||1)+'" style="width:58px;flex:0 0 58px;padding:6px 8px;" />'
+      +'</div>';
+  }
+  function renderMaintFilterRows() {
+    const row  = document.getElementById('maint-filters-row');
+    const list = document.getElementById('maint-filters-list');
+    const type = (document.getElementById('maint-type') || {}).value;
+    if (!row || !list) return;
+    if (type !== 'air-filter') { row.style.display = 'none'; return; }
+    row.style.display = 'block';
+    const locId = (document.getElementById('maint-location') || {}).value || '';
+    let items;
+    if (_maintFiltersPrefill && _maintFiltersPrefill.locationId === locId) {
+      // Editing: configured sizes shown, ticked only if they were part of this log
+      const logged = _maintFiltersPrefill.list.map(f => ({ size: normFilterSize(f.size), qty: f.qty }));
+      const cfgL   = getFilterList(getFilterConfig(locId, 'hvac'));
+      items = logged.map(f => ({ size: f.size, qty: f.qty, on: true }))
+        .concat(cfgL.filter(c => !logged.some(l => l.size.toLowerCase() === c.size.toLowerCase())).map(c => ({ size: c.size, qty: c.qty, on: false })));
+    } else {
+      items = getFilterList(getFilterConfig(locId, 'hvac')).map(f => ({ size: f.size, qty: f.qty, on: true }));
+    }
+    list.innerHTML = items.length
+      ? items.map(f => _maintFilterRowHtml(f.size, f.qty, f.on)).join('')
+      : '<div id="maint-filters-empty" style="font-size:0.75rem;color:var(--muted);padding:4px 0;">No sizes saved for this location — add one below, or set them with ⚙ on the location.</div>';
+  }
+  function maintAddFilterRow() {
+    const inp  = document.getElementById('maint-filter-add');
+    const list = document.getElementById('maint-filters-list');
+    const sz   = normFilterSize(inp ? inp.value : '');
+    if (!sz || !list) return;
+    const empty = document.getElementById('maint-filters-empty'); if (empty) empty.remove();
+    const exists = [...list.querySelectorAll('.mf-size')].some(e => e.textContent.toLowerCase() === sz.toLowerCase());
+    if (!exists) list.insertAdjacentHTML('beforeend', _maintFilterRowHtml(sz, 1, true));
+    inp.value = '';
+  }
+  window.renderMaintFilterRows = renderMaintFilterRows;
+  window.maintAddFilterRow     = maintAddFilterRow;
 
   function toggleMaintenanceFields() {
     const sel  = document.getElementById('maint-type');
@@ -8987,6 +9185,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     if (locRow) locRow.style.display = isVehicle ? 'none' : 'block';
     if (vehRow) vehRow.style.display = isVehicle ? 'block' : 'none';
     if (milRow) milRow.style.display = isVehicle ? 'block' : 'none';
+    renderMaintFilterRows();
   }
 
   // ── Custom type form ─────────────────────────────────────────
@@ -9098,6 +9297,11 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     } else {
       record.locationId   = locSel ? locSel.value : '';
       record.locationName = (locSel && locSel.options[locSel.selectedIndex]) ? locSel.options[locSel.selectedIndex].dataset.name : '';
+      if (type === 'air-filter') {
+        record.filters = [...document.querySelectorAll('#maint-filters-list .maint-filter-row')]
+          .filter(r => r.querySelector('.mf-chk').checked)
+          .map(r => ({ size: r.querySelector('.mf-size').textContent, qty: parseInt(r.querySelector('.mf-qty').value) || 1 }));
+      }
     }
     // Don't save if somehow __add_new__ slipped through
     if (type === '__add_new__') { showToast('Please select a valid type'); return; }
@@ -9406,7 +9610,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       propertyId:       sr.propertyId || '',
       property:         prop?.name || '',
       amount:           costAmt,
-      date:             sr.closedAt?.slice(0,10) || new Date().toISOString().split('T')[0],
+      date:             sr.closedAt?.slice(0,10) || localToday(),
       category:         'Cleaning & maintenance',
       description:      sr.title + (sr.description ? ' — ' + sr.description : ''),
       vendor:           sr.assignedTo || '',
@@ -9440,7 +9644,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
         propertyId:       sr.propertyId || '',
         property:         prop?.name || '',
         amount:           costAmt,
-        date:             new Date().toISOString().split('T')[0],
+        date:             localToday(),
         category:         'Cleaning & maintenance',
         description:      sr.title + (sr.description ? ' — ' + sr.description : ''),
         vendor:           sr.assignedTo || '',
@@ -9570,7 +9774,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
           id: genId(), type:'expense',
           propertyId: record.propertyId||'', property: prop?.name||'',
           amount: costAmt,
-          date: new Date().toISOString().split('T')[0],
+          date: localToday(),
           category: 'Cleaning & maintenance',
           description: record.title+(record.description?' — '+record.description:''),
           vendor: record.assignedTo||'',
@@ -10066,7 +10270,7 @@ I am continuing development on **Homemade Lane**, a single-file vanilla HTML/CSS
               var url  = URL.createObjectURL(blob);
               var a    = document.createElement('a');
               a.href   = url;
-              a.download = 'hml-session-context-' + new Date().toISOString().slice(0,10) + '.md';
+              a.download = 'hml-session-context-' + localToday() + '.md';
               document.body.appendChild(a);
               a.click();
               setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
@@ -10998,17 +11202,22 @@ window.lbRenderApplianceChips = function(propAmenities, savedList) {
   if (!container) return;
 
   // Canonical appliance list — shown always
-  var DEFAULT_APPLIANCES = [
+  var DEFAULT_APPLIANCES = (window.HML_APPLIANCES || [
     'Stove/Oven','Refrigerator','Dishwasher','Microwave','Washer','Dryer',
     'Garbage Disposal','Freezer','Range Hood','Ice Maker',
-  ];
+  ]).slice();
+  var _norm = window.hmlNormAppliances || function(l){ return l || []; };
 
   // Merge: defaults + any extras from property amenities
   var APPLIANCE_KW = ['stove','oven','refrigerator','fridge','washer','dryer',
     'dishwasher','microwave','freezer','range','disposal','ice maker','hood'];
-  var fromProp = (propAmenities || []).filter(function(a) {
+  var fromProp = _norm((propAmenities || []).filter(function(a) {
     return APPLIANCE_KW.some(function(k){ return a.toLowerCase().indexOf(k) >= 0; });
-  });
+  }).concat((propAmenities || []).filter(function(a) {
+    // custom items the property lists explicitly (passed from property.appliances)
+    return !APPLIANCE_KW.some(function(k){ return a.toLowerCase().indexOf(k) >= 0; }) &&
+           !/^(wifi|parking|ac|heating|pool access|hot tub|smart tv|cable\/streaming|garage|backyard|pet area|ev charger|security system|gym access)$/i.test(a);
+  })));
   var allOptions = DEFAULT_APPLIANCES.slice();
   fromProp.forEach(function(a) {
     if (!allOptions.some(function(x){ return x.toLowerCase() === a.toLowerCase(); })) {
@@ -11019,7 +11228,7 @@ window.lbRenderApplianceChips = function(propAmenities, savedList) {
   // Pre-selected: from saved CSV or infer from prop amenities
   var preSelected = [];
   if (savedList) {
-    preSelected = savedList.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+    preSelected = _norm(savedList.split(',').map(function(s){ return s.trim(); }).filter(Boolean));
   } else if (fromProp.length) {
     preSelected = fromProp.slice();
   }
@@ -11074,7 +11283,7 @@ function lbInit() {
 }
 
 function lbSetToday() {
-  var today = new Date().toISOString().slice(0,10);
+  var today = localToday();
   var eff = document.getElementById('lb-eff-date');
   if (eff && !eff.value) eff.value = today;
 }
@@ -11266,16 +11475,30 @@ window.lbCascadeLease = function() {
   if (el && lease.propertyId) el.setAttribute('onclick',
     'closeLeaseBuilder();openProperty(\''+lease.propertyId+'\');setTimeout(function(){switchPropTab(\'tenants\');},200);');
 
+  // Switching to a different lease: clear Step 2 so the previous tenant's terms don't bleed through
+  if (LB._prefilledLeaseId !== leaseId) {
+    ['lb-due-day','lb-late-fee','lb-late-days','lb-pay-address','lb-pay-street','lb-pay-city','lb-pay-state','lb-pay-zip',
+     'lb-nsf-fee','lb-early-fee','lb-early-notice',
+     'lb-pet-count','lb-pet-types','lb-pet-weight',
+     'lb-appliances','lb-storage','lb-parking','lb-maint-resp'].forEach(function(id) {
+      var el = document.getElementById(id); if (el) el.value = '';
+    });
+    LB._prefilledLeaseId = leaseId;
+  }
+
   // Pre-fill payment address — split into street/city/state/zip
   var payStreet = document.getElementById('lb-pay-street');
   var payCity   = document.getElementById('lb-pay-city');
   var payState  = document.getElementById('lb-pay-state');
   var payZip    = document.getElementById('lb-pay-zip');
   if (payStreet && !payStreet.value && owner.address) {
-    payStreet.value = owner.address;
-    if (payCity  && owner.city)  payCity.value  = owner.city;
-    if (payState && owner.state) payState.value = owner.state;
-    if (payZip   && owner.zip)   payZip.value   = owner.zip;
+    // Owner profile usually stores one line ('306 E Halifax St, Mesa, AZ, 85201') — split it
+    var ownSplit = (owner.city || owner.zip) ? { street: owner.address, city: owner.city, state: owner.state, zip: owner.zip }
+                                             : lbSplitAddress(owner.address);
+    payStreet.value = ownSplit.street || owner.address;
+    if (payCity  && !payCity.value  && ownSplit.city)  payCity.value  = ownSplit.city;
+    if (payState && !payState.value && ownSplit.state) payState.value = ownSplit.state;
+    if (payZip   && !payZip.value   && ownSplit.zip)   payZip.value   = ownSplit.zip;
   }
 
   // Pre-fill pets from lease record
@@ -11285,43 +11508,58 @@ window.lbCascadeLease = function() {
     petsAllowedEl.value = hasPets ? 'yes' : 'no';
   }
 
-  // Pre-fill Step 2 from most recent saved leaseAgreement for this lease (if exists)
-  var lastAgreement = getCol('leaseAgreements')
-    .filter(function(a){ return a.leaseId === leaseId && !a.deletedAt; })
-    .sort(function(a,b){ return (b.updatedAt||'') > (a.updatedAt||'') ? 1 : -1; })[0];
-
-  if (lastAgreement && lastAgreement.builderFields) {
-    var bf = lastAgreement.builderFields;
-    var set = function(id, v) { var e=document.getElementById(id); if(e && v) e.value=v; };
-    set('lb-due-day',      bf.dueDay);
-    set('lb-late-days',    bf.lateDays);
-    set('lb-late-fee',     bf.lateFee);
-    set('lb-nsf-fee',      bf.nsfFee);
-    set('lb-early-fee',    bf.earlyFee);
-    set('lb-early-notice', bf.earlyNotice);
+  // Step 2 prefill — layered sources (v4.2.7):
+  //   1. this lease's own saved draft (its negotiated terms)
+  //   2. property.leaseDefaults (single source of truth; auto-updated with last-used values)
+  //   3. most recent saved agreement for the same property
+  //   4. most recent saved agreement anywhere (payment address only)
+  var _agAll = getCol('leaseAgreements')
+    .filter(function(a){ return !a.deletedAt && a.builderFields; })
+    .sort(function(a,b){ return (b.updatedAt||'') > (a.updatedAt||'') ? 1 : -1; });
+  var lastAgreement = _agAll.find(function(a){ return a.leaseId === leaseId; }) || null;
+  var propAgreement = prop ? (_agAll.find(function(a){ return a.propertyId === prop.id && a.leaseId !== leaseId; }) || null) : null;
+  var bf   = lastAgreement ? lastAgreement.builderFields : {};
+  var ldef = (prop && prop.leaseDefaults) || {};
+  var fbf  = propAgreement ? propAgreement.builderFields : {};
+  var abf  = _agAll[0] ? _agAll[0].builderFields : {};
+  var set  = function(id, v) { var e=document.getElementById(id); if(e && v) e.value=v; };
+  var pick = function(k) { return bf[k] || ldef[k] || fbf[k] || abf[k] || ''; };
+  ['dueDay:lb-due-day','lateDays:lb-late-days','lateFee:lb-late-fee','nsfFee:lb-nsf-fee',
+   'earlyFee:lb-early-fee','earlyNotice:lb-early-notice',
+   'petCount:lb-pet-count','petTypes:lb-pet-types','petWeight:lb-pet-weight'].forEach(function(pair) {
+    var kv = pair.split(':'); set(kv[1], pick(kv[0]));
+  });
+  if (lastAgreement) {
     if (bf.petsAllowed && petsAllowedEl) petsAllowedEl.value = bf.petsAllowed;
-    set('lb-pet-count',    bf.petCount);
-    set('lb-pet-types',    bf.petTypes);
-    set('lb-pet-weight',   bf.petWeight);
-    set('lb-furnished',    bf.furnished);
-    set('lb-storage',      bf.storage);
-    set('lb-parking',      bf.parking);
-    set('lb-maint-resp',   bf.maintResp);
-    // Payment address — prefer split fields; fall back to legacy single-field parse
-    if (bf.payStreet)  { set('lb-pay-street', bf.payStreet); }
-    else if (bf.payAddress && payStreet) {
-      // Legacy: stored as single string — put it all in street field
-      payStreet.value = bf.payAddress;
-    }
-    if (bf.payCity)  set('lb-pay-city',  bf.payCity);
-    if (bf.payState) set('lb-pay-state', bf.payState);
-    if (bf.payZip)   set('lb-pay-zip',   bf.payZip);
-    // Appliance chips — render with saved list
-    lbRenderApplianceChips(prop ? prop.amenities : [], bf.appliances);
+    // This lease's own overrides; property values fill whatever is still empty below
+    set('lb-furnished',  bf.furnished);
+    set('lb-storage',    bf.storage);
+    set('lb-parking',    bf.parking);
+    set('lb-maint-resp', bf.maintResp);
     LB.agreementId = lastAgreement.id;
-  } else {
-    // No prior agreement — render appliance chips from property amenities only
-    lbRenderApplianceChips(prop ? prop.amenities : [], null);
+  }
+  // Payment address — first source that has one; split fields preferred, legacy single string parsed
+  var paySrc = [bf, fbf, abf].find(function(x){ return x && (x.payStreet || x.payAddress); });
+  if (paySrc) {
+    var pSplit = paySrc.payStreet
+      ? ((paySrc.payCity || paySrc.payZip) ? { street: paySrc.payStreet, city: paySrc.payCity, state: paySrc.payState, zip: paySrc.payZip }
+                                           : lbSplitAddress(paySrc.payStreet))
+      : lbSplitAddress(paySrc.payAddress);
+    ['lb-pay-street','lb-pay-city','lb-pay-state','lb-pay-zip'].forEach(function(id){ var e=document.getElementById(id); if (e) e.value=''; });
+    set('lb-pay-street', pSplit.street || paySrc.payStreet || paySrc.payAddress);
+    set('lb-pay-city',   pSplit.city);
+    set('lb-pay-state',  pSplit.state);
+    set('lb-pay-zip',    pSplit.zip);
+  }
+  // Appliances — property record is the source; a saved draft for THIS lease keeps its own selection
+  var propAppl = (typeof window.hmlPropAppliances === 'function') ? window.hmlPropAppliances(prop) : (prop ? (prop.amenities||[]) : []);
+  lbRenderApplianceChips(propAppl, (lastAgreement && bf.appliances) ? bf.appliances : propAppl.join(', '));
+  // Source note on Step 2
+  var srcNote = document.getElementById('lb-terms-source-note');
+  if (srcNote) {
+    srcNote.textContent = lastAgreement ? '\u2713 Loaded from this lease\u2019s saved draft'
+      : (Object.keys(ldef).some(function(k){ return ldef[k]; }) ? '\u2713 Prefilled from property defaults \u2014 edit in Property \u2192 Info'
+      : (propAgreement ? '\u2713 Prefilled from the last lease for this property' : 'No saved defaults yet \u2014 values you use here will be remembered for this property'));
   }
 
   // Auto-derive governing state from property record — write to hidden input + display
@@ -11329,11 +11567,10 @@ window.lbCascadeLease = function() {
   var stateDisplay = document.getElementById('lb-state-display');
   if (prop && prop.state) {
     var propState = prop.state.trim();
-    var knownStates = ['Virginia','Arizona','California','Florida','Texas','Nevada','Colorado','Washington'];
-    var matched = knownStates.find(function(s) {
-      return s.toLowerCase() === propState.toLowerCase() || propState.toLowerCase().startsWith(s.toLowerCase());
-    });
-    var resolvedState = matched || propState;
+    // Normalize 'AZ' -> 'Arizona' so the doc reads 'State of Arizona', not 'the AZ'
+    var resolvedState = lbNormState(propState);
+    var matched = resolvedState !== propState || !!LB_STATE_NAMES[propState.toUpperCase()] ||
+      Object.keys(LB_STATE_NAMES).some(function(k){ return LB_STATE_NAMES[k] === resolvedState; });
     if (stateHidden)  stateHidden.value = resolvedState;
     if (stateDisplay) stateDisplay.textContent = resolvedState;
     LB.customState = matched ? null : propState;
@@ -11659,13 +11896,13 @@ var LB_CLAUSE_DEFS = [
   { id:'c4',  num:'4',  title:'Management',            required:true,
     text:'The Tenant is hereby notified that {{LANDLORD_NAME}} is the property manager of the Property. Should the Tenant have any issues or concerns, the Tenant may contact {{LANDLORD_NAME}} by one of the methods below:\n\nAddress: {{LANDLORD_ADDRESS}}\nTelephone: {{LANDLORD_PHONE}}\nEmail: {{LANDLORD_EMAIL}}' },
   { id:'c5',  num:'5',  title:'Rent',                  required:true,
-    text:'Tenant will pay to Landlord rent in the amount of ${{RENT}}.00 (the "Rent"), payable in advance on the {{DUE_DAY}}st day of each month, and is delinquent on the next day. If that day falls on a weekend or legal holiday, the rent is due on the next business day. There will be no rent increases through the initial term of the lease. Landlord may increase the rent that will be paid during any month-to-month renewal period by providing at least 30 days written notice to Tenant.\n\nPayments should be sent to: {{PAY_ADDRESS}}\n\nAcceptable forms of payment: Personal check, Money order, Cashier\'s check, Direct deposit, Paypal, Zelle.\n\nRent payments for any partial month will be pro-rated at the rate of 1/30th of the monthly rent payment per day.' },
+    text:'Tenant will pay to Landlord rent in the amount of ${{RENT}} (the "Rent"), payable in advance on the {{DUE_DAY_ORD}} day of each month, and is delinquent on the next day. If that day falls on a weekend or legal holiday, the rent is due on the next business day. There will be no rent increases through the initial term of the lease. Landlord may increase the rent that will be paid during any month-to-month renewal period by providing at least 30 days written notice to Tenant.\n\nPayments should be sent to: {{PAY_ADDRESS}}\n\nAcceptable forms of payment: Personal check, Money order, Cashier\'s check, Direct deposit, Paypal, Zelle.\n\nRent payments for any partial month will be pro-rated by dividing the monthly rent by the number of days in that month and multiplying by the number of days of occupancy.' },
   { id:'c6',  num:'6',  title:'Security Deposit',      required:true,
-    text:'At the time of signing this Agreement, Tenant must pay to Landlord the following amounts due at signing:\n\n\u2022 Security Deposit: ${{SEC_DEP}}.00\n\u2022 {{CLEANING_FEE_LABEL}}: ${{CLEAN_DEP}}.00\n\u2022 {{PET_FEE_LABEL}}: ${{PET_FEE}}.00\n\nTotal due at signing: ${{TOTAL_DEP}}.00\n\nThe Security Deposit will be returned to the Tenant within forty-five (45) days after the tenancy ends, along with an itemized accounting for any deductions. The {{CLEANING_FEE_LABEL}} is {{CLEAN_DEP_REFUNDABLE}}. The {{PET_FEE_LABEL}} is {{PET_FEE_REFUNDABLE}}.' },
+    text:'At the time of signing this Agreement, Tenant must pay to Landlord the following amounts due at signing:\n\n\u2022 Security Deposit: ${{SEC_DEP}}\n\u2022 {{CLEANING_FEE_LABEL}}: ${{CLEAN_DEP}}\n\u2022 {{PET_FEE_LABEL}}: ${{PET_FEE}}\n\nTotal due at signing: ${{TOTAL_DEP}}\n\nThe Security Deposit will be returned to the Tenant within forty-five (45) days after the tenancy ends, along with an itemized accounting for any deductions. The {{CLEANING_FEE_LABEL}} is {{CLEAN_DEP_REFUNDABLE}}. The {{PET_FEE_LABEL}} is {{PET_FEE_REFUNDABLE}}.' },
   { id:'c7',  num:'7',  title:'Non-Sufficient Funds',  required:false,
-    text:'Tenant will be charged a monetary fee of ${{NSF_FEE}}.00 as reimbursement of the expenses incurred by Landlord for each check that is returned to Landlord for lack of sufficient funds. Landlord and Tenant agree that three (3) returned checks in any 12 month period constitutes frequent return of checks due to insufficient funds and may be considered a just cause for eviction.' },
+    text:'Tenant will be charged a monetary fee of ${{NSF_FEE}} as reimbursement of the expenses incurred by Landlord for each check that is returned to Landlord for lack of sufficient funds. Landlord and Tenant agree that three (3) returned checks in any 12 month period constitutes frequent return of checks due to insufficient funds and may be considered a just cause for eviction.' },
   { id:'c8',  num:'8',  title:'Late Payments',         required:false,
-    text:'In the event that any payment required to be paid hereunder by Tenant is not made within {{LATE_DAYS}} days of when due, Tenant will pay to Landlord, in addition to such payment or other charges due hereunder, a "late fee" in the amount of ${{LATE_FEE}}.00.' },
+    text:'In the event that any payment required to be paid hereunder by Tenant is not made within {{LATE_DAYS}} days of when due, Tenant will pay to Landlord, in addition to such payment or other charges due hereunder, a "late fee" in the amount of ${{LATE_FEE}}.' },
   { id:'c9',  num:'9',  title:'Failure to Pay',        required:false,
     text:'Tenant is hereby notified that a negative credit report reflecting on Tenant\'s credit history may be submitted to a credit reporting agency if Tenant fails to fulfill the terms of their credit obligations, such as their financial obligations under the terms of this Agreement.' },
   { id:'c11', num:'11', title:'Occupants',              required:false,
@@ -11685,7 +11922,7 @@ var LB_CLAUSE_DEFS = [
   { id:'c18', num:'18', title:'Roof/Fire Escapes',      required:false,
     text:'Use of the roof and/or the fire escapes by Tenants and/or guests is limited to emergency use only. No other use is permitted, including but not limited to, the placement of personal property.' },
   { id:'c19', num:'19', title:'Pets',                   required:false,
-    text:'Tenant is not allowed to keep any animals or pets on or about the Property without Landlord\'s prior written consent, except for the following:\n\nNumber of pets allowed: {{PET_COUNT}}\nType of pets allowed: {{PET_TYPES}}\nWeight limit: {{PET_WEIGHT}}\n\nTenant will be required to pay a {{PET_FEE_LABEL}} in the amount of ${{PET_FEE}}.00. Tenant will be responsible for all costs that are reasonably necessary to remedy any damage to the Property which may be a result of any animal or pet.' },
+    text:'Tenant is not allowed to keep any animals or pets on or about the Property without Landlord\'s prior written consent, except for the following:\n\nNumber of pets allowed: {{PET_COUNT}}\nType of pets allowed: {{PET_TYPES}}\nWeight limit: {{PET_WEIGHT}}\n\nTenant will be required to pay a {{PET_FEE_LABEL}} in the amount of ${{PET_FEE}}. Tenant will be responsible for all costs that are reasonably necessary to remedy any damage to the Property which may be a result of any animal or pet.' },
   { id:'c20', num:'20', title:'Keys and Locks',         required:false,
     text:'Tenant will be given a set number of keys for the Property. If all keys are not returned to Landlord following termination of the Agreement, Tenant will be charged a monetary fee to replace the keys. Tenant is not permitted to change any lock or place additional locking devices on any door or window of the Property without Landlord\'s approval prior to installation.' },
   { id:'c21', num:'21', title:'Smoking',                required:false,
@@ -11697,7 +11934,7 @@ var LB_CLAUSE_DEFS = [
   { id:'c24', num:'24', title:'Default',                required:true,
     text:'Tenant will be in default of this Agreement if Tenant fails to comply with any material provisions of this Agreement by which Tenant is bound. If Tenant fails to cure any financial obligation (or any other obligation) after written notice of such default is provided by Landlord to Tenant, Landlord may elect to cure such default and the cost of such action will be added to Tenant\'s financial obligations under this Agreement, including reasonable attorneys\' fees.' },
   { id:'c25', num:'25', title:'Early Termination',      required:false,
-    text:'Tenant may, upon {{EARLY_NOTICE}} days\' written notice to Landlord, terminate this Agreement provided that the Tenant pays a termination fee equal to ${{EARLY_FEE}}.00 or the maximum allowable by law, whichever is less. Termination will be effective as of the last day of the calendar month following the end of the notice period.' },
+    text:'Tenant may, upon {{EARLY_NOTICE}} days\' written notice to Landlord, terminate this Agreement provided that the Tenant pays a termination fee equal to ${{EARLY_FEE}} or the maximum allowable by law, whichever is less. Termination will be effective as of the last day of the calendar month following the end of the notice period.' },
   { id:'c26', num:'26', title:'Holding Over',           required:false,
     text:'Should the Tenant hold over the term hereby created with consent of the Landlord, the term of this lease will become a month-to-month tenancy at the rental rate herein provided, until either party serves upon the other thirty (30) days written notice of termination.' },
   { id:'c27', num:'27', title:'Military Termination',   required:false,
@@ -11737,6 +11974,84 @@ var LB_CLAUSE_DEFS = [
 ];
 
 /* ── TOKEN SUBSTITUTION ──────────────────────────────────────── */
+/* ── LEASE DOC HELPERS (v4.2.7) ───────────────────────────────── */
+var LB_STATE_NAMES = {AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'District of Columbia',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming'};
+// 'AZ' / 'az' / 'Arizona' -> 'Arizona'; unknown values pass through trimmed
+function lbNormState(v) {
+  var t = String(v || '').trim();
+  if (!t) return '';
+  var up = t.toUpperCase().replace(/\./g, '');
+  if (LB_STATE_NAMES[up]) return LB_STATE_NAMES[up];
+  var full = Object.keys(LB_STATE_NAMES).map(function(k){ return LB_STATE_NAMES[k]; })
+    .find(function(n){ return n.toLowerCase() === t.toLowerCase(); });
+  return full || t;
+}
+window.lbNormState = lbNormState;
+// '2,800.00' / '2800' / 2800 -> '2800.00' (no thousands separator: callers parseFloat these)
+function lbMoney(v, fallback) {
+  var n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
+  if (isNaN(n)) n = parseFloat(fallback || 0) || 0;
+  return n.toFixed(2);
+}
+function lbOrdinal(n) {
+  var i = parseInt(n, 10); if (isNaN(i)) return String(n || '');
+  var j = i % 10, k = i % 100;
+  if (j === 1 && k !== 11) return i + 'st';
+  if (j === 2 && k !== 12) return i + 'nd';
+  if (j === 3 && k !== 13) return i + 'rd';
+  return i + 'th';
+}
+// Sequential section number among included clauses (defs keep gaps like 10, 37, 44)
+function lbClauseNum(c, list) {
+  var inc = (list || LB.clauses || []).filter(function(x){ return x.included; });
+  var idx = -1;
+  for (var i = 0; i < inc.length; i++) { if (inc[i] === c || (c && inc[i].id === c.id)) { idx = i; break; } }
+  return idx >= 0 ? String(idx + 1) : String((c && c.num) || '');
+}
+window.lbClauseNum = lbClauseNum;
+// Split '306 E Halifax St, Mesa, AZ, 85201' -> {street, city, state, zip}
+function lbSplitAddress(a) {
+  var out = { street: '', city: '', state: '', zip: '' };
+  var parts = String(a || '').split(',').map(function(x){ return x.trim(); }).filter(Boolean);
+  if (!parts.length) return out;
+  var last = parts[parts.length - 1];
+  var m = last.match(/^([A-Za-z]{2})?\s*(\d{5}(?:-\d{4})?)$/);
+  if (m) { out.zip = m[2]; if (m[1]) out.state = m[1].toUpperCase(); parts.pop(); }
+  if (!out.state && parts.length > 1 && /^[A-Za-z]{2}$/.test(parts[parts.length - 1])) out.state = parts.pop().toUpperCase();
+  if (parts.length > 1) out.city = parts.pop();
+  out.street = parts.join(', ');
+  return out;
+}
+
+// Remember last-used Step 2 terms on the property (property.leaseDefaults = single source of truth).
+// Physical facts (appliances) are owned by the property: seeded once, never overwritten from here.
+function lbRememberTerms() {
+  try {
+    if (typeof lbBridge === 'function') lbBridge();
+    var getCol = window.lbGetCollection, up = window.lbUpsert;
+    if (!LB.linkedPropertyId || typeof up !== 'function' || typeof getCol !== 'function') return;
+    var prop = getCol('properties').find(function(p){ return p.id === LB.linkedPropertyId; });
+    if (!prop) return;
+    var g = function(id){ return String((document.getElementById(id)||{}).value || '').trim(); };
+    var map = { dueDay:'lb-due-day', lateDays:'lb-late-days', lateFee:'lb-late-fee', nsfFee:'lb-nsf-fee',
+                earlyFee:'lb-early-fee', earlyNotice:'lb-early-notice' };
+    if (g('lb-pets-allowed') === 'yes') {
+      map.petCount = 'lb-pet-count'; map.petTypes = 'lb-pet-types'; map.petWeight = 'lb-pet-weight';
+    }
+    var ld = Object.assign({}, prop.leaseDefaults || {}), upd = {}, changed = false;
+    Object.keys(map).forEach(function(k) { var v = g(map[k]); if (v && v !== ld[k]) { ld[k] = v; changed = true; } });
+    if (changed) upd.leaseDefaults = ld;
+    if (!Array.isArray(prop.appliances) && g('lb-appliances')) {
+      var norm = window.hmlNormAppliances || function(l){ return l; };
+      upd.appliances = norm(g('lb-appliances').split(',').map(function(x){ return x.trim(); }).filter(Boolean));
+    }
+    if (Object.keys(upd).length) {
+      up('properties', Object.assign({}, prop, upd, { updatedAt: (typeof window.now === 'function') ? window.now() : new Date().toISOString() }));
+    }
+  } catch (e) { console.warn('lbRememberTerms:', e); }
+}
+window.lbRememberTerms = lbRememberTerms;
+
 function lbGetTokens() {
   // Builder-specific fields (from form — only these live in the builder)
   var g = function(id) { return (document.getElementById(id)||{}).value || ''; };
@@ -11782,9 +12097,15 @@ function lbGetTokens() {
   var payStateVal  = gs('lb-pay-state');
   var payZipVal    = gs('lb-pay-zip');
   var payAddressAssembled = payStreetVal || landlordAddress;
-  if (payCityVal)  payAddressAssembled += ', ' + payCityVal;
-  if (payStateVal) payAddressAssembled += ', ' + payStateVal;
-  if (payZipVal)   payAddressAssembled += ' '  + payZipVal;
+  // Only append parts the street line doesn't already contain (prevents 'Mesa, AZ, 85201, Mesa, AZ 85201')
+  var _has = function(part) {
+    if (!part) return true;
+    var esc = part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('(^|[\\s,])' + esc + '($|[\\s,])', 'i').test(payAddressAssembled);
+  };
+  if (payCityVal  && !_has(payCityVal))  payAddressAssembled += ', ' + payCityVal;
+  if (payStateVal && !_has(payStateVal)) payAddressAssembled += ', ' + payStateVal.toUpperCase();
+  if (payZipVal   && !_has(payZipVal))   payAddressAssembled += ' '  + payZipVal;
 
   // Builder-specific (form only)
   var furnSel  = (document.getElementById('lb-furnished')||{}).value || 'fully';
@@ -11792,9 +12113,13 @@ function lbGetTokens() {
                  furnSel === 'partial' ? 'House is partially furnished' : 'No furnishings provided';
   // lb-state hidden input always holds the resolved state value (never 'Other')
   var stateRaw = g('lb-state') || LB.customState || 'Virginia';
-  var stateVal = stateRaw;
+  var stateVal = lbNormState(stateRaw) || 'Virginia';
   var stateRef = stateVal === 'Virginia' ? 'Commonwealth of Virginia' :
-                 stateVal === 'Arizona'  ? 'State of Arizona' : stateVal;
+                 (/^(Kentucky|Massachusetts|Pennsylvania)$/.test(stateVal) ? 'Commonwealth of ' : 'State of ') + stateVal;
+  // Pets — clause 19 must agree with the Pets Allowed selector
+  var petsAllowedSel = g('lb-pets-allowed');
+  var petsOn = petsAllowedSel ? petsAllowedSel === 'yes' : !!hasPets;
+  var leasePetCount = lease && lease.pets ? (String(lease.pets).match(/\d+/) || [''])[0] : '';
   var occupants = lease ? tenantFull : '___________';
 
   function fmtDateLong(d) {
@@ -11820,25 +12145,26 @@ function lbGetTokens() {
     '{{EFF_DATE}}':         startDate || '___________',
     '{{START_DATE_LONG}}':  fmtDateLong(startDate),
     '{{END_DATE_LONG}}':    fmtDateLong(endDate),
-    '{{RENT}}':             rent,
+    '{{RENT}}':             lbMoney(rent),
     '{{DUE_DAY}}':          g('lb-due-day')      || '1',
-    '{{LATE_FEE}}':         g('lb-late-fee')     || '100',
+    '{{DUE_DAY_ORD}}':      lbOrdinal(g('lb-due-day') || '1'),
+    '{{LATE_FEE}}':         lbMoney(g('lb-late-fee'), '100'),
     '{{LATE_DAYS}}':        g('lb-late-days')    || '7',
     '{{PAY_ADDRESS}}':      payAddressAssembled,
-    '{{SEC_DEP}}':               secDep.toString(),
-    '{{CLEAN_DEP}}':             cleanDep.toString(),
-    '{{TOTAL_DEP}}':             totalDep.toString(),
-    '{{PET_FEE}}':               petFee.toString(),
+    '{{SEC_DEP}}':               lbMoney(secDep),
+    '{{CLEAN_DEP}}':             lbMoney(cleanDep),
+    '{{TOTAL_DEP}}':             lbMoney(totalDep),
+    '{{PET_FEE}}':               lbMoney(petFee),
     '{{CLEAN_DEP_REFUNDABLE}}':  prop ? (prop.cleaningFeeRefundable ? 'refundable' : 'non-refundable') : 'refundable',
     '{{PET_FEE_REFUNDABLE}}':    prop ? (prop.petDepositRefundable  ? 'refundable' : 'non-refundable') : 'non-refundable',
     '{{CLEANING_FEE_LABEL}}':    prop ? (prop.cleaningFeeRefundable ? 'Cleaning Deposit (Refundable)' : 'Cleaning Fee (Non-Refundable)') : 'Cleaning Fee',
     '{{PET_FEE_LABEL}}':         prop ? (prop.petDepositRefundable  ? 'Pet Deposit (Refundable)'      : 'Pet Fee (Non-Refundable)')      : 'Pet Deposit',
-    '{{NSF_FEE}}':          g('lb-nsf-fee')      || '50',
-    '{{EARLY_FEE}}':        g('lb-early-fee')    || '800',
+    '{{NSF_FEE}}':          lbMoney(g('lb-nsf-fee'), '50'),
+    '{{EARLY_FEE}}':        lbMoney(g('lb-early-fee'), '800'),
     '{{EARLY_NOTICE}}':     g('lb-early-notice') || '60',
-    '{{PET_COUNT}}':        g('lb-pet-count')    || '2',
-    '{{PET_TYPES}}':        g('lb-pet-types')    || 'Dog',
-    '{{PET_WEIGHT}}':       g('lb-pet-weight')   || 'No weight limit',
+    '{{PET_COUNT}}':        petsOn ? (g('lb-pet-count') || leasePetCount || '1') : '0',
+    '{{PET_TYPES}}':        petsOn ? (g('lb-pet-types') || 'Dog') : 'None',
+    '{{PET_WEIGHT}}':       petsOn ? (g('lb-pet-weight') || 'No weight limit') : 'N/A',
     '{{FURNISHED_DESC}}':   furnDesc,
     '{{APPLIANCES}}':       g('lb-appliances')   || 'Stove, Refrigerator, Washer, Dryer',
     '{{STORAGE}}':          g('lb-storage')      || 'Garage',
@@ -11850,6 +12176,13 @@ function lbGetTokens() {
 
 function lbSubstitute(text) {
   var tokens = lbGetTokens();
+  text = String(text || '');
+  // Money tokens are now pre-formatted to 2 decimals; collapse legacy '{{X}}.00' template suffixes
+  ['{{RENT}}','{{LATE_FEE}}','{{SEC_DEP}}','{{CLEAN_DEP}}','{{TOTAL_DEP}}','{{PET_FEE}}','{{NSF_FEE}}','{{EARLY_FEE}}'].forEach(function(k) {
+    text = text.split(k + '.00').join(k);
+  });
+  // '{{DUE_DAY}}st' -> proper ordinal (2nd, 3rd, 15th …)
+  text = text.split('{{DUE_DAY}}st').join('{{DUE_DAY_ORD}}');
   Object.keys(tokens).forEach(function(k) {
     text = text.split(k).join(tokens[k]);
   });
@@ -11893,12 +12226,13 @@ window.lbNewDraft = function() {
   if (rp) rp.style.display = 'none';
   if (sp) sp.style.display = '';
   // Reset builder-specific fields
-  ['lb-due-day','lb-late-fee','lb-late-days','lb-pay-address',
+  ['lb-due-day','lb-late-fee','lb-late-days','lb-pay-address','lb-pay-street','lb-pay-city','lb-pay-state','lb-pay-zip',
    'lb-nsf-fee','lb-early-fee','lb-early-notice',
    'lb-pet-count','lb-pet-types','lb-pet-weight',
    'lb-appliances','lb-storage','lb-parking','lb-maint-resp'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
+  LB._prefilledLeaseId = null;
   var lbl = document.getElementById('lb-property-label');
   if (lbl) lbl.textContent = 'Select a property to begin';
   if (window.lbToast) window.lbToast('📋 New draft started');
@@ -11919,7 +12253,7 @@ window.lbRenderClauses = function() {
       : '';
     return '<div class="lb-clause'+excCls+openCls+editCls+'" id="lbc-'+c.id+'">'
       + '<div class="lb-clause-header">'
-        + '<span class="lb-clause-num">§'+c.num+'</span>'
+        + '<span class="lb-clause-num">§'+(c.included ? lbClauseNum(c) : c.num)+'</span>'
         + '<span class="lb-clause-title">'+c.title+reqBadge+'</span>'
         + '<button class="lb-clause-toggle" onclick="lbToggleClause(\''+c.id+'\')" title="'+(c.included?'Exclude':'Include')+'"></button>'
         + '<span class="lb-clause-expand" onclick="lbToggleExpand(\''+c.id+'\')">▼</span>'
@@ -12116,7 +12450,7 @@ window.lbRenderPreview = function() {
   var tokens      = lbGetTokens();
   var tenantFull  = tokens['{{TENANT_FULL_NAME}}'];
   var landlordName= tokens['{{LANDLORD_NAME}}'];
-  var stateVal    = (document.getElementById('lb-state')||{}).value || 'Virginia';
+  var stateVal    = lbNormState((document.getElementById('lb-state')||{}).value) || 'Virginia';
   var effDate     = tokens['{{EFF_DATE}}'];
   var secDep      = tokens['{{SEC_DEP}}']   || '0';
   var cleanDep    = tokens['{{CLEAN_DEP}}'] || '0';
@@ -12144,7 +12478,7 @@ window.lbRenderPreview = function() {
 
   var clauseHtml = LB.clauses.filter(function(c){ return c.included; }).map(function(c) {
     var text = lbSubstitute(c.text).replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>');
-    return '<div class="lb-clause-preview"><p><strong>'+c.num+'. '+c.title+'.</strong> '+text+'</p></div>';
+    return '<div class="lb-clause-preview"><p><strong>'+lbClauseNum(c)+'. '+c.title+'.</strong> '+text+'</p></div>';
   }).join('');
 
   el.innerHTML = statusBanner
@@ -12304,6 +12638,7 @@ window.lbSaveDraft = function() {
 
   upsertFn('leaseAgreements', record);
   LB.agreementId = record.id;
+  lbRememberTerms();
 
   // Visual confirmation on the Save Draft button itself
   var saveBtn = document.querySelector('#lb-panel-preview .btn-amber');
@@ -12450,6 +12785,7 @@ window.lbAmend = function(summary) {
   var builderFields = {
     dueDay: g('lb-due-day'), lateDays: g('lb-late-days'), lateFee: g('lb-late-fee'),
     nsfFee: g('lb-nsf-fee'), payAddress: g('lb-pay-address'),
+    payStreet: g('lb-pay-street'), payCity: g('lb-pay-city'), payState: g('lb-pay-state'), payZip: g('lb-pay-zip'),
     earlyFee: g('lb-early-fee'), earlyNotice: g('lb-early-notice'),
     petsAllowed: g('lb-pets-allowed'), petCount: g('lb-pet-count'),
     petTypes: g('lb-pet-types'), petWeight: g('lb-pet-weight'),
@@ -12477,6 +12813,7 @@ window.lbAmend = function(summary) {
 
   upsertFn('leaseAgreements', record);
   LB.agreementId = record.id;
+  lbRememberTerms();
   toastFn('📝 Amendment saved — v'+record.version);
   try { lbUpdateStep4Buttons(); } catch(e) {}
   try { if (typeof renderLbDraftsTable === 'function') renderLbDraftsTable(); } catch(e) {}
@@ -12602,10 +12939,11 @@ window.lbDeleteDraft = window.lbDeleteAgreement; // legacy alias
 
 /* ── EXPORT DOCX (RTF wrapped as .docx — opens in Word/Pages) ── */
 window.lbExportDocx = function() {
+  lbRememberTerms();
   var tokens      = lbGetTokens();
   var tenantFull  = tokens['{{TENANT_FULL_NAME}}'];
   var landlordName= tokens['{{LANDLORD_NAME}}'];
-  var stateVal    = (document.getElementById('lb-state')||{}).value || 'Virginia';
+  var stateVal    = lbNormState((document.getElementById('lb-state')||{}).value) || 'Virginia';
   var effDate     = tokens['{{EFF_DATE}}'];
   var secDep      = tokens['{{SEC_DEP}}']   || '0';
   var cleanDep    = tokens['{{CLEAN_DEP}}'] || '0';
@@ -12634,7 +12972,7 @@ window.lbExportDocx = function() {
   rtf += para('', false, 11);
 
   LB.clauses.filter(function(c){ return c.included; }).forEach(function(c) {
-    rtf += para(c.num + '. ' + c.title.toUpperCase(), true, 11);
+    rtf += para(lbClauseNum(c) + '. ' + c.title.toUpperCase(), true, 11);
     lbSubstitute(c.text).split('\n').forEach(function(line) { rtf += para(line, false, 11); });
     rtf += para('', false, 11);
   });
@@ -12684,10 +13022,11 @@ window.lbExportDocx = function() {
 
 /* ── EXPORT TXT (plain text fallback) ───────────────────────── */
 window.lbExportTxt = function() {
+  lbRememberTerms();
   var tokens      = lbGetTokens();
   var tenantFull  = tokens['{{TENANT_FULL_NAME}}'];
   var landlordName= tokens['{{LANDLORD_NAME}}'];
-  var stateVal    = (document.getElementById('lb-state')||{}).value || 'Virginia';
+  var stateVal    = lbNormState((document.getElementById('lb-state')||{}).value) || 'Virginia';
   var effDate     = tokens['{{EFF_DATE}}'];
   var secDep      = tokens['{{SEC_DEP}}']   || '0';
   var cleanDep    = tokens['{{CLEAN_DEP}}'] || '0';
@@ -12704,7 +13043,7 @@ window.lbExportTxt = function() {
     'Subject to the terms and conditions stated below the parties agree as follows:', '',
   ];
   LB.clauses.filter(function(c){ return c.included; }).forEach(function(c) {
-    lines.push(c.num + '. ' + c.title.toUpperCase());
+    lines.push(lbClauseNum(c) + '. ' + c.title.toUpperCase());
     lines.push(lbSubstitute(c.text));
     lines.push('');
   });
@@ -12793,7 +13132,7 @@ window.lbExportSnapshot = function(agreementId, versionHint) {
   var totalDep   = ((parseFloat(tn.securityDeposit)||0)+(parseFloat(tn.cleaningDeposit)||0)+(parseFloat(tn.petDeposit)||0)).toLocaleString('en-US');
 
   var lines = [
-    (bf.state||'Virginia').toUpperCase()+' RESIDENTIAL LEASE AGREEMENT',
+    (lbNormState(bf.state)||'Virginia').toUpperCase()+' RESIDENTIAL LEASE AGREEMENT',
     '['+vLabel+' — executed '+fmtD(snap.executedAt)+']',
     '',
     'This Lease Agreement is made on '+fmtD(tn.startDate)+' by and between '+landlordName+' (the "Landlord") and:',
@@ -12808,9 +13147,9 @@ window.lbExportSnapshot = function(agreementId, versionHint) {
     '',
   ];
 
-  (agreement.clauses||[]).filter(function(c){ return c.included; }).forEach(function(c) {
+  (agreement.clauses||[]).filter(function(c){ return c.included; }).forEach(function(c, ci) {
     var def = LB_CLAUSE_DEFS.find(function(d){ return d.id === c.id; }) || {};
-    lines.push((def.num||c.id)+'. '+(def.title||c.id).toUpperCase());
+    lines.push((ci + 1)+'. '+(def.title||c.title||c.id).toUpperCase());
     lines.push(c.text || '');
     lines.push('');
   });
@@ -12896,12 +13235,13 @@ window.lbShowChangelog = function() {
 
 /* ── EXPORT PDF — raw PDF 1.4 writer, multi-page, no library, iOS-safe ── */
 window.lbExportPdf = function() {
+  lbRememberTerms();
 
   /* ── 1. Gather lease data (same pipeline as .doc / .txt exports) ── */
   var tokens      = lbGetTokens();
   var tenantFull  = tokens['{{TENANT_FULL_NAME}}'] || 'tenant';
   var landlordName= tokens['{{LANDLORD_NAME}}'];
-  var stateVal    = (document.getElementById('lb-state')||{}).value || 'Virginia';
+  var stateVal    = lbNormState((document.getElementById('lb-state')||{}).value) || 'Virginia';
   var effDate     = tokens['{{EFF_DATE}}'] !== '___________' ? tokens['{{EFF_DATE}}'] : 'draft';
   var secDep      = parseFloat(tokens['{{SEC_DEP}}']  || 0);
   var cleanDep    = parseFloat(tokens['{{CLEAN_DEP}}']|| 0);
@@ -12925,7 +13265,7 @@ window.lbExportPdf = function() {
   ];
 
   LB.clauses.filter(function(c){ return c.included; }).forEach(function(c) {
-    lines.push({ text: c.num + '. ' + c.title.toUpperCase(), bold: true, size: 11 });
+    lines.push({ text: lbClauseNum(c) + '. ' + c.title.toUpperCase(), bold: true, size: 11 });
     lbSubstitute(c.text).split('\n').forEach(function(ln) {
       lines.push({ text: ln, size: 11 });
     });
@@ -13312,6 +13652,7 @@ window.openLeaseBuilder = function() {
             '<span id="lb-terms-banner-term">Term</span> · ',
             '<span id="lb-terms-banner-rent">Rent</span>',
             '<div style="font-size:0.7rem;color:var(--green);margin-top:2px;">✓ Resolved from lease record — edit in Tenants to change</div>',
+            '<div id="lb-terms-source-note" style="font-size:0.7rem;color:var(--muted);margin-top:2px;"></div>',
           '</div>',
 
           '<div class="lb-section-head">Payment &amp; Late Fees</div>',
@@ -13324,11 +13665,11 @@ window.openLeaseBuilder = function() {
             '<div class="field"><label>NSF Fee ($) <span style="font-size:0.65rem;font-weight:400;color:var(--muted);">returned payment</span></label><input id="lb-nsf-fee" type="text" placeholder="50.00" min="0" inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)" /></div>',
           '</div>',
           '<div class="lb-section-head">Payment Address</div>',
-          '<div class="field"><label>Street</label><input id="lb-pay-street" type="text" placeholder="306 E Halifax St" /></div>',
+          '<div class="field"><label>Street</label><input id="lb-pay-street" type="text" placeholder="Street address" /></div>',
           '<div class="field field-row">',
-            '<div class="field" style="flex:2"><label>City</label><input id="lb-pay-city" type="text" placeholder="Mesa" /></div>',
-            '<div class="field" style="flex:1"><label>State</label><input id="lb-pay-state" type="text" placeholder="AZ" style="text-transform:uppercase;" /></div>',
-            '<div class="field" style="flex:1"><label>ZIP</label><input id="lb-pay-zip" type="text" placeholder="85201" inputmode="numeric" /></div>',
+            '<div class="field" style="flex:2"><label>City</label><input id="lb-pay-city" type="text" placeholder="City" /></div>',
+            '<div class="field" style="flex:1"><label>State</label><input id="lb-pay-state" type="text" placeholder="ST" style="text-transform:uppercase;" /></div>',
+            '<div class="field" style="flex:1"><label>ZIP</label><input id="lb-pay-zip" type="text" placeholder="ZIP" inputmode="numeric" /></div>',
           '</div>',
           '<input id="lb-pay-address" type="hidden" />',
 
@@ -13514,7 +13855,7 @@ function lbPreFlight() {
 function lbBuildLeasePayload() {
   var tokens   = lbGetTokens();
   var getCol   = window.lbGetCollection || function(){ return []; };
-  var stateVal = (document.getElementById('lb-state') || {}).value || 'Virginia';
+  var stateVal = lbNormState((document.getElementById('lb-state') || {}).value) || 'Virginia';
   var rentAmt  = parseFloat(tokens['{{RENT}}']     || 0);
   var secDep   = parseFloat(tokens['{{SEC_DEP}}']  || 0);
   var cleanDep = parseFloat(tokens['{{CLEAN_DEP}}'] || 0);
@@ -13535,7 +13876,7 @@ function lbBuildLeasePayload() {
   }
 
   var clauses = LB.clauses.filter(function(c){ return c.included; }).map(function(c) {
-    return { num: c.num, title: c.title, text: lbSubstitute(c.text) };
+    return { num: lbClauseNum(c), title: c.title, text: lbSubstitute(c.text) };
   });
 
   return {
@@ -13593,6 +13934,7 @@ window.lbShareLease = function() {
 
 window.lbShareLeaseConfirmed = function() {
   lbBridge(); // ensure window.lbToast and window.lbGetCollection are set
+  lbRememberTerms();
   var o   = document.getElementById('lb-share-preflight');
   var btn = o ? o.querySelector('button.btn-primary') : null;
   if (btn) { btn.textContent = '\u23f3 Creating link\u2026'; btn.disabled = true; }
@@ -14382,7 +14724,7 @@ function lbShowShareResult(url, tenantName) {
 
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 var DK_KEY        = 'hml_devlog';        // localStorage key — isolated from app data
-var DK_APP_VER    = 'Homemade Lane v4.2.6';
+var DK_APP_VER    = 'Homemade Lane v4.2.7';
 // Single source of truth — badge reads this at init; update only DK_APP_VER for future releases
 (function(){ var b=document.getElementById('hml-build-ref'); if(b) b.textContent='v'+DK_APP_VER.replace('Homemade Lane v',''); })();
 var DK_MAX_RECENT = 3;                   // entries shown in Log tab preview
