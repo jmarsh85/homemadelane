@@ -1347,6 +1347,15 @@
     @media (min-width: 480px) {
       .fab { right: calc(50% - 240px + 16px); }
     }
+  
+    /* ── QUICK-CLEAR (v4.2.8) — ✕ shown inside the focused, non-empty text field ── */
+    .hml-qc-btn {
+      position: absolute; z-index: 5; width: 26px; height: 26px; padding: 0;
+      border: none; border-radius: 50%; background: var(--muted, #8a8f98); color: #fff;
+      font-size: 13px; line-height: 26px; text-align: center; cursor: pointer;
+      opacity: 0.75; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    }
+    .hml-qc-btn:active { opacity: 1; }
   </style>
 </head>
 <body>
@@ -1439,6 +1448,7 @@
         <button class="home-action-pill" onclick="openTenantInfoPanel()">🗓 Lease Info</button>
         <button class="home-action-pill" onclick="openLeaseBuilder()">📋 Lease Builder</button>
       </div>
+      <button class="home-action-pill" style="width:100%;margin-bottom:10px;" onclick="openQuickLease()">⚡ Quick Lease from a message</button>
 
       <!-- Row 3: Personal + Service consolidated -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;">
@@ -3037,6 +3047,17 @@
           });
           if (changed) saveDB();
         })();
+        // ── Strip legacy ' (copy)' suffixes left by the old Duplicate action (v4.2.8) ──
+        // Idempotent; bumps updatedAt so the cleaned text wins on merge-import elsewhere.
+        (function() {
+          var changed = false, ts = now();
+          DB.transactions.forEach(function(t) {
+            if (typeof t.description !== 'string' || !/\(copy\)/i.test(t.description)) return;
+            var cleaned = t.description.replace(/(\s*\(copy\))+/gi, '').trim();
+            if (cleaned !== t.description) { t.description = cleaned; t.updatedAt = ts; changed = true; }
+          });
+          if (changed) saveDB();
+        })();
       }
     } catch(e) { console.warn('Load failed:', e); }
   }
@@ -3133,6 +3154,11 @@
       if (s.amenities && !localStorage.getItem('hml_amenities_demo'))   localStorage.setItem('hml_amenities_demo', s.amenities);
       if (s.aiEnabled && !localStorage.getItem('hml_ai_enabled'))       localStorage.setItem('hml_ai_enabled', s.aiEnabled);
       if (s.lbApiKey  && !localStorage.getItem('hml_lb_apikey'))        localStorage.setItem('hml_lb_apikey', s.lbApiKey);
+      if (s.signature && !localStorage.getItem('hml_signature'))        localStorage.setItem('hml_signature', s.signature);
+      if (s.ghPat     && !localStorage.getItem('hml_gh_pat'))           localStorage.setItem('hml_gh_pat', s.ghPat);
+      if (s.aiModel   && !localStorage.getItem('hml_ai_model'))         localStorage.setItem('hml_ai_model', s.aiModel);
+      if (s.lbTestMode && !localStorage.getItem('hml_lb_test_mode'))    localStorage.setItem('hml_lb_test_mode', s.lbTestMode);
+      if (s.devLog    && !localStorage.getItem('hml_devlog'))           localStorage.setItem('hml_devlog', s.devLog);
       if (s.ownerProfile) {
         const op = s.ownerProfile;
         ['name','phone','email','address'].forEach(k => {
@@ -3277,6 +3303,12 @@
       aiEnabled:  localStorage.getItem('hml_ai_enabled') || '',
       lbApiKey:   localStorage.getItem('hml_lb_apikey')  || '',
       ownerProfile: getOwnerProfile(),
+      // v4.2.8 — previously missing from backups
+      signature:  localStorage.getItem('hml_signature')  || '',   // landlord signature (PNG data URL) used on leases
+      ghPat:      localStorage.getItem('hml_gh_pat')     || '',   // GitHub token for lease share links
+      aiModel:    localStorage.getItem('hml_ai_model')   || '',
+      lbTestMode: localStorage.getItem('hml_lb_test_mode') || '',
+      devLog:     localStorage.getItem('hml_devlog')     || '',   // DevKit bug/feature log
     };
 
     // Note: documents with fileData (base64) are included in full
@@ -3403,6 +3435,11 @@
               if (s.amenities) localStorage.setItem('hml_amenities_demo',   s.amenities);
               if (s.aiEnabled) localStorage.setItem('hml_ai_enabled',       s.aiEnabled);
               if (s.lbApiKey)  localStorage.setItem('hml_lb_apikey',        s.lbApiKey);
+              if (s.signature) localStorage.setItem('hml_signature',        s.signature);
+              if (s.ghPat)     localStorage.setItem('hml_gh_pat',           s.ghPat);
+              if (s.aiModel)   localStorage.setItem('hml_ai_model',         s.aiModel);
+              if (s.lbTestMode) localStorage.setItem('hml_lb_test_mode',    s.lbTestMode);
+              if (s.devLog)    localStorage.setItem('hml_devlog',           s.devLog);
               if (s.ownerProfile) {
                 const op = s.ownerProfile;
                 ['name','phone','email','address'].forEach(k => {
@@ -4277,21 +4314,31 @@
   function duplicateTxn(id) {
     const original = getTxnData().find(t => t.id === id);
     if (!original) return;
+    // v4.2.8: open a prefilled NEW form — nothing is saved until the user taps Save,
+    // so Cancel leaves no stray copy. Description is kept as-is (no '(copy)' suffix).
     const copy = Object.assign({}, original, {
-      id:        genId(),
-      date:      localToday(), // default to today — user edits in form
-      createdAt: now(),
-      updatedAt: now(),
-      description: original.description ? original.description + ' (copy)' : 'Copy',
+      date:        localToday(), // default to today — user edits in form
+      description: String(original.description || '').replace(/(\s*\(copy\))+/gi, '').trim(),
     });
-    delete copy.deletedAt;
-    upsert('transactions', copy);
+    // Identity + links that belong only to the original record
+    ['id','createdAt','updatedAt','deletedAt','receiptData','serviceRequestId','_linkedTransactionId','aiChip'].forEach(k => delete copy[k]);
     // Close the current detail drawer
     TXN_STATE.openRow = null;
     renderTransactionTable();
-    showToast('✅ Duplicated — opening to edit…');
-    // Open in edit mode after a short delay so the table re-renders first
-    setTimeout(() => editTxn(copy.id), 180);
+    setTimeout(() => {
+      if (copy.type === 'income') {
+        openTransactionForm('modal-rent', copy);
+        if (copy.leaseRef) {
+          setTimeout(() => {
+            const leaseSel = document.getElementById('rent-lease-select');
+            if (leaseSel && [...leaseSel.options].some(o => o.value === copy.leaseRef)) leaseSel.value = copy.leaseRef;
+          }, 60);
+        }
+      } else {
+        openTransactionForm('modal-expense', copy);
+      }
+      showToast('Duplicate ready — review and tap Save');
+    }, 180);
   }
 
   function saveIncomeTransaction() {
@@ -5087,6 +5134,450 @@ Respond ONLY in this JSON format, no markdown, no preamble:
     var cents = digits.slice(-2);
     el.value = whole + '.' + cents;
   }
+
+  /* ── QUICK-CLEAR (v4.2.8) ──────────────────────────────────────
+     One floating ✕ for the whole app: appears inside whichever text
+     field / textarea has focus and a value; tap to empty it. Fires
+     input + change so dependent logic (cents formatting, smart
+     populate, lease prefill hints) reacts as if the user deleted it.
+     Opt out per field with data-noclear.
+  ─────────────────────────────────────────────────────────────── */
+  (function initQuickClear() {
+    const OK_TYPES = ['text','email','tel','search','url','number',''];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'hml-qc-btn';
+    btn.setAttribute('aria-label', 'Clear field');
+    btn.textContent = '✕';
+    let target = null, savedPad = null;
+    const eligible = el => {
+      if (!el || el.readOnly || el.disabled || el.hasAttribute('data-noclear')) return false;
+      if (el.tagName === 'TEXTAREA') return true;
+      if (el.tagName !== 'INPUT') return false;
+      return OK_TYPES.includes((el.getAttribute('type') || '').toLowerCase()) && el.offsetWidth >= 90;
+    };
+    const place = () => {
+      if (!target || !target.value) { btn.remove(); return; }
+      const host = target.parentElement;
+      if (!host) return;
+      if (getComputedStyle(host).position === 'static') { host.style.position = 'relative'; host.dataset.qcPos = '1'; }
+      if (btn.parentElement !== host) host.appendChild(btn);
+      // offsetTop/Left are relative to host now that it is positioned
+      const isArea = target.tagName === 'TEXTAREA';
+      btn.style.top  = (target.offsetTop + (isArea ? 6 : Math.max(0, (target.offsetHeight - 26) / 2))) + 'px';
+      btn.style.left = (target.offsetLeft + target.offsetWidth - 26 - 6) + 'px';
+    };
+    const detach = () => {
+      if (target && savedPad !== null) target.style.paddingRight = savedPad;
+      target = null; savedPad = null;
+      btn.remove();
+    };
+    document.addEventListener('focusin', e => {
+      const el = e.target;
+      if (el === btn) return;
+      if (target && target !== el) detach();
+      if (!eligible(el)) return;
+      target = el;
+      savedPad = el.style.paddingRight || '';
+      el.style.paddingRight = '36px';
+      place();
+    });
+    document.addEventListener('focusout', e => {
+      if (e.target !== target) return;
+      // Defer so a tap on the ✕ (which keeps focus via pointerdown) is not lost
+      setTimeout(() => { if (document.activeElement !== target) detach(); }, 0);
+    });
+    document.addEventListener('input', e => { if (e.target === target) place(); });
+    // Keep focus (and the iOS keyboard) on the field while tapping ✕
+    btn.addEventListener('pointerdown', e => e.preventDefault());
+    btn.addEventListener('mousedown',   e => e.preventDefault());
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (!target) return;
+      const el = target;
+      el.value = '';
+      el.dispatchEvent(new Event('input',  { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.focus();
+      place();
+    });
+  })();
+
+  /* ── QUICK LEASE (v4.2.8) ──────────────────────────────────────
+     Paste a booking message (or read a screenshot with AI) →
+     editable parsed fields → prospect lease record → Lease Builder
+     opened on Preview, ready to export PDF or share a link.
+  ─────────────────────────────────────────────────────────────── */
+  const QL_MONTHS = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12 };
+  const QL_NUMS   = { one:1,two:2,three:3,four:4,a:1,an:1 };
+  const QL_ANIMALS = /\b(cats?|kittens?|dogs?|pupp(?:y|ies)|birds?|rabbits?|bunn(?:y|ies)|fish|hamsters?|guinea pigs?|ferrets?|reptiles?|lizards?|snakes?|turtles?|pets?)\b/gi;
+
+  function _qlIso(y, m, d) {
+    return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+  // Find all dates in a string → ['YYYY-MM-DD', …]. Missing year → next occurrence on/after refISO.
+  function _qlDates(str, refISO) {
+    const out = [];
+    const ref = refISO || localToday();
+    const refY = parseInt(ref.slice(0, 4), 10);
+    const fixYear = (y, m, d) => {
+      if (y) { y = parseInt(y, 10); return y < 100 ? 2000 + y : y; }
+      return _qlIso(refY, m, d) >= ref ? refY : refY + 1;
+    };
+    const re = /\b(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?/gi;
+    let m;
+    while ((m = re.exec(str))) {
+      let mo, da, yr;
+      if (m[1]) { mo = +m[1]; da = +m[2]; yr = m[3]; }
+      else      { mo = QL_MONTHS[m[4].toLowerCase()]; da = +m[5]; yr = m[6]; }
+      if (!(mo >= 1 && mo <= 12 && da >= 1 && da <= 31)) continue;
+      out.push(_qlIso(fixYear(yr, mo, da), mo, da));
+    }
+    return out;
+  }
+  function _qlMoney(str) {
+    const m = str.match(/\$\s*([\d,]+(?:\.\d{1,2})?)\s*(k)?\b|\b([\d,]{3,}(?:\.\d{1,2})?)\s*(?:\/|per\s*)(?:mo|month)/i);
+    if (!m) return null;
+    let n = parseFloat((m[1] || m[3]).replace(/,/g, ''));
+    if (m[2]) n *= 1000;
+    return isNaN(n) ? null : n.toFixed(2);
+  }
+  function _qlRefund(str) {
+    if (/non[\s\-]*refund/i.test(str)) return false;
+    if (/refund/i.test(str)) return true;
+    return null;
+  }
+  function _qlPhone(str) {
+    const m = str.match(/(?:\+?1[\s.\-]?)?\(?(\d{3})\)?[\s.\-]?(\d{3})[\s.\-]?(\d{4})\b/);
+    return m ? '(' + m[1] + ') ' + m[2] + '-' + m[3] : '';
+  }
+  function _qlSplitName(full) {
+    const parts = String(full || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+    if (!parts.length) return { first: '', last: '' };
+    if (parts.length === 1) return { first: parts[0], last: '' };
+    return { first: parts.slice(0, -1).join(' '), last: parts[parts.length - 1] };
+  }
+  const QL_KEYWORDS = /\b(rent|month|deposit|fee|clean|pet|check|move|email|phone|tel|cell|arriv|depart|refund|nightly|total|due|pay|lease|start|end|from|until|occupan|guest|vehicle|car|license|notes?)\b/i;
+  function _qlLooksLikeName(line) {
+    if (/[\d@$:#\/]/.test(line)) return false;
+    if (QL_KEYWORDS.test(line)) return false;
+    QL_ANIMALS.lastIndex = 0;
+    if (QL_ANIMALS.test(line)) { QL_ANIMALS.lastIndex = 0; return false; }
+    QL_ANIMALS.lastIndex = 0;
+    const words = line.replace(/\s*(&|\band\b)\s*/gi, ' & ').split(/\s+/).filter(w => w !== '&');
+    return words.length >= 1 && words.length <= 6 && words.every(w => /^[A-Za-z][A-Za-z'.\-]*$/.test(w));
+  }
+  // "Jon Fenske" / "Jon & Rachael Fenske" / "Jon Fenske and Rachael Ward" → [{first,last}, …]
+  function _qlPeople(line) {
+    const segs = line.split(/\s*(?:&|\band\b|,|\+)\s*/i).map(x => x.trim()).filter(Boolean);
+    const people = segs.map(_qlSplitName);
+    // "Jon & Rachael Fenske": the single-word first segment shares the last name
+    if (people.length === 2 && !people[0].last && people[1].last) people[0].last = people[1].last;
+    return people;
+  }
+  function _qlPets(line) {
+    if (/\bno\s+pets?\b|\bpets?\s*[:\-]?\s*(none|no)\b/i.test(line)) return { pets: 'No pets', desc: '' };
+    const found = [];
+    let m; QL_ANIMALS.lastIndex = 0;
+    while ((m = QL_ANIMALS.exec(line))) { if (!/^pets?$/i.test(m[1])) found.push(m[1]); }
+    QL_ANIMALS.lastIndex = 0;
+    let count = 0;
+    const numRe = /\b(\d+|one|two|three|four|an?)\s+(?:small\s+|large\s+|medium\s+|senior\s+|indoor\s+)?(cats?|kittens?|dogs?|pupp(?:y|ies)|birds?|rabbits?|fish|pets?)\b/gi;
+    let n; while ((n = numRe.exec(line))) count += parseInt(n[1], 10) || QL_NUMS[n[1].toLowerCase()] || 0;
+    if (!count) count = found.length || (/\bpets?\b/i.test(line) ? 1 : 0);
+    if (!count) return null;
+    const desc = line.replace(/^\s*pets?\s*[:\-]\s*/i, '').trim();
+    return { pets: count >= 3 ? '3+ pets' : (count + (count === 1 ? ' pet' : ' pets')), desc: desc };
+  }
+
+  // Parse a free-form booking message. Returns only what it found.
+  function hmlParseLeaseText(text, refISO) {
+    const r = { people: [], emails: [], phones: [], refundable: {} };
+    // Lines, then sentences ('… Fenske. Jan 11 - Apr 25. 2500/mo') and ', $…' / ', 2 dogs' run-ons
+    const lines = String(text || '').split(/\r?\n|;/)
+      .flatMap(l => l.split(/\.\s+(?=[A-Z0-9$])|,\s+(?=[$\d])/))
+      .map(l => l.replace(/^[\s•\-*–]+/, '').replace(/[.\s]+$/, '').trim()).filter(Boolean);
+    const looseDates = [];
+    lines.forEach(line => {
+      const low = line.toLowerCase();
+      const label = (low.match(/^([a-z\- ]{2,24})\s*[:#]/) || [])[1] || '';
+      (line.match(/[\w.+\-]+@[\w\-]+\.[\w.\-]+/g) || []).forEach(e => r.emails.push(e));
+      const money = _qlMoney(line);
+      const dates = money ? [] : _qlDates(line, refISO);
+      const phone = (!money && !dates.length) || /phone|cell|tel|mobile/.test(low) ? _qlPhone(line) : '';
+      if (phone) { r.phones.push(phone); return; }
+      if (money) {
+        const rf = _qlRefund(line);
+        if (/\bpet/.test(low))                     { r.petFee = money;   if (rf !== null) r.refundable.pet = rf; }
+        else if (/clean/.test(low))                { r.cleaning = money; if (rf !== null) r.refundable.cleaning = rf; }
+        else if (/deposit|security/.test(low))     { r.security = money; if (rf !== null) r.refundable.security = rf; }
+        else if (/month|\/\s*mo\b|rent|monthly/.test(low) || !r.rent) r.rent = money;
+        return;
+      }
+      if (dates.length) {
+        if (dates.length >= 2) { r.start = r.start || dates[0]; r.end = r.end || dates[1]; return; }
+        if (/check[\s\-]*in|move[\s\-]*in|arriv|start|begin|\bfrom\b/.test(low))            r.start = dates[0];
+        else if (/check[\s\-]*out|move[\s\-]*out|depart|\bend\b|until|\bto\b|leav/.test(low)) r.end = dates[0];
+        else looseDates.push(dates[0]);
+        return;
+      }
+      if (/@/.test(line)) return;
+      if (/^(co[\s\-]*tenant|roommate|partner|occupant|second)/.test(label)) { r.people.push(..._qlPeople(line.slice(line.indexOf(':') + 1))); return; }
+      if (/^(tenant|name|primary|guest|renter|tenants|names)/.test(label))   { r.people.push(..._qlPeople(line.slice(line.indexOf(':') + 1))); return; }
+      const pets = (/^pets?\b/.test(low) || (QL_ANIMALS.lastIndex = 0, QL_ANIMALS.test(line))) ? _qlPets(line) : null;
+      QL_ANIMALS.lastIndex = 0;
+      if (pets) { r.pets = pets.pets; r.petDesc = pets.desc; return; }
+      if (_qlLooksLikeName(line)) r.people.push(..._qlPeople(line));
+    });
+    looseDates.forEach(d => { if (!r.start) r.start = d; else if (!r.end) r.end = d; });
+    if (r.start && r.end && r.end < r.start) { const t = r.start; r.start = r.end; r.end = t; }
+    return r;
+  }
+  window.hmlParseLeaseText = hmlParseLeaseText;
+
+  /* ── Quick Lease sheet ─────────────────────────────────────── */
+  function openQuickLease(propertyId) {
+    const ex = document.getElementById('hml-quick-lease-modal');
+    if (ex) ex.remove();
+    if (document.getElementById('hml-lb-modal') && typeof window.closeLeaseBuilder === 'function') window.closeLeaseBuilder();
+    const props = activeRecords('properties').slice().sort((a, b) => (a.isPrimaryResidence ? 1 : 0) - (b.isPrimaryResidence ? 1 : 0));
+    const selId = propertyId || (currentProperty && !currentProperty.isPrimaryResidence ? currentProperty.id : '') || (props[0] ? props[0].id : '');
+    const inp = 'width:100%;';
+    const f = (id, label, type, extra) => '<div class="field" style="margin:0;"><label>' + label + '</label><input id="ql-' + id + '" type="' + (type || 'text') + '" ' + (extra || '') + ' style="' + inp + '" /></div>';
+    const m = document.createElement('div');
+    m.id = 'hml-quick-lease-modal';
+    m.className = 'modal-overlay';
+    m.style.zIndex = '700';
+    m.onclick = e => { if (e.target === m) closeDynModal('hml-quick-lease-modal'); };
+    m.innerHTML = '<div class="modal-sheet" style="max-height:92vh;display:flex;flex-direction:column;">'
+      + '<div class="modal-header" style="flex-shrink:0;"><div class="modal-title">⚡ Quick Lease</div>'
+      + '<button class="modal-close" onclick="closeDynModal(\'hml-quick-lease-modal\')">✕</button></div>'
+      + '<div class="modal-body" style="overflow-y:auto;flex:1;">'
+      + '<div class="field"><label>Property</label><select id="ql-prop" onchange="qlApplyDefaults(true)">'
+      + props.map(p => '<option value="' + escAttr(p.id) + '"' + (p.id === selId ? ' selected' : '') + '>' + escAttr(p.name || p.address) + (p.isPrimaryResidence ? ' (primary residence)' : '') + '</option>').join('')
+      + '</select></div>'
+      + '<div class="field"><label>Paste booking details</label>'
+      + '<textarea id="ql-text" style="min-height:130px;" placeholder="Jon Fenske\nRachael Ward\nCat\nEmail: name@gmail.com\nPhone# (555) 555-5555\nCheck in: 1/11/27\nCheck out: 4/25/27\n$2500/month\n$250 non refundable pet\n$200 non refundable cleaning\n$1000 refundable deposit"></textarea>'
+      + '<div style="display:flex;gap:8px;margin-top:8px;">'
+      + '<button type="button" class="btn btn-primary" style="flex:2;" onclick="qlFill()">Fill fields ↓</button>'
+      + '<button type="button" class="btn btn-outline" style="flex:1;" onclick="document.getElementById(\'ql-img\').click()">📷 Screenshot</button>'
+      + '<input id="ql-img" type="file" accept="image/*" style="display:none;" onchange="qlReadImage(this)" />'
+      + '</div><div id="ql-img-status" style="font-size:0.75rem;color:var(--muted);margin-top:6px;"></div></div>'
+      + '<div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:14px 0 10px;">Tenant</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+      + f('first', 'First Name') + f('last', 'Last Name')
+      + f('cofirst', 'Co-tenant First') + f('colast', 'Co-tenant Last')
+      + '</div>'
+      + '<label style="display:flex;align-items:center;gap:8px;font-size:0.8125rem;margin:8px 0 4px;"><input id="ql-coinclude" type="checkbox" checked style="width:17px;height:17px;accent-color:var(--navy);" /> Name co-tenant on the lease</label>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;">'
+      + f('email', 'Email', 'email', 'autocomplete="off"') + f('phone', 'Phone', 'tel', 'oninput="if(typeof lbFormatPhone===\'function\')lbFormatPhone(this)"')
+      + '</div>'
+      + '<div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:14px 0 10px;">Term &amp; Money</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+      + f('start', 'Check-in', 'date', 'onchange="qlCheckWarnings()"') + f('end', 'Check-out', 'date', 'onchange="qlCheckWarnings()"')
+      + f('rent', 'Monthly Rent ($)', 'text', 'inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)"')
+      + f('security', 'Security Deposit ($)', 'text', 'inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)"')
+      + f('cleaning', 'Cleaning Fee ($)', 'text', 'inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)"')
+      + f('petfee', 'Pet Fee ($)', 'text', 'inputmode="decimal" autocomplete="off" oninput="_formatCentsInput(this)"')
+      + '<div class="field" style="margin:0;"><label>Pets</label><select id="ql-pets" onchange="qlApplyDefaults(false)"><option>No pets</option><option>1 pet</option><option>2 pets</option><option>3+ pets</option></select></div>'
+      + f('petdesc', 'Pet Description', 'text', 'placeholder="e.g. Cat"')
+      + '</div>'
+      + '<div id="ql-notes" style="font-size:0.75rem;line-height:1.5;margin-top:12px;"></div>'
+      + '<div style="display:flex;gap:10px;margin-top:14px;">'
+      + '<button class="btn btn-outline" style="flex:1;" onclick="closeDynModal(\'hml-quick-lease-modal\')">Cancel</button>'
+      + '<button class="btn btn-primary" style="flex:2;" onclick="qlCreate()">Create &amp; Preview Lease</button>'
+      + '</div></div></div>';
+    document.body.appendChild(m);
+    const ta = document.getElementById('ql-text');
+    // Auto-fill right after a paste (the most common path)
+    ta.addEventListener('paste', () => setTimeout(qlFill, 30));
+    _qlState = { parsed: null, fromProp: [] };
+    qlApplyDefaults(true);
+    requestAnimationFrame(() => m.classList.add('open'));
+  }
+  let _qlState = { parsed: null, fromProp: [] };
+  const _qlG = id => document.getElementById('ql-' + id);
+  const _qlV = id => ((_qlG(id) || {}).value || '').trim();
+  const _qlProp = () => activeRecords('properties').find(p => p.id === _qlV('prop')) || null;
+
+  // Fill empty money fields from the property record (rent/deposit/cleaning; pet fee only when pets).
+  // force=true (property changed) replaces values that came from the previous property.
+  function qlApplyDefaults(force) {
+    const p = _qlProp(); if (!p) return;
+    const parsed = (_qlState.parsed) || {};
+    const map = { rent: ['rent', p.monthlyRate], security: ['security', p.securityDeposit], cleaning: ['cleaning', p.cleaningFee] };
+    const hasPets = _qlV('pets') && _qlV('pets') !== 'No pets';
+    map.petfee = ['petFee', hasPets ? p.petDeposit : ''];
+    Object.keys(map).forEach(id => {
+      const el = _qlG(id); if (!el) return;
+      const parsedVal = parsed[map[id][0]];
+      const wasDefault = _qlState.fromProp.includes(id);
+      if (parsedVal) return;                                   // message wins
+      if (el.value && !wasDefault) return;                     // user typed it — never overwrite
+      const v = map[id][1] ? parseFloat(String(map[id][1]).replace(/[^0-9.]/g, '')) : NaN;
+      el.value = isNaN(v) ? '' : v.toFixed(2);
+      _qlState.fromProp = _qlState.fromProp.filter(x => x !== id);
+      if (el.value) _qlState.fromProp.push(id);
+    });
+    if (!hasPets && _qlG('petfee') && !parsed.petFee) { _qlG('petfee').value = ''; _qlState.fromProp = _qlState.fromProp.filter(x => x !== 'petfee'); }
+    qlCheckWarnings();
+  }
+
+  function qlFill() {
+    const text = _qlV('text');
+    if (!text) { showToast('Paste the booking details first'); return; }
+    const r = hmlParseLeaseText(text);
+    _qlState.parsed = r;
+    const set = (id, v) => { const el = _qlG(id); if (el && v !== undefined && v !== null && v !== '') el.value = v; };
+    const p0 = r.people[0] || {}, p1 = r.people[1] || {};
+    ['first','last','cofirst','colast'].forEach(id => { const el = _qlG(id); if (el) el.value = ''; });
+    set('first', p0.first); set('last', p0.last);
+    set('cofirst', p1.first); set('colast', p1.last);
+    set('email', r.emails[0]); set('phone', r.phones[0]);
+    set('start', r.start); set('end', r.end);
+    set('rent', r.rent); set('security', r.security); set('cleaning', r.cleaning); set('petfee', r.petFee);
+    if (r.pets) { _qlG('pets').value = r.pets; set('petdesc', r.petDesc); }
+    _qlState.fromProp = _qlState.fromProp.filter(id => !({rent:r.rent,security:r.security,cleaning:r.cleaning,petfee:r.petFee})[id]);
+    qlApplyDefaults(false);
+    showToast('Fields filled — review before creating');
+  }
+
+  function _qlOverlaps(p, start, end, excludeId) {
+    if (!p || !start || !end) return [];
+    return activeRecords('leases').filter(l => l.propertyId === p.id && l.id !== excludeId &&
+      ['active','prospect','extended'].includes(l.status) && l.startDate && l.endDate &&
+      l.startDate <= end && start <= l.endDate);
+  }
+  function _qlExisting(p) {
+    const fn = _qlV('first').toLowerCase(), ln = _qlV('last').toLowerCase();
+    if (!p || !fn) return null;
+    return activeRecords('leases').find(l => l.propertyId === p.id &&
+      (l.firstName || '').trim().toLowerCase() === fn && (l.lastName || '').trim().toLowerCase() === ln) || null;
+  }
+  function qlCheckWarnings() {
+    const box = document.getElementById('ql-notes'); if (!box) return;
+    const p = _qlProp(); const notes = [];
+    const fmt = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '?';
+    if (_qlState.fromProp.length) {
+      const names = { rent: 'rent', security: 'security deposit', cleaning: 'cleaning fee', petfee: 'pet fee' };
+      notes.push('<div style="color:var(--muted);">Filled from ' + escAttr(p ? p.name : 'property') + ': ' + _qlState.fromProp.map(x => names[x]).join(', ') + '</div>');
+    }
+    const rf = (_qlState.parsed && _qlState.parsed.refundable) || {};
+    const ref = { cleaning: ['cleaningFeeRefundable', 'Cleaning fee'], pet: ['petDepositRefundable', 'Pet fee'] };
+    Object.keys(ref).forEach(k => {
+      if (!p || rf[k] === undefined || !!p[ref[k][0]] === rf[k]) return;
+      notes.push('<label style="display:flex;gap:8px;align-items:flex-start;color:var(--amber);margin-top:4px;"><input type="checkbox" class="ql-fix-ref" data-key="' + ref[k][0] + '" data-val="' + (rf[k] ? '1' : '0') + '" checked style="margin-top:2px;width:16px;height:16px;accent-color:var(--navy);" />'
+        + '<span>Message says ' + ref[k][1].toLowerCase() + ' is <strong>' + (rf[k] ? 'refundable' : 'non-refundable') + '</strong>; ' + escAttr(p.name) + ' is set to ' + (p[ref[k][0]] ? 'refundable' : 'non-refundable') + '. Update the property to match (applies to this lease)</span></label>');
+    });
+    if (rf.security === false) notes.push('<div style="color:var(--amber);">⚠ Message calls the security deposit non-refundable; the lease always treats it as refundable.</div>');
+    const ex = _qlExisting(p);
+    if (ex) notes.push('<div style="color:var(--amber);">⚠ ' + escAttr((ex.firstName + ' ' + ex.lastName).trim()) + ' already has a lease here (' + fmt(ex.startDate) + ' – ' + fmt(ex.endDate) + ', ' + ex.status + '). Creating will <strong>update that record</strong> instead of adding a duplicate.</div>');
+    _qlOverlaps(p, _qlV('start'), _qlV('end'), ex ? ex.id : null).forEach(l => {
+      notes.push('<div style="color:var(--red);">⚠ Dates overlap ' + escAttr(((l.firstName || '') + ' ' + (l.lastName || '')).trim()) + ' (' + l.status + ', ' + fmt(l.startDate) + ' – ' + fmt(l.endDate) + ')</div>');
+    });
+    if (p && p.isPrimaryResidence) notes.push('<div style="color:var(--amber);">⚠ ' + escAttr(p.name) + ' is your primary residence.</div>');
+    box.innerHTML = notes.join('');
+  }
+
+  function qlCreate() {
+    const p = _qlProp();
+    if (!p) { showToast('Choose a property'); return; }
+    if (!_qlV('first') && !_qlV('last')) { showToast('Tenant name is required'); return; }
+    if (!_qlV('start') || !_qlV('end')) { showToast('Check-in and check-out dates are required'); return; }
+    if (_qlV('end') < _qlV('start')) { showToast('Check-out is before check-in'); return; }
+    // Refundability fixes the user left ticked → property record (lease tokens read these flags)
+    const fixes = {};
+    document.querySelectorAll('#ql-notes .ql-fix-ref').forEach(c => { if (c.checked) fixes[c.dataset.key] = c.dataset.val === '1'; });
+    if (Object.keys(fixes).length) upsert('properties', Object.assign({}, p, fixes));
+    const ex = _qlExisting(p);
+    const hasCo = !!(_qlV('cofirst') || _qlV('colast'));
+    const record = Object.assign({}, ex || {}, {
+      id:              ex ? ex.id : genId(),
+      propertyId:      p.id,
+      firstName:       _qlV('first'),
+      lastName:        _qlV('last'),
+      email:           _qlV('email'),
+      phone:           _qlV('phone'),
+      coTenantFirst:   _qlV('cofirst'),
+      coTenantLast:    _qlV('colast'),
+      coTenantInclude: hasCo && !!(_qlG('coinclude') || {}).checked,
+      pets:            _qlV('pets') || 'No pets',
+      petDesc:         _qlV('pets') && _qlV('pets') !== 'No pets' ? _qlV('petdesc') : '',
+      startDate:       _qlV('start'),
+      endDate:         _qlV('end'),
+      monthlyRent:     _qlV('rent'),
+      securityDeposit: _qlV('security'),
+      cleaningDeposit: _qlV('cleaning'),
+      petDeposit:      _qlV('pets') && _qlV('pets') !== 'No pets' ? _qlV('petfee') : '0.00',
+      platform:        (ex && ex.platform) || 'Direct',
+      status:          ex ? ex.status : 'prospect',
+      createdAt:       ex ? ex.createdAt : now(),
+    });
+    upsert('leases', record);
+    try { if (typeof renderTenantsTab === 'function') renderTenantsTab(); } catch (e) {}
+    try { renderDashboard(); } catch (e) {}
+    closeDynModal('hml-quick-lease-modal');
+    const name = (record.firstName + ' ' + record.lastName).trim();
+    showToast((ex ? '✅ Lease updated for ' : '✅ Prospect lease created for ') + name);
+    // Open the builder on this lease, fresh clauses, straight to Preview
+    setTimeout(() => {
+      if (typeof window.lbStartFor === 'function') window.lbStartFor(p.id, record.id, 'preview');
+    }, 250);
+  }
+
+  // Screenshot → Claude vision → normalized lines in the textarea → same parser
+  function qlReadImage(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    const st = document.getElementById('ql-img-status');
+    const say = (t, c) => { if (st) { st.textContent = t; st.style.color = c || 'var(--muted)'; } };
+    if (!file) return;
+    const apiKey = localStorage.getItem('hml_lb_apikey') || '';
+    if (!apiKey) { say('Add your API key in Settings → AI Features to read screenshots. Or on iPhone, long-press the text in the screenshot (Live Text) → Copy, then paste above.', 'var(--amber)'); return; }
+    if (window.location.protocol === 'file:') { say('Open via the GitHub Pages URL — file:// blocks API calls.', 'var(--amber)'); return; }
+    say('Reading screenshot…');
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, 1568 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      const b64 = c.toDataURL('image/jpeg', 0.85).split(',')[1];
+      const prompt = 'This image is a message describing a rental booking. Extract the details and reply with ONLY these lines, '
+        + 'omitting any line you cannot find, with no other text:\n'
+        + 'Tenant: <full name>\nCo-tenant: <full name>\nPets: <description, or None>\nEmail: <email>\nPhone: <phone>\n'
+        + 'Check in: <M/D/YYYY>\nCheck out: <M/D/YYYY>\nRent: $<amount>/month\nPet fee: $<amount> <refundable or non refundable>\n'
+        + 'Cleaning fee: $<amount> <refundable or non refundable>\nSecurity deposit: $<amount> <refundable or non refundable>';
+      fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({ model: getAiModel(), max_tokens: 400, messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
+          { type: 'text', text: prompt } ] }] })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { say('✗ ' + (data.error.message || 'API error'), 'var(--red)'); return; }
+        const txt = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+        if (!txt) { say('⚠️ Nothing readable found in that image', 'var(--amber)'); return; }
+        const ta = _qlG('text');
+        ta.value = (ta.value ? ta.value.trim() + '\n' : '') + txt;
+        say('✓ Read from screenshot — check the text, then the fields', 'var(--green)');
+        qlFill();
+      })
+      .catch(() => say('✗ Network error — check connection', 'var(--red)'));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); say('✗ Could not open that image', 'var(--red)'); };
+    img.src = url;
+  }
+  window.openQuickLease  = openQuickLease;
+  window.qlFill          = qlFill;
+  window.qlApplyDefaults = qlApplyDefaults;
+  window.qlCheckWarnings = qlCheckWarnings;
+  window.qlCreate        = qlCreate;
+  window.qlReadImage     = qlReadImage;
 
   /* ── SMART POPULATE ────────────────────────────────────────────
      When the user confirms a value for category, vendor, or description,
@@ -7666,6 +8157,7 @@ Respond ONLY in this JSON format, no markdown, no preamble:
       + '<div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">'
       + (historyRows || '<div style="padding:16px;text-align:center;color:var(--muted);font-size:0.875rem;">No previous leases</div>')
       + '</div>'
+      + '<button class="btn btn-outline btn-full" style="margin-bottom:8px;" onclick="openQuickLease(currentProperty && currentProperty.id)">⚡ Quick Lease from a message</button>'
       + '<button class="btn btn-primary btn-full" onclick="openLeaseForm(null)">+ Add New Lease</button>';
   }
 
@@ -11484,6 +11976,7 @@ window.lbCascadeLease = function() {
       var el = document.getElementById(id); if (el) el.value = '';
     });
     LB._prefilledLeaseId = leaseId;
+    LB.agreementId = null; // re-set below only if THIS lease has a saved draft
   }
 
   // Pre-fill payment address — split into street/city/state/zip
@@ -11529,6 +12022,13 @@ window.lbCascadeLease = function() {
    'petCount:lb-pet-count','petTypes:lb-pet-types','petWeight:lb-pet-weight'].forEach(function(pair) {
     var kv = pair.split(':'); set(kv[1], pick(kv[0]));
   });
+  // The lease record's own pets beat property defaults (e.g. tenant has 1 cat; property default says '2 Dogs').
+  // A saved draft for THIS lease still wins — the user may have edited it there.
+  if (!lastAgreement && lease.pets && lease.pets !== 'No pets') {
+    var _lpc = (String(lease.pets).match(/\d+/) || [''])[0];
+    if (_lpc) { var _pcEl = document.getElementById('lb-pet-count'); if (_pcEl) _pcEl.value = _lpc; }
+    if (lease.petDesc) { var _ptEl = document.getElementById('lb-pet-types'); if (_ptEl) _ptEl.value = lease.petDesc; }
+  }
   if (lastAgreement) {
     if (bf.petsAllowed && petsAllowedEl) petsAllowedEl.value = bf.petsAllowed;
     // This lease's own overrides; property values fill whatever is still empty below
@@ -12009,6 +12509,24 @@ function lbClauseNum(c, list) {
   return idx >= 0 ? String(idx + 1) : String((c && c.num) || '');
 }
 window.lbClauseNum = lbClauseNum;
+// 'street' + city/state/zip, skipping parts the street line already contains -> '739 W. University Dr, Mesa, AZ 85201'
+function lbJoinAddress(street, city, state, zip) {
+  var out = String(street || '').trim().replace(/[,\s]+$/, '');
+  var has = function(part) {
+    if (!part) return true;
+    var esc = String(part).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('(^|[\\s,])' + esc + '($|[\\s,.])', 'i').test(out);
+  };
+  if (city  && !has(city))  out += (out ? ', ' : '') + city;
+  if (state && !has(state)) out += (out ? ', ' : '') + String(state).toUpperCase();
+  if (zip   && !has(zip))   out += (out ? ' ' : '') + zip;
+  return out;
+}
+// Normalize a one-line address: '306 E Halifax St, Mesa, AZ, 85201' -> '306 E Halifax St, Mesa, AZ 85201'
+function lbTidyAddress(a) {
+  var sp = lbSplitAddress(a);
+  return sp.street ? lbJoinAddress(sp.street, sp.city, sp.state, sp.zip) : String(a || '');
+}
 // Split '306 E Halifax St, Mesa, AZ, 85201' -> {street, city, state, zip}
 function lbSplitAddress(a) {
   var out = { street: '', city: '', state: '', zip: '' };
@@ -12035,9 +12553,9 @@ function lbRememberTerms() {
     var g = function(id){ return String((document.getElementById(id)||{}).value || '').trim(); };
     var map = { dueDay:'lb-due-day', lateDays:'lb-late-days', lateFee:'lb-late-fee', nsfFee:'lb-nsf-fee',
                 earlyFee:'lb-early-fee', earlyNotice:'lb-early-notice' };
-    if (g('lb-pets-allowed') === 'yes') {
-      map.petCount = 'lb-pet-count'; map.petTypes = 'lb-pet-types'; map.petWeight = 'lb-pet-weight';
-    }
+    // Pet count/types are NOT remembered: since v4.2.8 they come from the tenant's lease record,
+    // so writing them back would turn one tenant's '1 Cat' into the property's pet policy.
+    // Pet policy defaults are edited in Property → Info → Lease Term Defaults.
     var ld = Object.assign({}, prop.leaseDefaults || {}), upd = {}, changed = false;
     Object.keys(map).forEach(function(k) { var v = g(map[k]); if (v && v !== ld[k]) { ld[k] = v; changed = true; } });
     if (changed) upd.leaseDefaults = ld;
@@ -12066,9 +12584,10 @@ function lbGetTokens() {
   // Resolved values — prefer linked record, fall back gracefully
   var landlordName    = owner.name    || '___________';
   var landlordPhone   = owner.phone   || '___________';
-  var landlordAddress = owner.address || '___________';
+  var landlordAddress = owner.address ? lbTidyAddress(owner.address) : '___________';
   var landlordEmail   = owner.email   || '___________';
-  var propAddress     = prop    ? (prop.address||'___________')    : '___________';
+  // Full legal address — street plus city/state/zip from the property record (VA Beach House stores them separately)
+  var propAddress     = prop    ? (lbJoinAddress(prop.address, prop.city, prop.state, prop.zip) || '___________') : '___________';
   var bedrooms        = prop    ? (prop.bedrooms||'_')             : '_';
   var bathrooms       = prop    ? (prop.bathrooms||'_')            : '_';
   var tenantFirst     = lease   ? (lease.firstName||'')            : '';
@@ -12237,6 +12756,27 @@ window.lbNewDraft = function() {
   if (lbl) lbl.textContent = 'Select a property to begin';
   if (window.lbToast) window.lbToast('📋 New draft started');
   }); // end lbConfirm callback
+};
+
+// Open the builder straight onto a property + lease (used by Quick Lease). Fresh draft: default
+// clauses, no carried-over agreement — like New Draft without the confirm.
+window.lbStartFor = function(propId, leaseId, step) {
+  window.openLeaseBuilder();
+  setTimeout(function() {
+    LB.clauses          = [];
+    LB.linkedLeaseId    = null;
+    LB.linkedPropertyId = null;
+    LB.agreementId      = null;
+    LB.customState      = null;
+    LB.payInFull        = null;
+    LB._prefilledLeaseId = null;
+    lbInitClauses();
+    var ps = document.getElementById('lb-prop-select');
+    if (ps) { ps.value = propId; lbCascadeProperty(); }
+    var ls = document.getElementById('lb-lease-select');
+    if (ls) { ls.value = leaseId; lbCascadeLease(); }
+    if (LB.linkedLeaseId) lbGoStep(step || 'preview');
+  }, 180);
 };
 
 /* ── CLAUSE RENDER ───────────────────────────────────────────── */
@@ -12485,7 +13025,7 @@ window.lbRenderPreview = function() {
     + '<h1>'+stateVal+' Residential Lease Agreement</h1>'
     + '<h2></h2>'
     + '<p>This Lease Agreement (the "Agreement") is made and entered on '
-    + effDate+' by and between <strong>'+landlordName+'</strong> (the "Landlord") and the following tenant:</p>'
+    + (tokens['{{START_DATE_LONG}}'] || effDate)+' by and between <strong>'+landlordName+'</strong> (the "Landlord") and the following tenant:</p>'
     + '<p style="text-align:center;font-weight:600;font-size:1rem;">'+tenantFull+'</p>'
     + '<p style="text-align:center;">(the "Tenant")</p>'
     + '<p>Subject to the terms and conditions stated below the parties agree as follows:</p>'
@@ -12964,7 +13504,7 @@ window.lbExportDocx = function() {
   var rtf = '{\\rtf1\\ansi\\deff0\n{\\fonttbl{\\f0\\froman Times New Roman;}}\n{\\colortbl;\\red27\\green43\\blue75;}\n\\widowctrl\\hyphauto\n';
   rtf += para(stateVal.toUpperCase() + ' RESIDENTIAL LEASE AGREEMENT', true, 14);
   rtf += para('', false, 11);
-  rtf += para('This Lease Agreement (the "Agreement") is made and entered on ' + effDate + ' by and between ' + landlordName + ' (the "Landlord") and:', false, 11);
+  rtf += para('This Lease Agreement (the "Agreement") is made and entered on ' + (tokens['{{START_DATE_LONG}}'] || effDate) + ' by and between ' + landlordName + ' (the "Landlord") and:', false, 11);
   rtf += para('', false, 11);
   rtf += para(tenantFull + ' (the "Tenant")', true, 12);
   rtf += para('', false, 11);
@@ -13037,7 +13577,7 @@ window.lbExportTxt = function() {
 
   var lines = [
     stateVal.toUpperCase() + ' RESIDENTIAL LEASE AGREEMENT', '',
-    'This Lease Agreement (the "Agreement") is made and entered on ' + effDate,
+    'This Lease Agreement (the "Agreement") is made and entered on ' + (tokens['{{START_DATE_LONG}}'] || effDate),
     'by and between ' + landlordName + ' (the "Landlord") and:',
     '', tenantFull + ' (the "Tenant")', '',
     'Subject to the terms and conditions stated below the parties agree as follows:', '',
@@ -13255,7 +13795,7 @@ window.lbExportPdf = function() {
   var lines = [
     { text: stateVal.toUpperCase() + ' RESIDENTIAL LEASE AGREEMENT', bold: true,  size: 14, center: true  },
     { text: '', size: 11 },
-    { text: 'This Lease Agreement (the "Agreement") is made and entered on ' + effDate, size: 11 },
+    { text: 'This Lease Agreement (the "Agreement") is made and entered on ' + (tokens['{{START_DATE_LONG}}'] || effDate), size: 11 },
     { text: 'by and between ' + landlordName + ' (the "Landlord") and:', size: 11 },
     { text: '', size: 11 },
     { text: tenantFull + ' (the "Tenant")', bold: true, size: 12 },
@@ -13350,6 +13890,11 @@ window.lbExportPdf = function() {
   function pdfStr(s) {
     return s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/[^\x20-\x7E]/g, function(c) {
       var code = c.charCodeAt(0);
+      // WinAnsiEncoding slots for characters outside Latin-1 (v4.2.8: bullets were printing as '?')
+      var WIN = { 0x2022:0x95, 0x2018:0x91, 0x2019:0x92, 0x201C:0x93, 0x201D:0x94, 0x2013:0x96, 0x2014:0x97,
+                  0x2026:0x85, 0x20AC:0x80, 0x2122:0x99, 0x00A0:0x20, 0x2010:0x2D, 0x2011:0x2D, 0x2212:0x2D, 0x00D7:0xD7 };
+      if (WIN[code]) code = WIN[code];
+      if (code === 0x20) return ' ';
       return code < 256 ? ('\\' + code.toString(8).padStart(3,'0')) : '?';
     });
   }
@@ -13554,6 +14099,7 @@ window.openLeaseBuilder = function() {
         '<div class="lb-panel active" id="lb-panel-parties">',
 
           // AI key — moved to bottom, collapsed by default
+          '<button class="btn btn-outline btn-sm" style="width:100%;margin-bottom:12px;" onclick="openQuickLease(LB.linkedPropertyId)">⚡ New tenant from a message (paste or screenshot)</button>',
           '<div class="lb-section-head" style="margin-top:0;">Select Lease</div>',
 
           // Property cascade → Lease cascade
@@ -13884,7 +14430,7 @@ function lbBuildLeasePayload() {
     state:        stateVal,
     landlord:     tokens['{{LANDLORD_NAME}}'],
     tenant:       tokens['{{TENANT_FULL_NAME}}'],
-    effDate:      tokens['{{EFF_DATE}}'],
+    effDate:      tokens['{{START_DATE_LONG}}'] || tokens['{{EFF_DATE}}'],
     rent:         rentAmt,
     secDep:       secDep,
     cleanDep:     cleanDep,
@@ -14724,7 +15270,7 @@ function lbShowShareResult(url, tenantName) {
 
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 var DK_KEY        = 'hml_devlog';        // localStorage key — isolated from app data
-var DK_APP_VER    = 'Homemade Lane v4.2.7';
+var DK_APP_VER    = 'Homemade Lane v4.2.8';
 // Single source of truth — badge reads this at init; update only DK_APP_VER for future releases
 (function(){ var b=document.getElementById('hml-build-ref'); if(b) b.textContent='v'+DK_APP_VER.replace('Homemade Lane v',''); })();
 var DK_MAX_RECENT = 3;                   // entries shown in Log tab preview
@@ -15493,7 +16039,7 @@ var DKM_ROWS = [
   {id:178,form:'FINANCES', object:'Property chip filter row',  type:'BUTTON',trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'togglePropFilter(propId) / clearPropFilterAll() — multi-prop filter above search bar', desired:'',notes:'TXN_STATE.propertyIds Set; overridden by single propertyId drill-down from property detail',domHint:'#prop-filter-row,[onclick*=togglePropFilter]'},
   {id:179,form:'FINANCES', object:'+ Income button',           type:'BUTTON',trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'openTransactionForm(\"modal-rent\") — green button in transactions tab', desired:'',notes:'Split from single + Add button in Session 9',domHint:'[onclick*=modal-rent]'},
   {id:180,form:'FINANCES', object:'+ Expense button',          type:'BUTTON',trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'openTransactionForm(\"modal-expense\") — amber button in transactions tab', desired:'',notes:'Split from single + Add button in Session 9',domHint:'[onclick*=modal-expense]'},
-  {id:181,form:'FINANCES', object:'Duplicate txn button',      type:'BUTTON',trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'duplicateTxn(id) — copies record, appends (copy), opens in edit mode after 180ms', desired:'',notes:'Located in transaction detail drawer, between Edit and Delete',domHint:'[onclick*=duplicateTxn]'},
+  {id:181,form:'FINANCES', object:'Duplicate txn button',      type:'BUTTON',trigger:'tap',   stores:'yes',status:'ok',     priority:3, current:'duplicateTxn(id) — opens a prefilled unsaved form (no (copy) suffix; receipt/SR link not copied)', desired:'',notes:'Located in transaction detail drawer, between Edit and Delete',domHint:'[onclick*=duplicateTxn]'},
 
   // ── SETTINGS (additions — Sessions 8–9) ──────────────────────────
   {id:113,form:'SETTINGS', object:'Expense Categories row',    type:'BUTTON',trigger:'tap',   stores:'no', status:'ok',     priority:3, current:'openModal(\"modal-categories\") — edit Sch. E / Sch. C category lists', desired:'',notes:'modal-categories now at body level (iOS-safe)',domHint:'[onclick*=modal-categories]'},
