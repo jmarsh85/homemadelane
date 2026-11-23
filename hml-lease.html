@@ -197,20 +197,25 @@
       return '<div class="clause"><p><span class="clause-title">' + c.num + '. ' + c.title + '.</span> ' + text + '</p></div>';
     }).join('');
 
-    // Receipt rows
+    // Receipt rows — v4.2.8b payloads carry data.moveIn {rows,total}; older links fall back below
     var receiptRows = '';
-    if (data.proratedAmt && data.proratedAmt > 0) {
+    var mi = data.moveIn && Array.isArray(data.moveIn.rows) ? data.moveIn : null;
+    if (mi) {
+      mi.rows.forEach(function(r) {
+        receiptRows += '<tr><td>' + r.label + ':</td><td>' + fmt(r.amount) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+      });
+    } else if (data.proratedAmt && data.proratedAmt > 0) {
       receiptRows +=
-        '<tr><td>Prorated First Month (' + data.proratedNote + '):</td><td>' + fmt(data.proratedAmt) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>' +
-        '<tr><td>Second Month Rent:</td><td>' + fmt(data.rent) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+        '<tr><td>Prorated First Month (' + data.proratedNote + '):</td><td>' + fmt(data.proratedAmt) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
     } else {
       receiptRows += '<tr><td>First Month Rent:</td><td>' + fmt(data.rent) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
     }
-    if (data.secDep)   receiptRows += '<tr><td>Security Deposit:</td><td>' + fmt(data.secDep) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
-    if (data.cleanDep) receiptRows += '<tr><td>' + (data.cleanLabel || 'Cleaning Fee') + ':</td><td>' + fmt(data.cleanDep) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
-    if (data.petFee)   receiptRows += '<tr><td>' + (data.petLabel || 'Pet Fee') + ':</td><td>' + fmt(data.petFee) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+    if (!mi && data.secDep)   receiptRows += '<tr><td>Security Deposit:</td><td>' + fmt(data.secDep) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+    if (!mi && data.cleanDep) receiptRows += '<tr><td>' + (data.cleanLabel || 'Cleaning Fee') + ':</td><td>' + fmt(data.cleanDep) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+    if (!mi && data.petFee)   receiptRows += '<tr><td>' + (data.petLabel || 'Pet Fee') + ':</td><td>' + fmt(data.petFee) + '</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
 
-    var totalDep = (parseFloat(data.secDep||0) + parseFloat(data.cleanDep||0) + parseFloat(data.petFee||0)).toFixed(2);
+    var totalDep = mi ? parseFloat(mi.total || 0).toFixed(2)
+      : (parseFloat(data.secDep||0) + parseFloat(data.cleanDep||0) + parseFloat(data.petFee||0)).toFixed(2);
     if (data.payInFull) {
       receiptRows += '<tr><td style="color:#2e7d32;font-weight:700;">Move-in Total (Paid in Full):</td><td style="color:#2e7d32;font-weight:700;">' + fmt(data.payInFull.total) + '</td><td></td><td></td></tr>';
     } else {
@@ -221,13 +226,16 @@
     doc.innerHTML =
       '<h1>' + (data.state || '').toUpperCase() + ' RESIDENTIAL LEASE AGREEMENT</h1>' +
       '<h2>Prepared via Homemade Lane &bull; ' + (data.sharedAt ? new Date(data.sharedAt).toLocaleDateString() : '') + '</h2>' +
-      '<p>This Lease Agreement (the &ldquo;Agreement&rdquo;) is made and entered on <strong>' + (data.effDate || '___________') + '</strong> by and between <strong>' + (data.landlord || '___________') + '</strong> (the &ldquo;Landlord&rdquo;) and the following tenant:</p>' +
+      (data.effective
+        ? '<p>This Lease Agreement (the &ldquo;Agreement&rdquo;) is made and entered into by and between <strong>' + (data.landlord || '___________') + '</strong> (the &ldquo;Landlord&rdquo;) and the following tenant:</p>'
+        : '<p>This Lease Agreement (the &ldquo;Agreement&rdquo;) is made and entered on <strong>' + (data.effDate || '___________') + '</strong> by and between <strong>' + (data.landlord || '___________') + '</strong> (the &ldquo;Landlord&rdquo;) and the following tenant:</p>') +
       '<p style="text-align:center;font-weight:600;font-size:12pt;">' + (data.tenant || '___________') + '</p>' +
       '<p style="text-align:center;">(the &ldquo;Tenant&rdquo;)</p>' +
+      (data.effective ? '<p>' + data.effective + '</p>' : '') +
       '<p>Subject to the terms and conditions stated below the parties agree as follows:</p>' +
       clauseHtml +
       '<div class="sig-block">' +
-        '<p style="font-weight:600;margin-bottom:0;">Receipt of Funds</p>' +
+        '<p style="font-weight:600;margin-bottom:0;">Receipt of Move-in Funds</p>' +
         '<table class="receipt-table"><tbody>' + receiptRows + '</tbody></table>' +
         '<p style="font-weight:600;margin-top:14pt;">IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement as of the Effective Date.</p>' +
         '<div class="sig-row">' +
