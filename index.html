@@ -12398,7 +12398,7 @@ var LB_CLAUSE_DEFS = [
   { id:'c5',  num:'5',  title:'Rent',                  required:true,
     text:'Tenant will pay to Landlord rent in the amount of ${{RENT}} (the "Rent"), payable in advance on the {{DUE_DAY_ORD}} day of each month, and is delinquent on the next day. If that day falls on a weekend or legal holiday, the rent is due on the next business day. There will be no rent increases through the initial term of the lease. Landlord may increase the rent that will be paid during any month-to-month renewal period by providing at least 30 days written notice to Tenant.\n\nPayments should be sent to: {{PAY_ADDRESS}}\n\nAcceptable forms of payment: Personal check, Money order, Cashier\'s check, Direct deposit, Paypal, Zelle.\n\nRent payments for any partial month will be pro-rated by dividing the monthly rent by the number of days in that month and multiplying by the number of days of occupancy.' },
   { id:'c6',  num:'6',  title:'Security Deposit',      required:true,
-    text:'At the time of signing this Agreement, Tenant must pay to Landlord the following amounts due at signing:\n\n\u2022 Security Deposit: ${{SEC_DEP}}\n\u2022 {{CLEANING_FEE_LABEL}}: ${{CLEAN_DEP}}\n\u2022 {{PET_FEE_LABEL}}: ${{PET_FEE}}\n\nTotal due at signing: ${{TOTAL_DEP}}\n\nThe Security Deposit will be returned to the Tenant within forty-five (45) days after the tenancy ends, along with an itemized accounting for any deductions. The {{CLEANING_FEE_LABEL}} is {{CLEAN_DEP_REFUNDABLE}}. The {{PET_FEE_LABEL}} is {{PET_FEE_REFUNDABLE}}.' },
+    text:'At the time of signing this Agreement, Tenant must pay to Landlord the following amounts due at signing:\n\n\u2022 Security Deposit: ${{SEC_DEP}}\n\u2022 {{CLEANING_FEE_LABEL}}: ${{CLEAN_DEP}}\n\u2022 {{PET_FEE_LABEL}}: ${{PET_FEE}}\n\nTotal deposits and fees due at signing: ${{TOTAL_DEP}}\n\nThe Security Deposit and any other amount marked refundable above will be returned to the Tenant within forty-five (45) days after the tenancy ends, along with an itemized accounting for any deductions. Amounts marked non-refundable will not be returned.' },
   { id:'c7',  num:'7',  title:'Non-Sufficient Funds',  required:false,
     text:'Tenant will be charged a monetary fee of ${{NSF_FEE}} as reimbursement of the expenses incurred by Landlord for each check that is returned to Landlord for lack of sufficient funds. Landlord and Tenant agree that three (3) returned checks in any 12 month period constitutes frequent return of checks due to insufficient funds and may be considered a just cause for eviction.' },
   { id:'c8',  num:'8',  title:'Late Payments',         required:false,
@@ -12540,6 +12540,44 @@ function lbSplitAddress(a) {
   out.street = parts.join(', ');
   return out;
 }
+
+// Preamble wording (v4.2.8b): the lease is dated by signature + funds received, not move-in day
+var LB_PREAMBLE_OPEN = 'This Lease Agreement (the "Agreement") is made and entered into by and between ';
+var LB_EFFECTIVE     = 'This Agreement becomes effective (the "Effective Date") once it has been signed by both Landlord and Tenant and Landlord has received the move-in funds listed in the Receipt at the end of this Agreement.';
+
+// Every move-in amount in one place, so preview/.doc/.txt/.pdf/share all list and total the same rows.
+// rows: [{label, amount}] — rent row(s) first, then deposit and non-zero fees. total = sum of rows.
+function lbMoveIn(tokens) {
+  tokens = tokens || lbGetTokens();
+  var getCol  = window.lbGetCollection || function(){ return []; };
+  var lease   = LB.linkedLeaseId ? getCol('leases').find(function(l){ return l.id === LB.linkedLeaseId; }) : null;
+  var rent    = parseFloat(tokens['{{RENT}}'] || 0) || 0;
+  var rows = [], proratedAmt = 0, proratedNote = '';
+  if (lease && lease.startDate) {
+    var sd = new Date(lease.startDate + 'T12:00:00');
+    if (sd.getDate() !== 1) {
+      var dim = new Date(sd.getFullYear(), sd.getMonth() + 1, 0).getDate();
+      var rem = dim - sd.getDate() + 1;
+      proratedAmt  = Math.round((rent / dim) * rem * 100) / 100;
+      proratedNote = rem + '/' + dim + ' days';
+    }
+  }
+  if (proratedAmt > 0) {
+    // Only the prorated partial month is collected at move-in; the first full month is due on the regular due day
+    rows.push({ label: 'Prorated First Month (' + proratedNote + ')', amount: proratedAmt });
+  } else {
+    rows.push({ label: 'First Month Rent', amount: rent });
+  }
+  var sec = parseFloat(tokens['{{SEC_DEP}}'] || 0) || 0;
+  var cln = parseFloat(tokens['{{CLEAN_DEP}}'] || 0) || 0;
+  var pet = parseFloat(tokens['{{PET_FEE}}'] || 0) || 0;
+  if (sec) rows.push({ label: 'Security Deposit', amount: sec });
+  if (cln) rows.push({ label: tokens['{{CLEANING_FEE_LABEL}}'] || 'Cleaning Fee', amount: cln });
+  if (pet) rows.push({ label: tokens['{{PET_FEE_LABEL}}'] || 'Pet Fee', amount: pet });
+  var total = Math.round(rows.reduce(function(n, r){ return n + r.amount; }, 0) * 100) / 100;
+  return { rows: rows, total: total, proratedAmt: proratedAmt, proratedNote: proratedNote };
+}
+window.lbMoveIn = lbMoveIn;
 
 // Remember last-used Step 2 terms on the property (property.leaseDefaults = single source of truth).
 // Physical facts (appliances) are owned by the property: seeded once, never overwritten from here.
@@ -12700,11 +12738,17 @@ function lbSubstitute(text) {
   ['{{RENT}}','{{LATE_FEE}}','{{SEC_DEP}}','{{CLEAN_DEP}}','{{TOTAL_DEP}}','{{PET_FEE}}','{{NSF_FEE}}','{{EARLY_FEE}}'].forEach(function(k) {
     text = text.split(k + '.00').join(k);
   });
+  // Legacy §6 wording (saved drafts): refundability was stated twice (label + sentence)
+  text = text.split('Total due at signing: ${{TOTAL_DEP}}').join('Total deposits and fees due at signing: ${{TOTAL_DEP}}');
+  text = text.split('The Security Deposit will be returned to the Tenant within forty-five (45) days after the tenancy ends, along with an itemized accounting for any deductions. The {{CLEANING_FEE_LABEL}} is {{CLEAN_DEP_REFUNDABLE}}. The {{PET_FEE_LABEL}} is {{PET_FEE_REFUNDABLE}}.')
+             .join('The Security Deposit and any other amount marked refundable above will be returned to the Tenant within forty-five (45) days after the tenancy ends, along with an itemized accounting for any deductions. Amounts marked non-refundable will not be returned.');
   // '{{DUE_DAY}}st' -> proper ordinal (2nd, 3rd, 15th …)
   text = text.split('{{DUE_DAY}}st').join('{{DUE_DAY_ORD}}');
   Object.keys(tokens).forEach(function(k) {
     text = text.split(k).join(tokens[k]);
   });
+  // A fee that doesn't apply (e.g. no pets) shouldn't print as a '• Pet Fee: $0.00' bullet
+  text = text.replace(/^\u2022 [^\n]*: \$0\.00\n?/gm, '');
   return text;
 }
 
@@ -13024,43 +13068,24 @@ window.lbRenderPreview = function() {
   el.innerHTML = statusBanner
     + '<h1>'+stateVal+' Residential Lease Agreement</h1>'
     + '<h2></h2>'
-    + '<p>This Lease Agreement (the "Agreement") is made and entered on '
-    + (tokens['{{START_DATE_LONG}}'] || effDate)+' by and between <strong>'+landlordName+'</strong> (the "Landlord") and the following tenant:</p>'
+    + '<p>' + LB_PREAMBLE_OPEN + '<strong>'+landlordName+'</strong> (the "Landlord") and the following tenant:</p>'
     + '<p style="text-align:center;font-weight:600;font-size:1rem;">'+tenantFull+'</p>'
     + '<p style="text-align:center;">(the "Tenant")</p>'
+    + '<p>' + LB_EFFECTIVE + '</p>'
     + '<p>Subject to the terms and conditions stated below the parties agree as follows:</p>'
     + clauseHtml
     + '<div class="lb-sig-block">'
-      + '<h2 style="text-align:left;margin-bottom:12px;font-size:0.9rem;color:var(--navy);text-transform:none;letter-spacing:0;">Receipt</h2>'
+      + '<h2 style="text-align:left;margin-bottom:12px;font-size:0.9rem;color:var(--navy);text-transform:none;letter-spacing:0;">Receipt of Move-in Funds</h2>'
       + '<table class="lb-receipt-table">'
         + (function(){
-            // Prorated first month — computed independently from linked lease start date
-            var lease2 = LB.linkedLeaseId ? (window.lbGetCollection||function(){return[];})('leases').find(function(l){return l.id===LB.linkedLeaseId;}) : null;
-            var rentAmt = parseFloat(tokens['{{RENT}}']||0);
-            var proratedAmt = 0;
-            var proratedNote = '';
-            if (lease2 && lease2.startDate) {
-              var sd = new Date(lease2.startDate + 'T12:00:00');
-              var startDay = sd.getDate();
-              if (startDay !== 1) {
-                var dim = new Date(sd.getFullYear(), sd.getMonth()+1, 0).getDate();
-                var remDays = dim - startDay + 1;
-                proratedAmt = Math.round((rentAmt / dim) * remDays * 100) / 100;
-                proratedNote = ' ('+remDays+'/'+dim+' days)';
-              }
-            }
-            if (proratedAmt > 0) {
-              return '<tr><td>Prorated First Month'+proratedNote+':</td><td>$'+proratedAmt.toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>'
-                   + '<tr><td>Second Month Rent:</td><td>$'+rentAmt.toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
-            }
-            return '<tr><td>First Month Rent:</td><td>$'+rentAmt.toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+            var mi = lbMoveIn(tokens);
+            var html = mi.rows.map(function(r) {
+              return '<tr><td>'+r.label+':</td><td>$'+r.amount.toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>';
+            }).join('');
+            return html + (LB.payInFull
+              ? '<tr><td style="font-weight:700;color:var(--green);">Move-in Total (Paid in Full):</td><td style="font-weight:700;color:var(--green);">$'+LB.payInFull.total.toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>'
+              : '<tr><td style="font-weight:700;color:var(--navy);">Total Received:</td><td style="font-weight:700;">$'+mi.total.toFixed(2)+'</td><td></td><td></td></tr>');
           }())
-        + '<tr><td>Security Deposit:</td><td>$'+parseFloat(secDep).toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>'
-        + (parseFloat(cleanDep) ? '<tr><td>'+cleanLabel+':</td><td>$'+parseFloat(cleanDep).toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>' : '')
-        + (parseFloat(petFee)   ? '<tr><td>'+petLabel+':</td><td>$'+parseFloat(petFee).toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>' : '')
-        + (LB.payInFull
-            ? '<tr><td style="font-weight:700;color:var(--green);">Move-in Total (Paid in Full):</td><td style="font-weight:700;color:var(--green);">$'+LB.payInFull.total.toFixed(2)+'</td><td>Tenant ______</td><td>Landlord ______</td></tr>'
-            : '<tr><td style="font-weight:700;color:var(--navy);">Total Received:</td><td style="font-weight:700;">$'+totalDep+'</td><td></td><td></td></tr>')
       + '</table>'
       + (LB.payInFull ? '<p style="margin-top:8px;font-size:0.8125rem;color:var(--green);font-weight:600;">✓ Tenant is paying all move-in costs in full at signing.</p>' : '')
       + '<p style="margin-top:16px;font-weight:600;">IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement as of the Effective Date.</p>'
@@ -13504,9 +13529,11 @@ window.lbExportDocx = function() {
   var rtf = '{\\rtf1\\ansi\\deff0\n{\\fonttbl{\\f0\\froman Times New Roman;}}\n{\\colortbl;\\red27\\green43\\blue75;}\n\\widowctrl\\hyphauto\n';
   rtf += para(stateVal.toUpperCase() + ' RESIDENTIAL LEASE AGREEMENT', true, 14);
   rtf += para('', false, 11);
-  rtf += para('This Lease Agreement (the "Agreement") is made and entered on ' + (tokens['{{START_DATE_LONG}}'] || effDate) + ' by and between ' + landlordName + ' (the "Landlord") and:', false, 11);
+  rtf += para(LB_PREAMBLE_OPEN + landlordName + ' (the "Landlord") and:', false, 11);
   rtf += para('', false, 11);
   rtf += para(tenantFull + ' (the "Tenant")', true, 12);
+  rtf += para('', false, 11);
+  rtf += para(LB_EFFECTIVE, false, 11);
   rtf += para('', false, 11);
   rtf += para('Subject to the terms and conditions stated below the parties agree as follows:', false, 11);
   rtf += para('', false, 11);
@@ -13518,27 +13545,11 @@ window.lbExportDocx = function() {
   });
 
   (function(){
-    var lease2 = LB.linkedLeaseId ? (window.lbGetCollection||function(){return[];})('leases').find(function(l){return l.id===LB.linkedLeaseId;}) : null;
-    var rentAmt = parseFloat(tokens['{{RENT}}']||0);
-    var proratedAmt = 0;
-    if (lease2 && lease2.startDate) {
-      var sd2 = new Date(lease2.startDate+'T12:00:00');
-      var startDay2 = sd2.getDate();
-      if (startDay2 !== 1) {
-        var dim2 = new Date(sd2.getFullYear(), sd2.getMonth()+1, 0).getDate();
-        var rem2 = dim2 - startDay2 + 1;
-        proratedAmt = Math.round((rentAmt/dim2)*rem2*100)/100;
-        rtf += para('Prorated First Month ('+rem2+'/'+dim2+' days): $'+proratedAmt.toFixed(2), false, 11);
-        rtf += para('Second Month Rent:  $'+rentAmt.toFixed(2), false, 11);
-      }
-    }
-    if (!proratedAmt) rtf += para('First Month Rent:   $'+rentAmt.toFixed(2), false, 11);
+    var mi = lbMoveIn(tokens);
+    rtf += para('RECEIPT OF MOVE-IN FUNDS', true, 11);
+    mi.rows.forEach(function(r){ rtf += para(r.label + ':  $' + r.amount.toFixed(2), false, 11); });
+    rtf += para('Total Received:  $' + (LB.payInFull ? LB.payInFull.total : mi.total).toFixed(2), true, 11);
   }());
-  rtf += para('RECEIPT', true, 11);
-  rtf += para('Security Deposit:   $' + parseFloat(secDep).toFixed(2), false, 11);
-  if (parseFloat(cleanDep)) rtf += para(cleanLabel + ':  $' + parseFloat(cleanDep).toFixed(2), false, 11);
-  if (parseFloat(petFee))   rtf += para(petLabel   + ':  $' + parseFloat(petFee).toFixed(2),   false, 11);
-  rtf += para('Total Received:     $' + totalDep, true, 11);
   rtf += para('', false, 11);
   rtf += para('IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement as of the Effective Date.', false, 11);
   rtf += para('', false, 11);
@@ -13577,9 +13588,9 @@ window.lbExportTxt = function() {
 
   var lines = [
     stateVal.toUpperCase() + ' RESIDENTIAL LEASE AGREEMENT', '',
-    'This Lease Agreement (the "Agreement") is made and entered on ' + (tokens['{{START_DATE_LONG}}'] || effDate),
-    'by and between ' + landlordName + ' (the "Landlord") and:',
+    LB_PREAMBLE_OPEN + landlordName + ' (the "Landlord") and:',
     '', tenantFull + ' (the "Tenant")', '',
+    LB_EFFECTIVE, '',
     'Subject to the terms and conditions stated below the parties agree as follows:', '',
   ];
   LB.clauses.filter(function(c){ return c.included; }).forEach(function(c) {
@@ -13589,26 +13600,11 @@ window.lbExportTxt = function() {
   });
 
   (function(){
-    var lease2 = LB.linkedLeaseId ? (window.lbGetCollection||function(){return[];})('leases').find(function(l){return l.id===LB.linkedLeaseId;}) : null;
-    var rentAmt = parseFloat(tokens['{{RENT}}']||0);
-    var proratedAmt = 0;
-    if (lease2 && lease2.startDate) {
-      var sd2 = new Date(lease2.startDate+'T12:00:00');
-      if (sd2.getDate() !== 1) {
-        var dim2 = new Date(sd2.getFullYear(), sd2.getMonth()+1, 0).getDate();
-        var rem2 = dim2 - sd2.getDate() + 1;
-        proratedAmt = Math.round((rentAmt/dim2)*rem2*100)/100;
-        lines.push('Prorated First Month ('+rem2+'/'+dim2+' days):  $'+proratedAmt.toFixed(2));
-        lines.push('Second Month Rent:   $'+rentAmt.toFixed(2));
-      }
-    }
-    if (!proratedAmt) lines.push('First Month Rent:    $'+rentAmt.toFixed(2));
+    var mi = lbMoveIn(tokens);
+    lines.push('', 'RECEIPT OF MOVE-IN FUNDS');
+    mi.rows.forEach(function(r){ lines.push((r.label + ':').padEnd(36) + '$' + r.amount.toFixed(2)); });
+    lines.push(('Total Received:').padEnd(36) + '$' + (LB.payInFull ? LB.payInFull.total : mi.total).toFixed(2));
   }());
-  lines.push('', 'RECEIPT');
-  lines.push('Security Deposit:  $' + parseFloat(secDep).toFixed(2));
-  if (parseFloat(cleanDep)) lines.push(cleanLabel.padEnd(19) + '$' + parseFloat(cleanDep).toFixed(2));
-  if (parseFloat(petFee))   lines.push(petLabel.padEnd(19)   + '$' + parseFloat(petFee).toFixed(2));
-  lines.push('Total Received:    $' + totalDep);
   lines.push('', 'IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement.', '');
   lines.push('Landlord: ' + landlordName);
   var txtSig = localStorage.getItem('hml_signature') ? landlordName + ' [signed]' : '_________________________________';
@@ -13795,10 +13791,11 @@ window.lbExportPdf = function() {
   var lines = [
     { text: stateVal.toUpperCase() + ' RESIDENTIAL LEASE AGREEMENT', bold: true,  size: 14, center: true  },
     { text: '', size: 11 },
-    { text: 'This Lease Agreement (the "Agreement") is made and entered on ' + (tokens['{{START_DATE_LONG}}'] || effDate), size: 11 },
-    { text: 'by and between ' + landlordName + ' (the "Landlord") and:', size: 11 },
+    { text: LB_PREAMBLE_OPEN + landlordName + ' (the "Landlord") and:', size: 11 },
     { text: '', size: 11 },
     { text: tenantFull + ' (the "Tenant")', bold: true, size: 12 },
+    { text: '', size: 11 },
+    { text: LB_EFFECTIVE, size: 11 },
     { text: '', size: 11 },
     { text: 'Subject to the terms and conditions stated below the parties agree as follows:', size: 11 },
     { text: '', size: 11 },
@@ -13812,32 +13809,13 @@ window.lbExportPdf = function() {
     lines.push({ text: '', size: 11 });
   });
 
-  // Prorated first month (mirrors lbExportDocx logic)
+  // Receipt of move-in funds — shared rows/total (lbMoveIn)
   (function() {
-    var getCol  = window.lbGetCollection || function(){ return []; };
-    var lease2  = LB.linkedLeaseId ? getCol('leases').find(function(l){ return l.id === LB.linkedLeaseId; }) : null;
-    var rentAmt = parseFloat(tokens['{{RENT}}'] || 0);
-    var proratedAmt = 0;
-    if (lease2 && lease2.startDate) {
-      var sd2      = new Date(lease2.startDate + 'T12:00:00');
-      var startDay = sd2.getDate();
-      if (startDay !== 1) {
-        var dim = new Date(sd2.getFullYear(), sd2.getMonth() + 1, 0).getDate();
-        var rem = dim - startDay + 1;
-        proratedAmt = Math.round((rentAmt / dim) * rem * 100) / 100;
-        lines.push({ text: 'Prorated First Month (' + rem + '/' + dim + ' days):  $' + proratedAmt.toFixed(2), size: 11 });
-        lines.push({ text: 'Second Month Rent:   $' + rentAmt.toFixed(2), size: 11 });
-      }
-    }
-    if (!proratedAmt) lines.push({ text: 'First Month Rent:    $' + rentAmt.toFixed(2), size: 11 });
+    var mi = lbMoveIn(tokens);
+    lines.push({ text: 'RECEIPT OF MOVE-IN FUNDS', bold: true, size: 11, _keep: true });
+    mi.rows.forEach(function(r){ lines.push({ text: r.label + ': $' + r.amount.toFixed(2), size: 11 }); });
+    lines.push({ text: 'Total Received: $' + (LB.payInFull ? LB.payInFull.total : mi.total).toFixed(2), bold: true, size: 11 });
   }());
-
-  lines.push({ text: '', size: 11 });
-  lines.push({ text: 'RECEIPT', bold: true, size: 11 });
-  lines.push({ text: 'Security Deposit:    $' + secDep.toFixed(2), size: 11 });
-  if (cleanDep) lines.push({ text: cleanLabel + ':  $' + cleanDep.toFixed(2), size: 11 });
-  if (petFee)   lines.push({ text: petLabel   + ':  $' + petFee.toFixed(2),   size: 11 });
-  lines.push({ text: 'Total Received:      $' + totalDep, bold: true, size: 11 });
   lines.push({ text: '', size: 11 });
   lines.push({ text: 'IN WITNESS WHEREOF, the Landlord and Tenant have executed this Agreement as of the Effective Date.', size: 11 });
   lines.push({ text: '', size: 11 });
@@ -13911,17 +13889,29 @@ window.lbExportPdf = function() {
   lines.forEach(function(ln) {
     var wrapped = wrapText(ln.text || '', CHARS_PER_LINE);
     wrapped.forEach(function(wl, wi) {
-      renderLines.push({ text: wl, bold: !!ln.bold, center: !!ln.center && wi === 0, _landlordSig: !!ln._landlordSig && wi === 0 });
+      renderLines.push({ text: wl, bold: !!ln.bold, center: !!ln.center && wi === 0, _landlordSig: !!ln._landlordSig && wi === 0, _keep: !!ln._keep && wi === 0 });
     });
   });
 
   // Paginate
   var usableH   = PH - MT - MB;
   var linesPerPage = Math.floor(usableH / LINE_H);
-  var pages = [];
-  for (var i = 0; i < renderLines.length; i += linesPerPage) {
-    pages.push(renderLines.slice(i, i + linesPerPage));
-  }
+  // v4.2.8b: receipt + signatures (from the _keep line to the end) stay on one page when they fit,
+  // and a bold section heading is never the last line of a page.
+  var pages = [], curPage = [];
+  var keepIdx = -1;
+  renderLines.forEach(function(rl, ix){ if (rl._keep && keepIdx < 0) keepIdx = ix; });
+  renderLines.forEach(function(rl, ix) {
+    if (ix === keepIdx && curPage.length) {
+      var rest = renderLines.length - ix;
+      if (rest <= linesPerPage && curPage.length + rest > linesPerPage) { pages.push(curPage); curPage = []; }
+    }
+    var nxt = renderLines[ix + 1];
+    if (rl.bold && curPage.length === linesPerPage - 1 && nxt && !nxt.bold && nxt.text) { pages.push(curPage); curPage = []; }
+    curPage.push(rl);
+    if (curPage.length >= linesPerPage) { pages.push(curPage); curPage = []; }
+  });
+  if (curPage.length) pages.push(curPage);
   if (!pages.length) pages.push([]);
 
   // Build PDF bytes as string array
@@ -14439,11 +14429,15 @@ function lbBuildLeasePayload() {
     petLabel:     tokens['{{PET_FEE_LABEL}}']      || 'Pet Fee',
     proratedAmt:  proratedAmt,
     proratedNote: proratedNote,
+    moveIn:       lbMoveIn(tokens),   // v4.2.8b: {rows, total} — viewer prefers this
+    effective:    LB_EFFECTIVE,
     payInFull:    LB.payInFull || null,
     clauses:      clauses,
     sharedAt:     new Date().toISOString(),
   };
 }
+
+window.lbBuildLeasePayload = lbBuildLeasePayload;
 
 window.lbShareLease = function() {
   var checks = lbPreFlight();
@@ -15270,7 +15264,7 @@ function lbShowShareResult(url, tenantName) {
 
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 var DK_KEY        = 'hml_devlog';        // localStorage key — isolated from app data
-var DK_APP_VER    = 'Homemade Lane v4.2.8';
+var DK_APP_VER    = 'Homemade Lane v4.2.10';
 // Single source of truth — badge reads this at init; update only DK_APP_VER for future releases
 (function(){ var b=document.getElementById('hml-build-ref'); if(b) b.textContent='v'+DK_APP_VER.replace('Homemade Lane v',''); })();
 var DK_MAX_RECENT = 3;                   // entries shown in Log tab preview
